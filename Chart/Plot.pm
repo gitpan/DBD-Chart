@@ -9,6 +9,10 @@
 #
 #	Change History:
 #
+#	0.81	2005-Jan-26		D. Arnold
+#		use TITLE instead of ALT in AREAMAPs
+#		exit w/ error if compute scales/ranges would fail
+#
 #	0.80	2002-Sep-13		D. Arnold
 #		programmable fonts
 #		fix origin alignment for areagraphs w/ linegraphs
@@ -106,7 +110,7 @@ use GD::Text::Align;
 use Time::Local;
 use GD qw(gdBrushed gdSmallFont gdTinyFont gdMediumBoldFont);
 
-$DBD::Chart::Plot::VERSION = '0.80';
+$DBD::Chart::Plot::VERSION = '0.81';
 
 #
 #	list of valid colors
@@ -1384,7 +1388,9 @@ sub computeScales {
 	
 	my $plottypes = $obj->{plotTypes};
 # set axis ranges for widest/tallest/deepest dataset
-	$obj->computeRanges($xl, $xh, $yl, $yh, $zl, $zh);
+	$obj->{errmsg} = 'Invalid dataset.',
+	return undef
+		unless $obj->computeRanges($xl, $xh, $yl, $yh, $zl, $zh);
 	$obj->{yl} = 0 if (($plottypes & (BAR|HISTO)) && ($yl == 0));
 	if ($obj->{keepOrigin}) {
 		unless ($obj->{xLog} || $obj->{symDomain} ||
@@ -1553,6 +1559,7 @@ sub computeRanges {
 	$xl = int($xl) - ($xl < 0 ? 1 : 0),
 	$xh = int($xh) + 1
 		if ($obj->{xLog});
+	return undef if ($xh == $xl);
 	$xr = (log($xh - $xl))/log(10),
 	$xd = $xr - int($xr)
 		unless $obj->{symDomain};
@@ -1580,6 +1587,7 @@ sub computeRanges {
 	$yl = int($yl) - ($yl < 0 ? 1 : 0),
 	$yh = int($yh) + 1
 		if ($obj->{yLog});
+	return undef if ($yh == $yl);
 	$xr = (log($yh - $yl))/log(10);
 	$xd = $xr - int($xr);
 	$obj->{vertStep} = ($xd < 0.4) ? (10 ** (int($xr) - 1)) :
@@ -1606,6 +1614,7 @@ sub computeRanges {
 		if ($obj->{plotTypes} & (HISTO|GANTT));
 
 	if (($obj->{zAxisLabel} || $obj->{threed}) && ($zh != $zl)) {
+		return undef if ($zh == $zl);
 		$xr = (log($zh - $zl))/log(10),
 		$xd = $xr - int($xr)
 			unless $obj->{symDomain};
@@ -3792,7 +3801,7 @@ sub updateImagemap {
 	$imgScript=~s/:Z\b/$z/g
 		if ($imgScript);
 
-	$imgmap .= "\n<AREA ALT=\"$alt\" " .
+	$imgmap .= "\n<AREA TITLE=\"$alt\" " .
 		(($obj->{mapURL}) ? " HREF=\"$imgURL\" " : ' NOHREF ');
 	$imgmap .= " $imgScript "
 		if ($imgScript);
@@ -4470,20 +4479,20 @@ DBD::Chart::Plot - Graph/chart Plotting engine for DBD::Chart
 
 =head1 SYNOPSIS
 
-    use DBD::Chart::Plot; 
-    
-    my $img = DBD::Chart::Plot->new(); 
-    my $anotherImg = DBD::Chart::Plot->new($image_width, $image_height); 
-    
+    use DBD::Chart::Plot;
+
+    my $img = DBD::Chart::Plot->new();
+    my $anotherImg = DBD::Chart::Plot->new($image_width, $image_height);
+
     $img->setPoints(\@xdataset, \@ydataset, 'blue line nopoints');
-    
+
     $img->setOptions (
         horizMargin => 75,
         vertMargin => 100,
         title => 'My Graph Title',
         xAxisLabel => 'my X label',
         yAxisLabel => 'my Y label' );
-    
+
     print $img->plot;
 
 =head1 DESCRIPTION
@@ -4499,7 +4508,7 @@ B<DBD::Chart::Plot> supports the following:
 
 =item - multiple data set plots
 
-=item - line graphs, areagraphs, scatter graphs, linegraphs w/ points, 
+=item - line graphs, areagraphs, scatter graphs, linegraphs w/ points,
 	candlestick graphs, barcharts (2-D, 3-D, and 3-axis), histograms,
 	piecharts, box & whisker charts (aka boxcharts), and Gantt charts
 
@@ -4515,7 +4524,7 @@ B<DBD::Chart::Plot> supports the following:
 
 =item - optional symbolic and temproal (i.e., non-numeric) domain values
 
-=item - automatic sorting of numeric and temporal input datasets to assure 
+=item - automatic sorting of numeric and temporal input datasets to assure
 	proper order of plotting
 
 =item - optional X, Y, and Z axis labels
@@ -4552,15 +4561,15 @@ GD.pm requires additional libraries:
 
 =head2 Create an image object: new()
 
-    use DBD::Chart::Plot; 
+    use DBD::Chart::Plot;
 
-    my $img = DBD::Chart::Plot->new; 
-    my $img = DBD::Chart::Plot->new ( $image_width, $image_height ); 
-    my $img = DBD::Chart::Plot->new ( $image_width, $image_height, \%colormap ); 
-    my $anotherImg = new DBD::Chart::Plot; 
+    my $img = DBD::Chart::Plot->new;
+    my $img = DBD::Chart::Plot->new ( $image_width, $image_height );
+    my $img = DBD::Chart::Plot->new ( $image_width, $image_height, \%colormap );
+    my $anotherImg = new DBD::Chart::Plot;
 
-Creates an empty image. If image size is not specified, 
-the default is 400 x 300 pixels. 
+Creates an empty image. If image size is not specified,
+the default is 400 x 300 pixels.
 
 =head2 Graph-wide options: setOptions()
 
@@ -4614,12 +4623,12 @@ as for HTML: 'RECT', 'CIRCLE', 'POLY'
 
 coordinates => an arrayref of the (x,y) pixel coordinates of the hotspot
 area to be mapped; for CIRCLE shape, its (x-center, y-center, radius),
-for RECT, its (upper-left corner x, upper-left corner y, 
+for RECT, its (upper-left corner x, upper-left corner y,
 lower-right corner x, lower-right corner y), and for POLY its the
 set of vertices (x,y)'s.
 
 If the mapType is 'HTML', then either the mapURL or mapScript (or both)
-can be specified. mapURL specifies a legal URL string, e.g., 
+can be specified. mapURL specifies a legal URL string, e.g.,
 'http://www.mysite.com/cgi-bin/plotproc.pl?plotnum=:PLOTNUM&X=:X&Y=:Y',
 which will be added to the AREA tags generated for each mapped plot element.
 mapScript specifies any legal HTML scripting tag, e.g.,
@@ -4665,7 +4674,7 @@ above the chart title string.
 The legend for each plot is
 printed in the same color as the plot. If a point shape or icon has been specified
 for a plot, then the point shape is printed with the label; otherwise, a small
-line segment is printed with the label. Due to space limitations, 
+line segment is printed with the label. Due to space limitations,
 the number of datasets plotted should be limited to 8 or less.
 
 =item showValues
@@ -4679,7 +4688,7 @@ Causes grid lines to be drawn completely across the plot area.
 
 =item xAxisVert
 
-When set to a non-zero value, causes the X axis tick labels to be rendered 
+When set to a non-zero value, causes the X axis tick labels to be rendered
 vertically.
 
 =item keepOrigin
@@ -4759,7 +4768,7 @@ plot image, and will be clipped if the logo size exceeds
 the defined width or height of the plot image.
 
 By default, the graph will be centered within the image, with 50
-pixel margin around the graph border. You can obtain more space for 
+pixel margin around the graph border. You can obtain more space for
 titles or labels by increasing the image size or increasing the
 margin values.
 
@@ -4773,7 +4782,7 @@ margin values.
 
 Copies the input array values for later plotting.
 May be called repeatedly to establish multiple plots in a single graph.
-Returns a positive integer on success and C<undef> on failure. 
+Returns a positive integer on success and C<undef> on failure.
 The global graph properties should be set (via setOptions())
 prior to setting the data points.
 The error() method can be used to retrieve an error message.
@@ -4788,8 +4797,8 @@ data is assumed non-numeric and is uniformly distributed, the first range
 data array is used as the bottom value, and the second range data array
 is used as the top value of each candlestick. Pointshapes may be specified,
 in which case the top and bottom of each stick will be capped with the
-specified pointshape. The range and/or domain axis may be logarithmically scaled. 
-If value display is requested, the range value of both the top and bottom 
+specified pointshape. The range and/or domain axis may be logarithmically scaled.
+If value display is requested, the range value of both the top and bottom
 of each stick will be printed above and below the stick, respectively.
 
 B<Plot properties:> Properties of each dataset plot can be set
@@ -4797,11 +4806,11 @@ with an optional string as the third argument. Properties are separated
 by spaces. The following properties may be set on a per-plot basis
 (defaults in capitals):
 
-    COLOR     CHARTSTYLE  USE POINTS?   POINTSHAPE 
+    COLOR     CHARTSTYLE  USE POINTS?   POINTSHAPE
     -----     ---------  -----------   ----------
 	BLACK       LINE        POINTS     FILLCIRCLE
 	white      noline      nopoints    opencircle
-	lgray       fill                   fillsquare  
+	lgray       fill                   fillsquare
 	gray        bar                    opensquare
 	dgray       pie                    filldiamond
 	lblue       box                    opendiamond
@@ -4817,7 +4826,7 @@ by spaces. The following properties may be set on a per-plot basis
 	lred
 	red
 	dred
-	lpurple	
+	lpurple
 	purple
 	dpurple
 	lorange
@@ -4825,7 +4834,7 @@ by spaces. The following properties may be set on a per-plot basis
 	pink
 	dpink
 	marine
-	cyan	
+	cyan
 	lbrown
 	dbrown
 
@@ -4833,17 +4842,17 @@ E.g., if you want a red scatter plot (red dots
 but no lines) with filled diamonds, you could specify
 
     $p->setPoints (\@xdata, \@ydata, 'Points Noline Red filldiamond');
-    
+
 Specifying icon for the pointshape requires setting the
 icon object attribute to a list of compatible image filenames
 (as an arrayref, see below). In that case, the icon images
-are displayed centered on the associated plotpoints. For 2-D 
+are displayed centered on the associated plotpoints. For 2-D
 barcharts, a stack of the icon is used to display the bars,
 including a proportionally clipped icon image to cap the bar
 if needed.
 
 
-=head2 Draw the image: plot() 
+=head2 Draw the image: plot()
 
      $img->plot();
 
@@ -4862,16 +4871,16 @@ To return the graph to a browser via HTTP:
 
 The range of values on each axis is automatically
 computed to optimize the data placement in the largest possible
-area of the image. As a result, the origin (0, 0) axes 
-may be omitted if none of the datasets cross them at any point. 
+area of the image. As a result, the origin (0, 0) axes
+may be omitted if none of the datasets cross them at any point.
 Instead, the axes will be drawn on the left and bottom borders
 using the value ranges that appropriately fit the dataset(s).
 
-=head2 Fetch the imagemap: getMap() 
+=head2 Fetch the imagemap: getMap()
 
      $img->getMap();
 
-Returns the imagemap for the chart. 
+Returns the imagemap for the chart.
 If no mapType was set, or if mapType was set to HTML.
 the returned value is a valid <MAP...><AREA...></MAP> HTML string.
 If mapType was set to 'Perl', a Perl-compatible arrayref
@@ -4937,7 +4946,7 @@ The area of each bar in the chart is mapped.
 
 Copyright (c) 2001 by Presicient Corporation. (darnold@presicient.com)
 
-You may distribute this module under the terms of the Artistic License, 
+You may distribute this module under the terms of the Artistic License,
 as specified in the Perl README file.
 
 =head1 SEE ALSO
