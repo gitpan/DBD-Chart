@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.71 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.72 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD, Quadtree, Gantt">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -109,10 +109,10 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>Current Version</h2><p>
 
-Release 0.71<p>
+Release 0.72<p>
 
-<a href="http://www.presicient.com/dbdchart/dbdchart071.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.71.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart072.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.72.tar.gz">.tar.gz version</a>
 <p>
 <a name="conform"></a>
 <h2>Prerequisites and Conformance</h2><p>
@@ -1708,6 +1708,12 @@ an imagemap.</i><p>
 <a name="history"></a>
 <h2>Change History</h2><p>
 
+Release 0.72:
+<ul>
+<li>fixed SHOWVALUES for bars/histos when clipped origin
+<li>improved legend placement
+</ul>
+<p>
 Release 0.71:
 <ul>
 <li>added ANCHORED property
@@ -1955,6 +1961,13 @@ Release 0.10:<p>
 	<td align=left>LINEWIDTH property was specified in subquery of composite image, but applied globally</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.71</td>
+</tr><tr bgcolor=white>
+	<td align=center>16</td>
+	<td align=center>2002-Aug-16</td>
+	<td align=center>0.71</td>
+	<td align=left>SHOWVALUES property not working on barcharts</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.72</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>

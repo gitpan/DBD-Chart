@@ -47,7 +47,7 @@ DESCRIPTION
 
     Perl 5.6.0 minimum
     DBI 1.14 minimum
-    DBD::Chart::Plot 0.71 (included with this package)
+    DBD::Chart::Plot 0.72 (included with this package)
     GD X.XX minimum
     GD::Text X.XX minimum
     libpng
@@ -66,11 +66,11 @@ DESCRIPTION
 
     For Unix, extract it with
 
-        gzip -cd DBD-Chart-0.71.tar.gz | tar xf -
+        gzip -cd DBD-Chart-0.72.tar.gz | tar xf -
 
     and then enter the following:
 
-        cd DBD-Chart-0.71
+        cd DBD-Chart-0.72
         perl Makefile.PL
         make
 

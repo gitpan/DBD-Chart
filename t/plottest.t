@@ -1020,15 +1020,15 @@ stack3Dbar:
 	AND SHOWVALUES=1 
 	AND STACK=1 
 	AND THREE_D=1
-	AND MAPNAME='stack3dbar' 
+	AND MAPNAME='stack3Dbar'
 	AND MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X\&y=:Y\&z=:Z\&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' 
 	AND COLORS IN ('yellow', 'blue')");
 	$sth->execute;
 	$row = $sth->fetchrow_arrayref;
-	dump_img($row, 'png', 'stack3dbar');
+	dump_img($row, 'png', 'stack3Dbar');
 	$testnum++;
-	print "ok $testnum stack3dbar OK\n";
+	print "ok $testnum stack3Dbar OK\n";
 #
 #	stacked histogram chart
 #
@@ -1044,7 +1044,7 @@ stack3Dhisto:
 	AND SHOWVALUES=1 
 	AND STACK=1 
 	AND THREE_D=1
-	AND	MAPNAME='stackhisto' AND
+	AND	MAPNAME='stack3Dhisto' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X\&y=:Y\&z=:Z\&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' 
 	AND COLORS IN ('red', 'green')");

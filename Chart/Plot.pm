@@ -9,6 +9,10 @@
 #
 #	Change History:
 #
+#	0.72	2002-Aug-17		D. Arnold
+#		fix showvalues for nonstacked bars/histos/candles
+#		fix legend placement
+#
 #	0.71	2002-Aug-12		D. Arnold
 #		add float property for bars/histos/areas
 #		fix linewidth to be local property
@@ -83,7 +87,7 @@ use GD;
 use Time::Local;
 use GD qw(gdBrushed gdSmallFont gdTinyFont gdMediumBoldFont);
 
-$DBD::Chart::Plot::VERSION = '0.71';
+$DBD::Chart::Plot::VERSION = '0.72';
 
 #
 #	list of valid colors
@@ -304,6 +308,7 @@ sub new {
 #	icon - name of icon image file for iconic barcharts/points
 #	logo - name of background logo image file
 #	mapModifier - ref to callback to modify imagemap entries
+#	_legends - arrayref to hold legend info til we render it
 #
 sub init {
 	my ($obj, $w, $h, $colormap) = @_;
@@ -386,7 +391,6 @@ sub init {
 	$obj->{title} = '';
 	$obj->{signature} = '';
 	$obj->{legend} = 0; 	# 1 => render legend
-	$obj->{legendPos} = 0;	# current legend index
 	$obj->{showValues} = 0; # 1 => print datapoint values
 	$obj->{horizGrid} = 0;	# 1 => print y-axis gridlines
 	$obj->{vertGrid} = 0;	# 1 => print x-axis gridlines
@@ -415,6 +419,8 @@ sub init {
 	
 #	for now these aren't used, but someday we'll let them be configured
 	$obj->{font} = 'gd';
+
+	$obj->{_legends} = [ ];
 
 # set image basic properties
 	$img->transparent($obj->{transparent});
@@ -1246,6 +1252,9 @@ sub plot {
 		return undef	# since 3-D only compatible with 3-D 
 			if (! $obj->plot3DBars);
 
+		return undef
+			unless (($#{$obj->{_legends}} < 0) || $obj->drawLegend);
+
 		$obj->plot3DTicks;
 		return (($format) && $obj->{img}->$format);
 	}
@@ -1276,6 +1285,11 @@ sub plot {
 		
 	return undef 
 		if (($plottypes & POINT) && (! $obj->plotAll(POINT,\@proptypes)));
+#
+#	add any accumulated legends
+#
+	return undef
+		unless (($#{$obj->{_legends}} < 0) || $obj->drawLegend);
 #
 #	now render it in the requested format
 #
@@ -1721,7 +1735,7 @@ sub plot2DBars {
 #
 #	render legend if requested
 #	(a bit confusing here for multicolor single range charts?)
-		$obj->drawLegend($k, $barcolors[0], $markers[0], $$legend[$k])
+		$obj->addLegend($barcolors[0], $markers[0], $$legend[$k], undef)
 			if ((! $stacked) && $legend && $$legend[$k]);
 
 		if ($stacked && $legend && $$legend[$k]) {
@@ -1729,7 +1743,7 @@ sub plot2DBars {
 #	there may be alignment problems here, due to the
 #	possibility of drawing multiple stacked bars in the same image
 #
-			$obj->drawLegend($_, $barcolors[$_], $markers[$_], $$legend[$k]->[$_])
+			$obj->addLegend($barcolors[$_], $markers[$_], $$legend[$k]->[$_], undef)
 				foreach (0..$#{$$legend[$k]});
 		}
 #
@@ -1838,7 +1852,7 @@ sub plot2DBars {
 				}
 #
 #	convert range/domain values for printing
-				$prtYH -= $prtYL if ($prtYL > 0);
+				$prtYH -= $prtYL if ($stacked && ($prtYL > 0));
 				$prtYH = 10**($prtYH) if $obj->{yLog};
 				$prtYH = restore_temporal($prtYH, $obj->{timeRange}) 
 					if $obj->{timeRange};
@@ -1978,7 +1992,7 @@ sub plotBox {
 		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
 			unless $obj->{$color};
 			
-		$obj->drawLegend($k, $color, undef, $$legend[$k])
+		$obj->addLegend($color, undef, $$legend[$k], undef)
 			if (($legend) && ($$legend[$k]));
 #
 #	compute median, quartiles, and extremes
@@ -2254,7 +2268,6 @@ sub plotAll {
 				$legend = $obj->{legend} ? $obj->{legend}->[$n]->[$j] : undef;
 				return undef unless $obj->plotData($n, \@newary, $color, 'fill', $marker,
 					$legend, $lwidth, $anchor, $showvals);
-				$obj->{legendPos}++ if $obj->{legend};
 			}
 			next;
 		}
@@ -2312,7 +2325,7 @@ sub plotData {
 #
 #	render legend if requested
 #
-	$obj->drawLegend($k, $color, $marker, $legend) if $legend;
+	$obj->addLegend($color, $marker, $legend, ($line eq 'line')) if $legend;
 #
 #	line/point/area charts
 #
@@ -2383,35 +2396,62 @@ sub plotData {
 	return 1;
 }
 
+sub addLegend {
+	my ($obj, $color, $shape, $text, $line) = @_;
+#
+#	add the dataset to the legend
+#
+	push @{$obj->{_legends}}, [ $color, $shape, $text, $line ] ;
+	return 1;
+}
+
 sub drawLegend {
-	my ($obj, $k, $color, $shape, $text) = @_;
+	my ($obj) = @_;
 #
 #	add the dataset to the legend using current color
 #	and shape (if any)
 #
-	$k += $obj->{legendPos};
-	$shape = $obj->make_marker('fillsquare', $color)
-		unless $shape;
+	my ($color, $shape, $text, $line, $props);
+	my $legary = $obj->{_legends};
 
-	my $legend_wd = (int($k/3) * 85) + $obj->{horizEdge};
-	my $legend_maxht = $obj->{height} - 40;
-
-	my $legend_ht = $obj->{height} - 40 - 20 - (2 * $tfh) + 
-		(($k%3) * (3*$tfh/2));
-
-	my $img = $obj->{img};
-	$img->line($legend_wd, $legend_ht+4, $legend_wd+20, 
-		$legend_ht+4, $obj->{$color})
-		if $color;
-
-	$color = 'black' unless $color;
-	$img->string (gdTinyFont, $legend_wd + 25, $legend_ht,
-		$text, $obj->{$color});
-
+	my $xadj = 30;
+	my $xoff = $obj->{horizEdge};
+	my $maxyoff = $obj->{height} - 40;
+	my $yoff = $obj->{height} - 40 - 20 - (2 * $tfh);
 	my ($w, $h);
-	($w, $h) = $shape->getBounds(),
-	$img->copy($shape, $legend_wd+5, $legend_ht, 0, 0, $w-1, $w-1)
-		if ($shape);
+
+	while (@$legary) {
+		$props = shift @$legary;
+		($color, $shape, $text, $line) = @$props;
+		
+		$color = 'black' unless $color;
+		$shape = $obj->make_marker('fillsquare', $color)
+			unless ($shape || $line);
+#
+#	move to next column if shape too big to fit
+#
+		($w, $h) = $shape ? $shape->getBounds() : (20, int($tfh * 1.5));
+
+		$yoff = $obj->{height} - 40 - 20 - (2 * $tfh),
+		$xoff += $xadj
+			if ($yoff + $h > $maxyoff);
+
+		$xadj = ((($w < 20) ? 20 : $w) + ($tfw * (length($text)+2)))
+			if ($xadj < ((($w < 20) ? 20 : $w) + ($tfw * (length($text)+2))));
+		
+		my $img = $obj->{img};
+		$img->line($xoff, $yoff+4, $xoff+20, $yoff+4, $obj->{$color})
+			if $line;
+
+		$img->string(gdTinyFont, $xoff + ($line ? 25 : ($w + 5)),
+			$yoff, $text, $obj->{$color});
+
+		$img->copy($shape, $xoff+5, $yoff, 0, 0, $w-1, $w-1)
+			if $shape;
+		
+		$yoff += ($h < int($tfh * 1.5)) ? int($tfh * 1.5) : $h;
+	}
+	return 1;
 }
 
 # compute pixel coordinates from datapoint
@@ -3249,10 +3289,10 @@ sub plot3DBars {
 		}
 		
 		if (($legend) && ($$legend[$k])) {
-			$obj->drawLegend($k, $color, undef, $$legend[$k]), next
+			$obj->addLegend($color, undef, $$legend[$k], undef), next
 				unless $stacked;
 
-			$obj->drawLegend($_, $barcolors[$_], undef, $$legend[$k]->[$_])
+			$obj->addLegend($barcolors[$_], undef, $$legend[$k]->[$_], undef)
 				foreach (0..$#{$$legend[$k]});
 		}
 	}

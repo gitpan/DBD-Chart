@@ -7,6 +7,9 @@
 #
 #	History:
 #
+#		0.72	2002-Aug-17	D. Arnold
+#			fix legend placement
+#
 #		0.71	2002-Aug-12	D. Arnold
 #			fix LINEWIDTH property to be local
 #			add ANCHORED property
@@ -249,7 +252,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.71';
+$DBD::Chart::VERSION = '0.72';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
@@ -2614,6 +2617,11 @@ sub execute {
 				push(@legends, $legary) if ($$props{'STACK'});
 				for (my $c = 0; $c <= $#colnames; $c += $incr) {
 #
+#	if floating bar/histo, ignore last column name
+					last if ((! $$props{'ANCHORED'}) && ($c == $#colnames) &&
+						(($$dtypes[$i] eq 'BARCHART') ||
+						($$dtypes[$i] eq 'HISTOGRAM')));
+#
 #	prepend query names if provided for composites
 					push(@$legary, ($$dnames[$i] . '.' . $colnames[$c])),
 					next
@@ -3021,7 +3029,7 @@ See L<GD(3)>, L<GD::Graph(3)> for details about the graphing engines.
 
 =item DBI 1.14 minimum
 
-=item DBD::Chart::Plot 0.71 (included with this package)
+=item DBD::Chart::Plot 0.72 (included with this package)
 
 =item GD X.XX minimum
 
@@ -3051,11 +3059,11 @@ whip up a PPM in the future.
 
 For Unix, extract it with
 
-    gzip -cd DBD-Chart-0.71.tar.gz | tar xf -
+    gzip -cd DBD-Chart-0.72.tar.gz | tar xf -
 
 and then enter the following:
 
-    cd DBD-Chart-0.71
+    cd DBD-Chart-0.72
     perl Makefile.PL
     make
 
