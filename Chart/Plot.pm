@@ -59,7 +59,8 @@ my %colors = (
 	marine	=> [127,127,255], 
 	cyan	=> [0,255,255],
 	lbrown	=> [210,180,140], 
-	dbrown	=> [165,42,42]
+	dbrown	=> [165,42,42],
+	transparent => [1,1,1]
 );
 
 my %shapes = (
@@ -85,19 +86,14 @@ sub new {
 }
 
 sub init {
-	my $obj = shift;
+	my ($obj, $w, $h, $bgimg) = @_;
 
   #  create an image object
-	if ($#_ == 1) {
-		$obj->{'img'} = new GD::Image($_[0], $_[1]);
-		$obj->{'width'} = $_[0];
-		$obj->{'height'} = $_[1];
-	}
-	else {
-		$obj->{'img'} = new GD::Image(400,300);
-		$obj->{'width'} = 400;
-		$obj->{'height'} = 300;
-	}
+	$obj->{'img'} = ($w) ? new GD::Image($w, $h) : new GD::Image(400, 300);
+	$obj->{'width'} = ($w) ? $w : 400;
+	$obj->{'height'} = ($w) ? $h : 300;
+	$obj->{'img'}->copy($bgimg, 0, 0, 0, 0, $w-1, $h-1)
+  		if ($bgimg);
 
 # set image margins
 	$obj->{'horizMargin'} = 50;
@@ -119,15 +115,16 @@ sub init {
 	($obj->{'xLog'}, $obj->{'yLog'}) = (0,0);
 	$obj->{'title'} = '';
 	$obj->{'errmsg'} = '';
+	$obj->{'keepOrigin'} = 0;
+	$obj->{'bgColor'} = 'white' if (! $bgimg);
 
 #  allocate some colors
 	$obj->{'white'} = $obj->{'img'}->colorAllocate(@{$colors{'white'}});
 	$obj->{'black'} = $obj->{'img'}->colorAllocate(@{$colors{'black'}}); 
-#	foreach my $color (@clrlist) {
-#		my $t = $colors{$color};
-#		$obj->{$color} = 
-#			$obj->{'img'}->colorAllocate($$t[0], $$t[1], $$t[2] );
-#	}
+	$obj->{'transparent'} = 
+		$obj->{'img'}->colorAllocate(@{$colors{'transparent'}}); 
+	$obj->{'img'}->transparent($obj->{'transparent'});
+	
 	$obj->{'img'}->interlaced('true');
 
 # black border
@@ -251,20 +248,35 @@ sub setOptions {
 	my ($obj, %hash) = @_;
 
 	for (keys (%hash)) {
+#
+#	we need a lot more error checking here!!!
+#
+		if (($_ eq 'bgColor') && (! $colors{$hash{$_}})) {
+			$obj->{'errmsg'} = "Unrecognized color $hash{$_}.";
+			return undef;
+		}
 		$obj->{$_} = $hash{$_};
 	}
 	return 1;
 }
 
 sub plot {
-	my $obj = shift;
+	my ($obj, $format) = @_;
+
+	if ($obj->{'bgColor'}) {
+		my $color = ($obj->{$obj->{'bgColor'}}) ? $obj->{$obj->{'bgColor'}} :
+			$obj->{'img'}->colorAllocate(@{$colors{$obj->{'bgColor'}}});
+		$obj->{'img'}->fill(1, 1, $color );
+	}
 
 	$obj->computeScales unless $obj->{'haveScale'};
 	$obj->drawTitle if $obj->{'title'}; # vert offset may be increased
+	$obj->drawSignature if $obj->{'signature'}; # vert offset may be increased
 	$obj->plotAxes;
 	$obj->plotData;
 
-	return $obj->{'img'}->png;
+	return (($format) && ($format eq 'jpeg')) ? 
+		$obj->{'img'}->jpeg : $obj->{'img'}->png;
 }
 
 # sets min and max values of all data (xl, yl, xh, yh)
@@ -317,7 +329,21 @@ sub computeScales {
 		$th = (scalar(@$ary)-1)/2;
 		$xh = $th if (defined($tl) && ($xh < $th));
 	}
-
+#
+#	if keepOrigin, make sure (0,0) is included
+#	(but only if not in logarithmic mode)
+#
+	if ($obj->{'keepOrigin'}) {
+		if (! $obj->{'xLog'}) {
+			$xl = 0 if ($xl > 0);
+			$xh = 0 if ($xh < 0);
+		}
+		if (! $obj->{'yLog'}) {
+			$yl = 0 if ($yl > 0);
+			$yh = 0 if ($yh < 0);
+		}
+	}
+	
 # set axis ranges for widest dataset
 	($obj->{'xl'}, $obj->{'xh'}, $obj->{'yl'}, $obj->{'yh'}) = 
 		$obj->computeRanges($xl, $xh, $yl, $yh);
@@ -584,7 +610,7 @@ sub plotAxes {
 #                            y -- (0,$yl) (0,$yh);
 
 	my $obj = shift;
-	my ($w,$h) = (gdSmallFont->width, gdSmallFont->height);
+	my ($sfw,$sfh) = (gdSmallFont->width, gdSmallFont->height);
 	my ($tfw,$tfh) = (gdTinyFont->width, gdTinyFont->height);
 
 	my ($p1x, $p1y, $p2x, $p2y);
@@ -631,10 +657,10 @@ sub plotAxes {
 
 	if ($obj->{'xAxisLabel'}) {
 		($p2x, $p2y) = $obj->pt2pxl($xh, $yl);
-		my $len = $w * length($obj->{'xAxisLabel'});
+		my $len = $sfw * length($obj->{'xAxisLabel'});
 		my $xStart = ($p2x+$len/2 > $obj->{'width'}-10)
 			? ($obj->{'width'}-10-$len) : ($p2x-$len/2);
-		$img->string(gdSmallFont, $xStart, $p2y+4*$h/3, 
+		$img->string(gdSmallFont, $xStart, $p2y+4*$sfh/3, 
 			$obj->{'xAxisLabel'}, $obj->{'black'});
 	}
 
@@ -646,8 +672,8 @@ sub plotAxes {
 		if ((! $obj->{'vertGrid'}) && (! $obj->{'horizGrid'}));
 
 	if ($obj->{'yAxisLabel'}) {
-		my $xStart = $p2x - length($obj->{'yAxisLabel'}) * ($w >> 1);
-		$img->string(gdSmallFont, ($xStart>10 ? $xStart : 10), $p2y - 3*$h/2,
+		my $xStart = $p2x - length($obj->{'yAxisLabel'}) * ($sfw >> 1);
+		$img->string(gdSmallFont, ($xStart>10 ? $xStart : 10), $p2y - 3*$sfh/2,
 			  $obj->{'yAxisLabel'},  $obj->{'black'});
 	}
 #
@@ -676,7 +702,7 @@ sub plotAxes {
 			$py += 2 if (! $obj->{'vertGrid'});
 			if ($n == 1) {
 				my $powk = 10**$k;
-				$img->stringUp(gdSmallFont, $px-$h/2, $py+length($powk)*$w, 
+				$img->stringUp(gdSmallFont, $px-$sfh/2, $py+length($powk)*$sfw, 
 					$powk, $obj->{'black'});
 			}
 			($n, $i)  = (0 , $k )
@@ -689,6 +715,7 @@ sub plotAxes {
 #
 		my $ary = ${$obj->{'data'}}[0];
     
+    	my $prevx = 0;
 		for ($i = 0, $j = 0; $i < $xh; $i++, $j+=2 ) {
 			($px,$py) = $obj->pt2pxl($i, 
 				((($obj->{'yLog'}) || 
@@ -699,11 +726,16 @@ sub plotAxes {
 			$img->line($px, $py, $px, $p1y, $obj->{'black'});
 			$py += 2 if (! $obj->{'vertGrid'});
 			next if (!defined($$ary[$j]));
+#
+#	skip the label if it would overlap
+#
+			next if (($i > 0) && ($px - $prevx <= $sfh+1));
+			$prevx = $px;
 			
 			$txt = $$ary[$j];
 			$txt = substr($txt, 0, 7) . '...' 
 				if (length($txt) > 10);
-			$img->stringUp(gdSmallFont, $px-$h/2, $py+2+length($txt)*$w, 
+			$img->stringUp(gdSmallFont, $px-($sfh>>1), $py+2+length($txt)*$sfw, 
 				$txt, $obj->{'black'})
 		}
 	}
@@ -719,8 +751,14 @@ sub plotAxes {
 			$py -= 2 if (! $obj->{'vertGrid'});
 			$img->line($px, $py, $px, $p1y, $obj->{'black'});
 			$py += 2 if (! $obj->{'vertGrid'});
-			$img->string(gdSmallFont, $px-length($i)*$w/2, $py+$h/2, 
-				$i, $obj->{'black'});
+			if ($obj->{'xAxisVert'}) {
+				$img->stringUp(gdSmallFont, $px-($sfh>>1), $py+2+length($i)*$sfw, 
+					$i, $obj->{'black'})
+			}
+			else {
+				$img->string(gdSmallFont, $px-length($i)*($sfw>>1), $py+($sfh>>1), 
+					$i, $obj->{'black'});
+			}
 		}
 	}
 #
@@ -743,7 +781,7 @@ sub plotAxes {
 			$px +=2 if (! $obj->{'horizGrid'});
 			if ($n == 1) {
 				my $powk = 10**$k;
-				$img->string(gdSmallFont, $px-5-length($powk)*$w, $py-$h/2, 
+				$img->string(gdSmallFont, $px-5-length($powk)*$sfw, $py-($sfh>>1), 
 					$powk, $obj->{'black'});
 			}
 			
@@ -758,7 +796,7 @@ sub plotAxes {
 #
 		($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : 0), $yl);
 		($p1x,$p1y) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : 0), $yl+$step);
-		my $skip = ($p1y - $py < (2 * $h)) ? 1 : 0;
+		my $skip = ($p1y - $py < ($sfh<<1)) ? 1 : 0;
 
 		for ($i=$yl, $j = 0; $i <= $yh; $i+=$step, $j++ ) {
 			($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : 0), $i);
@@ -769,7 +807,7 @@ sub plotAxes {
 			$px +=2 if (! $obj->{'horizGrid'});
 
 			next if (($skip) && ($j&1));
-			$img->string(gdSmallFont, $px-5-length($i)*$w, $py-$h/2, 
+			$img->string(gdSmallFont, $px-5-length($i)*$sfw, $py-($sfh>>1), 
 				$i, $obj->{'black'});
 		}
 	}
@@ -785,6 +823,16 @@ sub drawTitle {
 	($px,$py) = ($px - length ($obj->{'title'}) * $w/2, $py+$h/2);
 	$obj->{'img'}->string (gdMediumBoldFont, $px, $py, 
 		$obj->{'title'}, $obj->{'black'}); 
+}
+
+sub drawSignature {
+	my ($obj) = @_;
+	my $fw = (gdTinyFont->width * length($obj->{'signature'})) - 5;
+# in lower right corner
+	my ($px,$py) = ($obj->{'width'} - $fw, $obj->{'height'} - (gdTinyFont->height * 2));
+
+	$obj->{'img'}->string (gdTinyFont, $px, $py, 
+		$obj->{'signature'}, $obj->{'black'}); 
 }
 
 sub fill_region

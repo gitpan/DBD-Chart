@@ -8,22 +8,25 @@ $dbh = DBI->connect('dbi:Chart:');
 #
 $dbh->do('CREATE CHART line (Month SMALLINT, sales FLOAT)');
 $sth = $dbh->prepare('INSERT INTO line VALUES( ?, ?)');
-$sth->execute(1, 2756.34);
-$sth->execute(4, undef);
-$sth->execute(8, 3456.78);
-$sth->execute(9, 12349.56);
-$sth->execute(10, 4569.78);
-$sth->execute(5, 33456.78);
-$sth->execute(6, 908.57);
-$sth->execute(7, 756.34);
-$sth->execute(11, 13456.78);
-$sth->execute(12, 90.57);
-$sth->execute(2, 3456.78);
-$sth->execute(3, 1234.56);
+$sth->execute(201, 2756.34);
+$sth->execute(204, undef);
+$sth->execute(208, 3456.78);
+$sth->execute(209, 12349.56);
+$sth->execute(210, 4569.78);
+$sth->execute(205, 33456.78);
+$sth->execute(206, 908.57);
+$sth->execute(207, 756.34);
+$sth->execute(211, 13456.78);
+$sth->execute(212, 90.57);
+$sth->execute(202, 3456.78);
+$sth->execute(203, 1234.56);
 
-$rsth = $dbh->prepare('SELECT LINEGRAPH FROM line ' .
-'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Month\' AND Y-AXIS=\'Sales\' AND ' .
-'TITLE = \'Sales By Month\' AND COLOR=black AND SHOWGRID=1 AND SHOWPOINTS=0');
+$rsth = $dbh->prepare(
+"SELECT LINEGRAPH FROM line
+	WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Month\' AND Y-AXIS=\'Sales\' AND
+	TITLE = \'Sales By Month\' AND COLOR=black AND SHOWGRID=1 AND SHOWPOINTS=0 AND
+	LOGO=\'gowilogo.png\' AND BACKGROUND=lyellow AND KEEPORIGIN=1 AND
+	X-ORIENT=\'VERTICAL\' AND SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
@@ -37,7 +40,7 @@ close(OUTF);
 $rsth = $dbh->prepare('SELECT POINTGRAPH FROM line ' .
 'WHERE WIDTH=500 AND HEIGHT=300 AND Y-AXIS=\'Sales\' AND X-AXIS=\'Month\' AND ' .
 'TITLE = \'Sales By Region\' AND COLOR=black AND SHOWGRID=0 AND ' .
-'SHAPE=filldiamond AND SHOWVALUES=1');
+'X-ORIENT=\'VERTICAL\' AND SHAPE=filldiamond AND SHOWVALUES=1 AND BACKGROUND=white');
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
@@ -79,11 +82,16 @@ $sth->func(\%stsary, chart_bind_param_status);
 
 $sth->execute;
 
-$rsth = $dbh->prepare('SELECT LINEGRAPH FROM line ' .
-'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Month\' AND Y-AXIS=\'Sales\' AND ' .
-'TITLE = \'Monthly Sales By Region\' AND COLOR=(red, green, blue, yellow, lbrown) AND ' .
-'SHOWPOINTS=1 AND SHOWGRID=1 AND SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross)');
-$rsth->execute;
+$rsth = $dbh->prepare(
+"SELECT LINEGRAPH FROM line
+	WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND
+	TITLE = \'Monthly Sales By Region\' AND 
+	COLOR=(red, green, blue, yellow, lbrown) AND
+	SHOWPOINTS=1 AND SHOWGRID=1 AND 
+	SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross) AND
+	LOGO=\'gowilogo.png\' AND BACKGROUND=lgray AND 
+	X-ORIENT=\'VERTICAL\' AND SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'");
+$rsth->execute(400, 400, 'Month', 'Sales');
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 open(OUTF, '>multlpt.png');

@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.20 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.30 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -50,15 +50,19 @@ DBD::Chart - Perl DBI Driver interface For Rendering Charts and Graphs</h3><p>
     $sth->execute('Southwest', 4569.78);
     $sth->execute('Northwest', 33456.78);
 
-    $rsth = $dbh->prepare('SELECT PIECHART FROM pie ' .
-    'WHERE WIDTH=400 AND HEIGHT=400 AND ' .
-    'TITLE = \'Sales By Region\' AND COLOR=(red, green, blue, lyellow, lpurple)');
+    $rsth = $dbh->prepare(
+    "SELECT PIECHART FROM pie
+        WHERE WIDTH=400 AND HEIGHT=400 AND
+        TITLE = \'Sales By Region\' AND 
+        COLOR=(red, green, blue, lyellow, lpurple) AND
+        BACKGROUND=lgray AND FOMRAT=\'JPEG\' AND
+        SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'");
     $rsth->execute;
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
 </pre><p>
 produces the image<p><center>
-<img src="simppie.png" alt="Simple Pie Chart"></center><p>
+<img src="simppie.jpg" alt="Simple Pie Chart"></center><p>
 <pre>
     #
     # multi-range 3-D bar chart
@@ -71,10 +75,11 @@ produces the image<p><center>
     $sth->execute(3, 2756.34, 3456.78, -1234.56, 4569.78, 33456.78);
     $sth->execute(4, 2756.34, -3456.78, 1234.56, 4569.78, 33456.78);
 
-    $rsth = $dbh->prepare('SELECT BARCHART FROM bars ' .
-    'WHERE WIDTH=600 AND HEIGHT=400 AND X-AXIS=\'Quarter\' AND ' .
-    ' Y-AXIS=\'Revenue\' AND TITLE = \'Quarterly Revenue By Region\' AND ' .
-    '3-D=1 AND SHOWVALUES=1 AND COLOR=(red, green, blue, yellow, dbrown)');
+    $rsth = $dbh->prepare(
+    "SELECT BARCHART FROM bars
+    	WHERE WIDTH=600 AND HEIGHT=400 AND X-AXIS=\'Quarter\' AND
+    	Y-AXIS=\'Revenue\' AND TITLE = \'Quarterly Revenue By Region\' AND
+    	3-D=1 AND SHOWVALUES=1 AND COLOR=(red, green, blue, yellow, dbrown)");
     $rsth->execute;
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
@@ -89,21 +94,14 @@ produces the image<p><center>
     $sth = $dbh->prepare('INSERT INTO line VALUES( ?, ?)');
     $sth->execute(1, 2756.34);
     $sth->execute(2, 3456.78);
-    $sth->execute(3, 1234.56);
-    $sth->execute(4, undef);
-    $sth->execute(5, 33456.78);
-    $sth->execute(6, 908.57);
-    $sth->execute(7, 756.34);
-    $sth->execute(8, 3456.78);
-    $sth->execute(9, 12349.56);
-    $sth->execute(10, 4569.78);
-    $sth->execute(11, 13456.78);
+            ...insert some more rows.....
     $sth->execute(12, 90.57);
 
-    $rsth = $dbh->prepare('SELECT POINTGRAPH FROM line ' .
-    'WHERE WIDTH=500 AND HEIGHT=300 AND X-AXIS=\'Sales\' AND ' .
-    'TITLE = \'Sales By Region\' AND COLOR=black AND SHOWGRID=0 AND ' .
-    'SHAPE=filldiamond AND SHOWVALUES=1');
+    $rsth = $dbh->prepare(
+    "SELECT POINTGRAPH FROM line
+        WHERE WIDTH=500 AND HEIGHT=300 AND X-AXIS=\'Sales\' AND
+        TITLE = \'Sales By Region\' AND COLOR=black AND SHOWGRID=0 AND
+        SHAPE=filldiamond AND SHOWVALUES=1");
     $rsth->execute;
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
@@ -112,7 +110,7 @@ produces the image<p><center>
 <img src="simppts.png" alt="Scatter Graph"></center><p>
 <pre>
     #
-    # multi-range line w/ points
+    # multi-range line w/ points, bkground image, and signature
     #
     $dbh->do('DROP CHART line');
     $dbh->do('CREATE CHART line (Month SMALLINT, East FLOAT, ' .
@@ -120,24 +118,20 @@ produces the image<p><center>
     $sth = $dbh->prepare('INSERT INTO line VALUES( ?, ?, ?, ?, ?, ?)');
     $sth->execute(1, 2756.34, 3456.90, 1234.99, 1005.34, 2876.34);
     $sth->execute(2, 3456.78, undef, 4321.25, 9001.34, 997.68);
-    $sth->execute(3, 1234.56, 7783.20, 5321.11, 3333.33, 876.10);
-    $sth->execute(4, 4569.78, 4326.3,  -7895.44, 4444.44, 12345.29);
-    $sth->execute(5, 33456.78, 12094.5, 6666.66, 3322.11, 9090.90);
-    $sth->execute(6, 908.57, -2367.4, 3399.55, 5555.55, 887.3);
-    $sth->execute(7, 756.34, 1111.11, 2222.22, 8888.88, 9456.3);
-    $sth->execute(8, undef, 7783.20, 5321.11, 3333.33, 876.10);
-    $sth->execute(9, 12349.56, 12094.5, 6666.66, 3322.11, 9090.90);
-    $sth->execute(10, 4569.78,3456.99, 4321.25, 9001.34, 997.68);
-    $sth->execute(11, 13456.78, 2367.4, 3399.55, 5555.55, 887.3);
+            ...insert some more rows.....
     $sth->execute(12, 90.57,3456.90, 1234.99, undef, 2876.34);
 
-    $rsth = $dbh->prepare('SELECT LINEGRAPH FROM line ' .
-    'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Month\' AND '.
-    'Y-AXIS=\'Sales\' AND TITLE = \'Monthly Sales By Region\' AND ' .
-    'COLOR=(red, green, blue, yellow, lbrown) AND ' .
-    'SHOWPOINTS=1 AND SHOWGRID=1 AND ' .
-    'SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross)');
-    $rsth->execute;
+    $rsth = $dbh->prepare(
+    "SELECT LINEGRAPH FROM line
+        WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND
+        TITLE = \'Monthly Sales By Region\' AND 
+        COLOR=(red, green, blue, yellow, lbrown) AND
+        SHOWPOINTS=1 AND SHOWGRID=1 AND 
+        SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross) AND
+        LOGO=\'gowilogo.png\' AND BACKGROUND=lgray AND 
+        X-ORIENT=\'VERTICAL\' AND 
+        SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'");
+    $rsth->execute(400, 400, 'Month', 'Sales');
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
 </pre><p>
@@ -172,12 +166,13 @@ produces the image<p><center>
 
     $sth->execute;
 
-    $rsth = $dbh->prepare('SELECT AREAGRAPH FROM line ' .
-    'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Month\' AND ' .
-    'Y-AXIS=\'Sales\' AND TITLE = \'Monthly Sales By Region\' AND ' .
-    'COLOR=(red, green, blue, yellow, lbrown) AND ' .
-    'SHOWPOINTS=1 AND SHOWGRID=1 AND ' .
-    'SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross)');
+    $rsth = $dbh->prepare(
+    "SELECT AREAGRAPH FROM line
+        WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Month\' AND
+        Y-AXIS=\'Sales\' AND TITLE = \'Monthly Sales By Region\' AND
+        COLOR=(red, green, blue, yellow, lbrown) AND
+        SHOWPOINTS=1 AND SHOWGRID=1 AND
+        SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross)");
     $rsth->execute;
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
@@ -194,11 +189,12 @@ produces the image<p><center>
 	    $sth->execute(5**$i, exp($i));
     }
 
-    $rsth = $dbh->prepare('SELECT LINEGRAPH FROM line ' .
-    'WHERE WIDTH=450 AND HEIGHT=450 AND X-AXIS=\'5**X\' AND Y-AXIS=\'e**X\' AND ' 
-    'Y-LOG=1 AND X-LOG=1 AND SHOWVALUES=0 AND ' .
-    'TITLE = \'Sample Log-Log Linegraph\' AND ' .
-    'COLOR=lred AND SHOWGRID=1 AND SHOWPOINTS=1');
+    $rsth = $dbh->prepare(
+    "SELECT LINEGRAPH FROM line
+        WHERE WIDTH=450 AND HEIGHT=450 AND X-AXIS=\'5**X\' AND 
+        Y-AXIS=\'e**X\' AND Y-LOG=1 AND X-LOG=1 AND 
+        SHOWVALUES=0 AND TITLE = \'Sample Log-Log Linegraph\' AND
+        COLOR=lred AND SHOWGRID=1 AND SHOWPOINTS=1");
     $rsth->execute;
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
@@ -207,36 +203,21 @@ produces the image<p><center>
 <img src="simpylog.png" alt="Log-Log Graph"></center><p>
 <pre>
     #
-    # simple candle graph
+    # simple candle graph, directly from another statement handle
     #
-    $dbh->do('CREATE CHART candle (Day DATE, low FLOAT, high FLOAT)');
-    $sth = $dbh->prepare('INSERT INTO candle VALUES( ?, ?, ?)');
-    $sth->execute('2000-05-11', 27.34, 29.50);
-    $sth->execute('2000-05-12', 24.67, 28.50);
-    $sth->execute('2000-05-13', 22.34, 26.50);
-    $sth->execute('2000-05-14', 17.34, 20.50);
-    $sth->execute('2000-05-15', 17.34, 19.50);
-    $sth->execute('2000-05-18', 17.34, 21.50);
-    $sth->execute('2000-05-19', 18.34, 25.50);
-    $sth->execute('2000-05-20', 27.34, 39.50);
-    $sth->execute('2000-05-21', 30.34, 34.50);
-    $sth->execute('2000-05-22', 33.34, 37.50);
-    $sth->execute('2000-05-25', 32.34, 36.50);
-    $sth->execute('2000-05-26', 30.34, 32.50);
-    $sth->execute('2000-05-27', 28.34, 33.50);
-    $sth->execute('2000-05-28', 30.34, 38.50);
-    $sth->execute('2000-05-29', 27.34, 35.50);
-    $sth->execute('2000-06-01', 28.34, 34.50);
-    $sth->execute('2000-06-02', 25.34, 30.50);
-    $sth->execute('2000-06-03', 23.34, 28.50);
-    $sth->execute('2000-06-04', 20.34, 26.50);
+    $tddbh = DBI->connect('dbi:Teradata:dbc', 'dbitst', 'dbitst',
+        { PrintError => 1, RaiseError => 0, AutoCommit => 1 });
+    $tdsth = $tddbh->prepare(
+    "SELECT TradeDay(VARCHAR(18)), lowprice, highprice
+        FROM candle ORDER BY TradeDay");
+    $tdsth->execute;
 
-    $rsth = $dbh->prepare('SELECT CANDLESTICK FROM candle ' .
-    'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND ' .
-    'Y-AXIS=\'Price\' AND TITLE = \'Daily Price Range\' AND ' .
-    'COLOR=red AND SHOWGRID=1 AND ' .
-    'SHAPE=filldiamond AND SHOWPOINTS=1');
-    $rsth->execute;
+    $rsth = $dbh->prepare(
+    "SELECT CANDLESTICK FROM ?
+        WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND
+        TITLE = \'Daily Price Range\' AND COLOR=red AND SHOWGRID=1 AND
+        SHAPE=filldiamond AND SHOWPOINTS=1 AND SHOWVALUES=0");
+    $rsth->execute($tdsth, 300,400, 'Date', 'Price');
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
 </pre><p>
@@ -246,12 +227,16 @@ produces the image<p><center>
     #
     #	use same data to render linegraph with symbolic domain
     #
-    $rsth = $dbh->prepare('SELECT LINEGRAPH FROM candle ' .
-    'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND ' .
-    'Y-AXIS=\'Price\' AND TITLE = \'Daily Price Range\' AND ' .
-    'COLOR=(red, blue) AND SHOWGRID=1 AND ' .
-    'SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1');
-    $rsth->execute;
+    $tdsth->execute;
+    
+    $rsth = $dbh->prepare(
+    "SELECT LINEGRAPH FROM ?
+        WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND
+        Y-AXIS=\'Price\' AND TITLE = \'Daily Price Range\' AND
+        COLOR=(red, blue) AND SHOWGRID=1 AND
+        SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1");
+
+    $rsth->execute($tdsth);
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
 </pre><p>
@@ -262,7 +247,8 @@ produces the image<p><center>
 <h2>DESCRIPTION</h2><p>
 
 DBI driver abstraction for rendering pie charts, bar charts, line, point, area, and
-candlestick graphs. (See <b>DBI(3)</b> for details).<br>
+candlestick graphs. The default output format is PNG; JPEG format can be generated
+by setting the FORMAT property (see below).<br>
 <b>BE ADVISED:</b> This is <b>ALPHA</B> software, and subject to change at the
 whim of the author(s). <p>
 
@@ -277,10 +263,27 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>CURRENT VERSION</h2><p>
 
-<a href="http://home.earthlink.net/~darnold/dbdchart/dbdchart020.zip">Release 0.20</a>
+Release 0.30<p>
+
+<a href="http://home.earthlink.net/~darnold/dbdchart/dbdchart030.zip">ZIP version</a><br>
+<a href="http://home.earthlink.net/~darnold/dbdchart/DBD-Chart-0.30.tar.gz">.tar.gz version</a>
 
 <a name="history"></a>
 <h2>CHANGE HISTORY</h2><p>
+
+Release 0.30:<p>
+<ul>
+<li>strip newlines from SQL for prepare()
+<li>add BACKGROUND property to set background color, incl. transparent background
+<li>add FORMAT property to select PNG or JPEG
+<li>add X-ORIENT property to set X-tick label orientation
+<li>add LOGO property to set a background image
+<li>add SIGNATURE property to set a signature string in image
+<li>add placeholder support in SELECT WHERE clause
+<li>add KEEPORIGIN property to force (0,0) in the graph
+<li>auto-skip symbolic X-axis vertical tick labels when they overlap
+<li>add parameterized chart datasource (i.e., SELECT BARCHART FROM ? WHERE...)
+</ul><p>
 
 Release 0.20:<p>
 <ul>
@@ -318,7 +321,7 @@ all domain types are treated as symbolic; for all other graph types,
 a numeric domain will be mapped using the actual (scaled) numeric values.
 
 <a name="datetime"></a>
-<h3>Date, Time, and Timestamp TypeS</h3><p>
+<h3>Date, Time, and Timestamp Types</h3><p>
 
 Obviously, handling these data types is important for temporal graphs. For now,
 however, we just treat them as symbolic values, the same as CHAR or VARCHAR.<p>
@@ -381,10 +384,9 @@ to manipulate the chart after it has been dropped will return errors.</li><p>
 Populates the chart with the specified data. A value must be provided for each column defined
 in the chart (i.e., no defaults are used.).</li><p>
 
-<li><code><b>SELECT <i>&lt;chart-type&gt;</i><br>
-FROM <i>&lt;chartname | subquery&gt;</i> [, ...]<br>
-WHERE <i>&lt;qualifier = literal&gt; | &lt;qualifier = valuelist&gt;</i> [AND ...]</b></code><p>
-Renders an image containing the specified chart(s), using the qualifers to control how the image
+<li><code><b>SELECT <i>&lt;chart-type&gt;</i> FROM <i>&lt;? | chartname&gt;</i> <!-- | subquery&gt;</i> [, ...] --><br>
+WHERE <i>&lt;qualifier&gt; = &lt;? | literal | literallist&gt;</i> [AND ...]</b></code><p>
+Renders an image containing the specified chart, using the qualifers to control how the image
 is rendered. Valid <i>&lt;chart-type&gt;</i> values are<p>
 <ul>
 <li><b>PIECHART</b> - generates a piechart; each wedge is represented as a percentage of the sum of all the 
@@ -430,22 +432,61 @@ for line, area, point, and candlestick graphs.
 <li><b>Y-AXIS</b> - sets the label string on the Y-AXIS.
 <li><b>TITLE</b> - sets the title string of the graph.
 <li><b>3-D</b> - sets the 3-D effect on either pie or bar charts.
-</ul>
+<li><b>BACKGROUND</b> - sets the background color; default white. single value only, from
+list of legal colors or <code>transparent</code>.
+<li><b>LOGO</b> - sets a background image; default none, single value only. Accepts a filename 
+(optionally including path info) of an image file of either PNG or JPEG format. The image
+will be centered under the graph image. If the image size is less than the defined
+specified WIDTH and/or HEIGHT, the BACKGROUND color will be used to fill to the edges. If
+the image exceeds the WIDTH and/or HEIGHT, the image will be clipped to fit.
+<li><b>SIGNATURE</b> - sets a signature string to be printed in tiny font in the
+lower right hand corner of the image; single value, text string only, default none. 
+E.g. "Copyright(C) 2001, GOWI Systems. All rights reserved.".
+<li><b>FORMAT</b> - sets the output image format, either PNG or JPEG. Single value,
+string, either 'PNG' or 'JPEG' (case insensitive).
+<li><b>X-ORIENT</b> - sets the display angle of the X-axis tick labels; single value,
+case-insensitive string, either 'horizontal' or 'vertical', default horizontal.
+<li><b>KEEPORIGIN</b> - forces the origin axes (0,0) in the image; single value, either
+0 or 1, default 0. Normally, line, point, area, and candlestick graphs automatically
+clip away the origin axes if the plot does not cross the origin axis. Set this property
+to 1 to force the origin axis to be included. Ignored for pie or barcharts.
+</ul><p>
 <b>Restrictions:</b><br>
 <ul>
 <!-- <li>Only a single level of derived tables is allowed. -->
-<li>no expressions (e.g., X + Y) or functions (e.g., AVG(X)) are allowed.
+<li>no expressions (e.g., X + Y) or functions (e.g., AVG(X)) are allowed.<br>
 <li>ordering of wedges and bars in pie and barcharts is determined by the order the rows are
-INSERTed.
+INSERTed.<br>
 <li>Ordering of plot points in line, area, and point graphs with numeric domains is ascending left to 
 right on the X-axis, ascending bottom to top on Y-axis. Graphs with non-numeric domains are plotted
-in the order they are INSERT'd.
+in the order they are INSERT'd.<br>
 <li>Due to a current misalignment problem in the GD::Graph3d::bar3d module, the alignment of text when
-setting SHOWVALUES=1 for 3-D barcharts may be less than appealing.
+setting SHOWVALUES=1 for 3-D barcharts may be less than appealing.<br>
 <li>When generating area graphs with multiple range valuesets (i.e., more the 1 set of Y values),
 the order in which the range valuesets are plotted is column 2, column 3,...column N.
 This order may cause some ranges to be completely obscured by the areagraph of a succeding range. You'll
-need to experiment with the order of your range valuesets to get the best view.
+need to experiment with the order of your range valuesets to get the best view.<br>
+<li>Datasources for the chart may be either 
+<ul>
+<li>a table explicitly CREATEd on the dbi:Chart database handle that has been 
+populated via INSERTs
+<li>a valid DBI statement handle which has been <code>execute()</code>'d. 
+When a parameterized FROM is specified in a SELECT statement, the application 
+must bind a <code>prepare()</code>'d and <code>execute()</code>'d
+statement handle from any valid DBI data source, from which DBD::Chart will 
+subsequently <code>fetch()</code> the data for populating the chart. In that case,
+the application does not need to explicitly CREATE and INSERT to a table for 
+the chart. Obviously, the application must still be careful that the column data
+returned by the bound statement handle is of the proper format (as described
+above) and does not returned an excessive number of rows - DBD::Chart currently
+generates an error if more than 1,000 rows is returned by such a bound statement
+handle.
+</ul><br>
+<li>Setting the FORMAT to JPEG on Windows platforms may be problematic. The PPM
+of the GD package provided by ActiveState does not appear to include the jpeg-6b 
+library, and the Makefile for the jpeg-6b library only builds a static library,
+rather than a DLL. To render JPEG format graphics requires building the jpeg 
+library and then building the libgd package to include JPEG support.
 </ul>
 </li><p>
 <li><code><b>DELETE FROM <i>chartname</i><br>
@@ -522,17 +563,18 @@ frisky, you can try older or newer versions.): <p>
 <li>Perl version 5.006
 <li>DBI module 1.14.
 <li>GD module 1.32
-<li>GD::Graph module X.XX
+<li>GD::Graph module 1.32
 <li>GD::Graph3d module 0.55
-<li>GD::TextUtil module X.XX
-<li>DBD::Chart::Plot module 0.10 (included in release package)
+<li>GD::Text (<i>aka GDTextUtil</i>) module 0.80
+<!-- <li>DBD::Chart::Plot module 0.10 (included in release package) -->
 </ul>
 
-Be advised that the GD modules require the following libraries:<p>
+Be advised that these modules require the following (non-Perl) libraries:<p>
 <ul>
 <li> <a href="http://www.boutell.com/gd/">libgd</a>
 <li> <a href="http://www.libpng.org/pub/png">libpng</a>
 <li> <a href="http://www.info-zip.org/pub/infozip/zlib/">zlib</a>
+<li> <a href="http://www.ijg.org/">jpeg-6b</a> (for JPEG support)
 </ul><p>
 
 The following DBI functions are not supported:
@@ -556,21 +598,45 @@ $dbh->type_info()
     <th align=center>Description</th>
     <th align=center>Status</th>
     <th align=center>Fix<br>Release</th>
+</tr><tr>
+	<td align=center>1</td>
+	<td align=center>2001-Mar-16</td>
+	<td align=center>0.20</td>
+	<td align=center>SQL statements with newlines won't prepare()</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.30</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
 
 <ul>
+<!-- <li>placeholders in SELECT predicate expressions
+<li>BACKGROUND color specification
+<li>image import via LOGO property
+<li>ability to specify label orientation on X axis
+<li>KEEPORIGIN property to force (0,0) in the graph
+<li>FORMAT property to select between PNG and JPEG 
+<li>add syntax to read directly from another statement handle
+(i.e., SELECT LINEGRAPH FROM ? WHERE...)
+<li>auto-skip symbolic labels when they overlap
+-->
+<li>FONT property to select fonts
 <li>Support derived tables to layer graphs in an image
+<li>clipped barcharts (i.e., Y axis starts > zero)
 <li> (X, Y, Z) (i.e., true 3 dimension) barcharts
+<li>Gantt charts ?
+<li>Box & whisker charts ?
 <li>surfacemaps ?
-<li>placeholders in SELECT predicate expressions
 <li> <i>Any suggestions?</i>
 </ul>
 <p>
 
 <a name="acks"></a>
 <h2>ACKNOWLEDGEMENTS</h2><p>
+
+Many thanks to all the authors of the various GD, PNG,JPEG, and zlib modules.
+Special thanks to all the initial victims, er, users for their comments,
+complaints, and suggestions.<p>
 
 <a name="refs"></a>
 <h2>REFERENCES</h2><p>
@@ -620,7 +686,7 @@ I reserve the right to provide support for this software
 to individual sites under a separate (possibly fee-based)
 agreement.<p>
 
-<center><i>Last updated March 12, 2001</i>
+<center><i>Last updated March 16, 2001</i>
 
 </body></html>
 

@@ -14,13 +14,17 @@ $sth->execute('Midwest', 1234.56);
 $sth->execute('Southwest', 4569.78);
 $sth->execute('Northwest', 33456.78);
 
-$rsth = $dbh->prepare('SELECT PIECHART FROM pie ' .
-'WHERE WIDTH=400 AND HEIGHT=400 AND ' .
-'TITLE = \'Sales By Region\' AND COLOR=(red, green, blue, lyellow, lpurple)');
+$rsth = $dbh->prepare(
+"SELECT PIECHART FROM pie
+	WHERE WIDTH=400 AND HEIGHT=400 AND
+	TITLE = \'Sales By Region\' AND 
+	COLOR=(red, green, blue, lyellow, lpurple) AND
+	SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'
+	AND FORMAT=\'JPEG\' AND BACKGROUND=lgray");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
-open(OUTF, '>simppie.png');
+open(OUTF, '>simppie.jpg');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);

@@ -5,13 +5,20 @@ package DBD::Chart;
 use DBI;
 
 @EXPORT = qw(); # Do NOT @EXPORT anything.
-$VERSION = '0.20';
+$VERSION = '0.21';
 
 #
 #   Copyright (c) 2001, Dean Arnold
 #
 #   You may distribute under the terms of either the GNU General Public
 #   License or the Artistic License, as specified in the Perl README file.
+#
+#	History:
+#		0.21	2001-Mar-17 D. Arnold
+#			Remove newlines from SQL stmts in prepare().
+#
+#		0.20	2001-Mar-12	D. Arnold
+#			Coded.
 #
 $drh = undef;
 $err = 0;
@@ -146,10 +153,24 @@ my %valid_shapes = (
 my %dfltprops = ( 'SHAPE', undef, 'WIDTH', 300, 'HEIGHT', 300,
 	'SHOWGRID', 0, 'SHOWPOINTS', 0, 'SHOWVALUES', 0, 'X-AXIS', 'X axis', 
 	'Y-AXIS', 'Y axis', 'Z-AXIS', undef, 'TITLE', '', 'COLOR', \@dfltcolors, 
-	'SHAPE', undef, 'X-LOG', 0, 'Y-LOG', 0, '3-D', 0);
+	'SHAPE', undef, 'X-LOG', 0, 'Y-LOG', 0, '3-D', 0, 'BACKGROUND', 'white',
+	'SIGNATURE', undef, 'LOGO', undef, 'X-ORIENT', 'horizontal', 'FORMAT', 'PNG',
+	'KEEPORIGIN', 0
+	);
 	
 my %mincols = ( 'PIECHART', 2, 'BARCHART', 2, 'POINTGRAPH', 2, 
 	'LINEGRAPH', 2, 'AREAGRAPH', 2, 'CANDLESTICK', 3, 'SURFACEMAP', 3);
+
+my %binary_props = ('SHOWGRID', 1, 'X-LOG', 1, 'Y-LOG', 1, '3-D', 1, 
+	'SHOWPOINTS', 1, 'SHOWVALUES', 1, 'KEEPORIGIN', 1);
+	
+my %string_props = ('X-AXIS', 1, 'Y-AXIS', 1, 'Z-AXIS', 1, 'TITLE', 1, 
+	'SIGNATURE', 1, 'LOGO', 1, 'X-ORIENT', 1);
+
+my %valid_props	= ( 'SHOWVALUES', 1, 'SHOWPOINTS', 1, 'BACKGROUND', 1,
+'KEEPORIGIN', 1, 'SIGNATURE', 1, 'SHOWGRID', 1, 'X-AXIS', 1, 'Y-AXIS', 1,
+'Z-AXIS', 1, 'TITLE', 1, 'COLOR', 1, 'WIDTH', 1, 'HEIGHT', 1, 'SHAPE', 1,
+'X-ORIENT', 1, 'FORMAT', 1, 'LOGO', 1, 'X-LOG', 1, 'Y-LOG', 1, '3-D', 1);
 
 sub parse_col_defs {
 	my ($req, $cols, $typeary, $typelen, $typescale) = @_;
@@ -238,31 +259,48 @@ sub parse_col_defs {
 }
 
 sub parse_props {
-	my ($ctype, $t) = @_;
+	my ($ctype, $t, $numphs) = @_;
 	
-	my %props = ();
+	my %props = %dfltprops;
 	my $prop;
 	$t .= ' AND ';
-	while ($t=~/^(X-AXIS|Y-AXIS|Z-AXIS|TITLE|COLOR|WIDTH|HEIGHT|SHOWGRID|SHOWVALUES|SHAPE|SHOWPOINTS|X-LOG|Y-LOG|3-D)\s*=\s*(.*)$/i) {
+	while ($t=~/^([^\s=]+)\s*=\s*(.*)$/i) {
 		$prop = uc $1;
 		$t = $2;
-		if (($prop eq 'SHOWGRID') || 
-			($prop eq 'X-LOG') || ($prop eq 'Y-LOG') || ($prop eq '3-D') ||
-			($prop eq 'SHOWPOINTS') || ($prop eq 'SHOWVALUES')) {
+		if (! $valid_props{$prop}) {
+			$DBD::Chart::err = -1;
+			$DBD::Chart::errstr = "Unrecognized property $prop.";
+			return (undef, $t);
+		}
+
+		if ($t=~/^\?\s+AND\s+(.*)$/i) {
+#
+#	got a placeholder
+#
+			$props{ $prop } = "?$$numphs";
+			$t = $1;
+			$$numphs++;
+			next;
+		}
+		
+		if ($binary_props{$prop}) {
+#
+#	make sure its zero or 1
+#
 			if ($t!~/^(1|0)\s+AND\s+(.*)$/i) {
 				$DBD::Chart::err = -1;
 				$DBD::Chart::errstr = "Invalid value for $prop property.";
-				return undef;
+				return (undef, $t);
 			}
 			$props{ $prop } = $1;
 			$t = $2;
 			next;
 		}
-		if (($prop eq 'X-AXIS') || ($prop eq 'Y-AXIS') || ($prop eq 'Z-AXIS') || ($prop eq 'TITLE')) {
+		if ($string_props{$prop}) {
 			if ($t!~/^\'([^\']*)\'(.*)$/) {
 				$DBD::Chart::err = -1;
 				$DBD::Chart::errstr = 
-					"$prop property requires a literal string.";
+					"$prop property requires a string.";
 				return (undef, $t);
 			}
 			my $str = $1;
@@ -295,6 +333,22 @@ sub parse_props {
 			}
 			next;
 		}
+		if ($prop eq 'BACKGROUND') { 
+			if ($t!~/^(\w+)\s+AND\s+(.*)$/i) {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = "Invalid value for $prop property.";
+				return (undef, $t);
+ 			}
+			$props{$prop} = lc $1;
+			$t = $2;
+			if ((! $valid_colors{$props{$prop}}) && 
+				($props{$prop} ne 'transparent')) {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = "Invalid value for $prop property.";
+				return (undef, $t);
+			}
+			next;
+		}
  		if (($prop eq 'COLOR') || ($prop eq 'SHAPE')) {
  			my @colors = ();
  			if ($t=~/^(\w+)\s+AND\s+(.*)$/i) {
@@ -319,6 +373,7 @@ sub parse_props {
 #
 #	validate properties for chart type
 #
+if (1 == 2) {
 	if ($ctype eq 'PIECHART') {
 		foreach $prop (keys(%inv_pieprop)) {
 			if (defined($props{$prop})) {
@@ -346,6 +401,7 @@ sub parse_props {
 			}
 		}
 	}
+}
 	if (defined($props{'COLOR'})) {
 		my $colors = $props{'COLOR'};
 		foreach $prop (@$colors) {
@@ -365,6 +421,12 @@ sub parse_props {
 				return (undef, $t);
 			}
 		}
+	}
+	if (($props{'X-ORIENT'}) && 
+		($props{'X-ORIENT'}!~/^(HORIZONTAL|VERTICAL)$/i)) {
+		$DBD::Chart::err = -1;
+		$DBD::Chart::errstr = "Invalid value for 'X-ORIENT' property.";
+		return (undef, $t);
 	}
 	return (\%props, $t);
 }
@@ -443,11 +505,13 @@ sub parse_predicate {
 		'Only NULL, placeholders, literal strings, and numbers allowed.';
 	return undef;
 }
+
 sub prepare {
 	my($dbh, $statement)= @_;
 	my $i;
 	my $tstmt = $statement;
 	$tstmt=~s/^\s*(.+);?\s*$/$1/;
+	$tstmt=~s/\n/ /g;
 #
 #	validate that its a CREATE, DROP, INSERT, or SELECT
 #
@@ -784,7 +848,7 @@ sub prepare {
 #
 #	check for derived tables
 #
-			while ($remnant=~/^\(\s*SELECT\s+(PIECHART|BARCHART|POINTGRAPH|LINEGRAPH|AREAGRAPH|CANDLESTICK|SURFACEMAP)\s+FROM\s+(\w+)\s*(.+)$/i) {
+			while ($remnant=~/^\(\s*SELECT\s+(PIECHART|BARCHART|POINTGRAPH|LINEGRAPH|AREAGRAPH|CANDLESTICK|SURFACEMAP)\s+FROM\s+(\?|\w+)\s*(.+)$/i) {
 				$ctype = uc $1;
 				push(@dtypes, uc $1);
 				push(@dcharts, uc $2);
@@ -837,7 +901,7 @@ sub prepare {
 #
 #	process format properties for this derived table
 #
-					($props, $remnant) = parse_props($ctype, $1);
+					($props, $remnant) = parse_props($ctype, $1, \$numphs);
 					return undef if (! $props);
 					if (($$props{'WIDTH'}) || ($$props{'HEIGHT'})) {
 						$DBD::Chart::err = -1;
@@ -857,7 +921,7 @@ sub prepare {
 				}
 			}
 			if ($remnant ne '') {
-				($props, $remnant) = parse_props('', $1);
+				($props, $remnant) = parse_props('', $1, \$numphs);
 				return undef if (! $props);
 				if ($$props{'COLOR'}) {
 					$DBD::Chart::err = -1;
@@ -876,35 +940,43 @@ sub prepare {
 				$dprops[0] = undef;
 			}
 		}
-		elsif ($remnant=~/^(PIECHART|BARCHART|POINTGRAPH|LINEGRAPH|AREAGRAPH|CANDLESTICK|SURFACEMAP)\s+FROM\s+(\w+)\s*(.*)$/i) {
+		elsif ($remnant=~/^(PIECHART|BARCHART|POINTGRAPH|LINEGRAPH|AREAGRAPH|CANDLESTICK|SURFACEMAP)\s+FROM\s+(\?|\w+)\s*(.*)$/i) {
 			$ctype = uc $1;
-			push(@dtypes, uc $1);
-			push(@dcharts, uc $2);
-			$remnant = $3;
 			$filenm = uc $2;
-			$chart = $DBD::Chart::charts{$filenm};
-			if (! $chart) {
-				$DBD::Chart::err = -1;
-				$DBD::Chart::errstr = $filenm . ' does not exist.';
-				return undef;
+			$remnant = $3;
+			if ($filenm ne '?') {
+				$chart = $DBD::Chart::charts{$filenm};
+				if (! $chart) {
+					$DBD::Chart::err = -1;
+					$DBD::Chart::errstr = $filenm . ' does not exist.';
+					return undef;
+				}
+				$ctypes = $$chart{'types'};
+				if (scalar(@$ctypes) < $mincols{$ctype}) {
+					$DBD::Chart::err = -1;
+					$DBD::Chart::errstr = $ctype . ' chart requires at least ' .
+						$mincols{$ctype} . ' columns.';
+					return undef;
+				}
+				if (($ctype eq 'CANDLESTICK') && ((scalar(@$ctypes) - 1) & 1)) {
+					$DBD::Chart::err = -1;
+					$DBD::Chart::errstr = 
+						'CANDLESTICK chart requires 2N + 1 columns.';
+					return undef;
+				}
+				$dversions{$filenm} = $$chart{'version'};
 			}
-			$ctypes = $$chart{'types'};
-			if (scalar(@$ctypes) < $mincols{$ctype}) {
-				$DBD::Chart::err = -1;
-				$DBD::Chart::errstr = $ctype . ' chart requires at least ' . $mincols{$ctype} . ' columns.';
-				return undef;
+			else {
+				$filenm = "?$numphs";
+				$numphs++;
 			}
-			if (($ctype eq 'CANDLESTICK') && ((scalar(@$ctypes) - 1) & 1)) {
-				$DBD::Chart::err = -1;
-				$DBD::Chart::errstr = 'CANDLESTICK chart requires 2N + 1 columns.';
-				return undef;
-			}
-			$dversions{$filenm} = $$chart{'version'};
+			push(@dtypes, $ctype);
+			push(@dcharts, $filenm);
 			if ($remnant=~/^WHERE\s+(.+)$/i) {
 #
 #	process format properties
 #
-				($props, $remnant) = parse_props($ctype, $1);
+				($props, $remnant) = parse_props($ctype, $1, \$numphs);
 				return undef if (! $props);
 				push(@dprops, $props);
 			}
@@ -921,7 +993,7 @@ sub prepare {
 #	we require the file to have been CREATED
 #
 		foreach $filenm (@dcharts) {
-			if (! $DBD::Chart::charts{$filenm}) {
+			if (($filenm!~/^\?\d+$/) && (! $DBD::Chart::charts{$filenm})) {
 				$DBD::Chart::err = -1;
 				$DBD::Chart::errstr = $filenm . ' does not exist.';
 				return undef;
@@ -933,7 +1005,7 @@ sub prepare {
 		'Statement'     => $statement,
 	});
 
-	$numphs = scalar(@parmcols) + ((($predval) && ($predval eq '?')) ? 1 : 0);
+#	$numphs = scalar(@parmcols) + ((($predval) && ($predval eq '?')) ? 1 : 0);
 	$sth->STORE('NUM_OF_PARAMS', $numphs);
 	$sth->{'chart_dbh'} = $dbh;
 	$sth->{'chart_cmd'} = $cmd;
@@ -1025,35 +1097,36 @@ use GD::Graph::bars3d;
 use DBD::Chart::Plot;
 
 my %colors = (
-'white', 1,
-'lgray', 1,
-'gray', 1,
-'dgray', 1,
-'black', 1,
-'lblue', 1,
-'blue', 1,
-'dblue', 1,
-'gold', 1,
-'lyellow', 1,
-'yellow', 1,
-'dyellow', 1,
-'lgreen', 1,
-'green', 1,
-'dgreen', 1,
-'lred', 1,
-'red', 1,
-'dred', 1,
-'lpurple', 1,
-'purple', 1,
-'dpurple', 1,
-'lorange', 1,
-'orange', 1,
-'pink', 1,
-'dpink', 1,
-'marine', 1,
-'cyan', 1,
-'lbrown', 1,
-'dbrown', 1
+	white	=> [255,255,255], 
+	lgray	=> [191,191,191], 
+	gray	=> [127,127,127],
+	dgray	=> [63,63,63],
+	black	=> [0,0,0],
+	lblue	=> [0,0,255], 
+	blue	=> [0,0,191],
+	dblue	=> [0,0,127], 
+	gold	=> [255,215,0],
+	lyellow	=> [255,255,0], 
+	yellow	=> [191,191,0], 
+	dyellow	=> [127,127,0],
+	lgreen	=> [0,255,0], 
+	green	=> [0,191,0], 
+	dgreen	=> [0,127,0],
+	lred	=> [255,0,0], 
+	red		=> [191,0,0],
+	dred	=> [127,0,0],
+	lpurple	=> [255,0,255], 
+	purple	=> [191,0,191],
+	dpurple	=> [127,0,127],
+	lorange	=> [255,183,0], 
+	orange	=> [255,127,0],
+	pink	=> [255,183,193], 
+	dpink	=> [255,105,180],
+	marine	=> [127,127,255], 
+	cyan	=> [0,255,255],
+	lbrown	=> [210,180,140], 
+	dbrown	=> [165,42,42],
+	transparent => [1,1,1]
 );
 
 my @dfltcolors = ( 'red', 'green', 'blue', 'yellow', 'purple', 'orange', 
@@ -1094,6 +1167,104 @@ SQL_TINYINT, 1,
 SQL_DECIMAL, 1,
 SQL_FLOAT, 1
 );
+
+my %mincols = ( 'PIECHART', 2, 'BARCHART', 2, 'POINTGRAPH', 2, 
+	'LINEGRAPH', 2, 'AREAGRAPH', 2, 'CANDLESTICK', 3, 'SURFACEMAP', 3);
+
+my %binary_props = ('SHOWGRID', 1, 'X-LOG', 1, 'Y-LOG', 1, '3-D', 1, 
+	'SHOWPOINTS', 1, 'SHOWVALUES', 1, 'KEEPORIGIN', 1);
+	
+my %string_props = ('X-AXIS', 1, 'Y-AXIS', 1, 'Z-AXIS', 1, 'TITLE', 1, 
+	'SIGNATURE', 1, 'LOGO', 1, 'X-ORIENT', 1);
+
+sub validate_properties {
+	my ($props, $parms) = @_;
+	foreach my $prop (keys(%$props)) {
+		next if ((! $$props{$prop}) || ($$props{$prop} !~/^\?(\d+)$/));
+		my $phnum = $1;
+		my $t = $$parms[$phnum];
+		if ($phnum > scalar(@$parms)) {
+			$DBD::Chart::err = -1;
+			$DBD::Chart::errstr = 'Insufficient parameters provided.';
+			return undef;
+		}
+		$$props{$prop} = $$parms[$phnum];
+
+		next if (($binary_props{$prop}) && ($t=~/^(0|1)$/));
+
+		next if ($string_props{$prop});
+
+		next if ((($prop eq 'WIDTH') || ($prop eq 'HEIGHT')) &&
+			(($t=~/^\d+$/) && ($t >= 10) && ($t <= 100000)));
+
+		next if (($prop eq 'BACKGROUND') && ($colors{$t}));
+
+		next if (($prop eq 'X-ORIENT') && 
+			($t=~/^(HORIZONTAL|VERTICAL)$/i));
+
+ 		next if (($prop eq 'COLOR') && ($colors{$t}));
+ 		
+ 		next if (($prop eq 'SHAPE') && ($shapes{$t}));
+#
+#	invalid property parameter value
+#
+		$DBD::Chart::err = -1;
+		$DBD::Chart::errstr = "Invalid value for $prop property.";
+		return undef;
+	}
+	return 1;
+}
+
+sub add_logo {
+	my ($logo, $imgw, $imgh, $bgcolor) = @_;
+	if ($logo!~/\.(png|jpg|jpeg)$/i) {
+		$DBD::Chart::errstr = 
+	'Unrecognized logo file format. File qualifier must be .png, .jpg, or .jpeg.';
+		$DBD::Chart::err = -1;
+		return undef;
+	}
+	if (! open(LOGO, "<$logo")) {
+		$DBD::Chart::errstr = 
+			'Unable to open logo file.';
+		$DBD::Chart::err = -1;
+		return undef;
+	}
+	my $logoimg = ($logo=~/\.png$/i) ? GD::Image->newFromPng(*LOGO) :
+		GD::Image->newFromJpeg(*LOGO);
+	close(LOGO);
+	if (! $logoimg) {
+		$DBD::Chart::errstr = 'GD cannot read logo file.';
+		$DBD::Chart::err = -1;
+		return undef;
+	}
+	my ($logow, $logoh) = $logoimg->getBounds();
+	my $newimg = GD::Image->new($imgw, $imgh);
+	my $trans = $newimg->colorAllocate(@{$colors{$bgcolor}});
+	$newimg->transparent($trans)
+		if ($bgcolor eq 'transparent');
+	$newimg->fill(0, 0, $trans );
+#
+#	force the logo into the defined image area
+#
+	my $srcX = ($logow > $imgw) ? ($logow - $imgw)>>1 : 0;
+	my $srcY = ($logoh > $imgh) ? ($logoh - $imgh)>>1 : 0;
+	my $dstX = ($logow > $imgw) ? 0 : ($imgw - $logow)>>1;
+	my $dstY = ($logoh > $imgh) ? 0 : ($imgh - $logoh)>>1;
+	my $h = ($logoh > $imgh) ? $imgh : $logoh;
+	my $w = ($logow > $imgw) ? $imgw : $logow;
+	$newimg->copy($logoimg, $dstX, $dstY, $srcX, $srcY, $w-1, $h-1);
+	return $newimg;
+}
+
+sub draw_signature {
+	my ($img, $signature) = @_;
+	my $fw = gdTinyFont->width * length($signature);
+	my ($w, $h) = $img->getBounds();
+	my $black = $img->colorClosest(0,0,0);
+	$img->string(gdTinyFont, $w - $fw - 5, ($h - (gdTinyFont->height * 1.5)), 
+		$signature, $black);
+	return 1;
+}
 
 sub execute {
 	my($sth, @bind_values) = @_;
@@ -1515,19 +1686,52 @@ sub execute {
 	my $dcharts = $sth->{'chart_sources'};
 	my $dprops = $sth->{'chart_properties'};
 	my $dversions = $sth->{'chart_version'};
-	foreach $name (@$dcharts) {
+	my $srcsth;
+	for ($i = 0; $i <= $#$dcharts; $i++) {
+		$name = $$dcharts[$i];
 		next if ($name eq ''); # for layered images
-		$chart = $DBD::Chart::charts{$name};
-		if (! $chart) {
-			$DBD::Chart::errstr = "Chart $name does not exist.";
-			$DBD::Chart::err = -1;
-			return undef;
+		$srcsth = undef;
+		if ($name!~/^\?(\d+)$/) {
+			$chart = $DBD::Chart::charts{$name};
+			if (! $chart) {
+				$DBD::Chart::errstr = "Chart $name does not exist.";
+				$DBD::Chart::err = -1;
+				return undef;
+			}
+			if ($$chart{'version'} != $$dversions{$name}) {
+				$DBD::Chart::errstr = 
+			"Prepared version of $name differs from current version.";
+				$DBD::Chart::err = -1;
+				return undef;
+			}
 		}
-		if ($$chart{'version'} != $$dversions{$name}) {
-			$DBD::Chart::errstr = 
-		"Prepared version of $name differs from current version.";
-			$DBD::Chart::err = -1;
-			return undef;
+		else {	# its a parameterized chartsource
+			my $phn = $1;
+			if (! $$parms[$phn]) {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = 'Parameterized chartsource not provided.';
+				return undef;
+			}
+			$srcsth = $$parms[$phn];
+			if (ref $srcsth ne 'DBI::st') {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = 
+	'Parameterized chartsource value must be a prepared and executed DBI statement handle.';
+				return undef;
+			}
+			my $ctype = $$dtypes[$i];
+			if ($srcsth->{'NUM_OF_FIELDS'} < $mincols{$ctype}) {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = $ctype . ' chart requires at least ' .
+					$mincols{$ctype} . ' columns.';
+				return undef;
+			}
+			if (($ctype eq 'CANDLESTICK') && (($srcsth->{'NUM_OF_FIELDS'} - 1) & 1)) {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = 
+					'CANDLESTICK chart requires 2N + 1 columns.';
+				return undef;
+			}
 		}
 	}
 #
@@ -1543,16 +1747,65 @@ sub execute {
 #			$img = DBD::Chart::Composite($$props{'WIDTH'}, $$props{'HEIGHT'});
 			$i++;
 		}
-		$chart = $DBD::Chart::charts{$$dcharts[$i]};
-		$props = $$dprops[$i];
+#
+#	now synthesize a chart structure from the stmt handle
+#	NOTE: we should eventually support array binding here!!!
+#
+		if ($$dcharts[$i]=~/^\?(\d+)$/) {
+			my $srcsth = $$parms[$1];
+			$columns = $srcsth->{'NAME'};
+			$types = $srcsth->{'TYPE'};
+			$precs = $srcsth->{'PRECISION'};
+			$scales = $srcsth->{'SCALE'};
+			$data = [];
+			my $rowcnt = 0;
+			my $row;
+			foreach my $col (@$columns) {
+				my @ary = ();
+				push(@$data, \@ary);
+			}
+			
+			while ($row = $srcsth->fetchrow_arrayref) {
+				$rowcnt++;
+				if ($rowcnt > 1000) {
+					$DBD::Chart::err = -1;
+					$DBD::Chart::errstr = 
+				'More than 1000 plot points returned by parameterized chartsource.';
+					$srcsth->finish;
+					return undef;
+				}
+				for ($j = 0; $j < $srcsth->{'NUM_OF_FIELDS'}; $j++) {
+					push(@{$$data[$j]}, $$row[$j]);
+				}
+			}
+		}
+		else {
+			$chart = $DBD::Chart::charts{$$dcharts[$i]};
 #
 #	get the record description
 #
-		$columns = $$chart{'columns'};
-		$types = $$chart{'types'};
-		$precs = $$chart{'precisions'};
-		$scales = $$chart{'scales'};
-		$data = $$chart{'data'};
+			$columns = $$chart{'columns'};
+			$types = $$chart{'types'};
+			$precs = $$chart{'precisions'};
+			$scales = $$chart{'scales'};
+			$data = $$chart{'data'};
+		}
+
+		$props = $$dprops[$i];
+#
+#	validate and copy in any placeholder values
+#
+		return undef if (! validate_properties($props, $parms));
+#
+#	process any logo image
+#
+		my $bgimg = undef;
+		if ($$props{'LOGO'}) {
+			$bgimg = add_logo($$props{'LOGO'}, $$props{'WIDTH'}, 
+				$$props{'HEIGHT'}, $$props{'BACKGROUND'}) ||
+				return undef;
+		}
+
 		if ($$dtypes[$i] eq 'PIECHART') {
 #
 #	first data array is domain names, the 2nd is the 
@@ -1574,17 +1827,28 @@ sub execute {
 			$img->set( '3d' => 0)
 				if (! $$props{'3-D'});
 				
+			$img->set( bgclr => $$props{'BACKGROUND'} ) 
+				if ($$props{'BACKGROUND'} ne 'transparent');
 			$img->set_title_font(gdLargeFont);
 			$img->set_value_font(gdSmallFont);
 
 			$img->set( 
 				suppress_angle => 5, 
-				transparent => 0,
+				transparent => (($$props{'BACKGROUND'} eq 'transparent') ? 1 : 0),
 				dclrs => \@colors
 			);
+			
+			my $gdimg = $img->gd();
+			$gdimg->copy($bgimg, 0, 0, 0, 0, $$props{'WIDTH'}, $$props{'HEIGHT'})
+				if ($bgimg);
 
 			$img->plot($data);
-			$sth->{'chart_image'} = $img->gd->png();
+
+			draw_signature($gdimg, $$props{'SIGNATURE'})
+				if ($$props{'SIGNATURE'});
+
+			$sth->{'chart_image'} = ($$props{'FORMAT'} eq 'JPEG') ? 
+				$img->gd->jpeg() : $img->gd->png();
 			next;
 		}
 		
@@ -1593,8 +1857,13 @@ sub execute {
 #	need column names in defined order
 #
 		my @colnames = ();
-		foreach (keys(%$columns)) {
-			$colnames[$$columns{$_}] = $_;
+		if (! $srcsth) {
+			foreach (keys(%$columns)) {
+				$colnames[$$columns{$_}] = $_;
+			}
+		}
+		else { 
+			@colnames = @$columns;
 		}
 		shift @colnames;
 
@@ -1621,6 +1890,8 @@ sub execute {
 				if ($$props{'SHOWGRID'});
 			$img->set ('show_values' => 1)
 				if ($$props{'SHOWVALUES'});
+			$img->set('bgclr' => $$props{'BACKGROUND'}) 
+				if ($$props{'BACKGROUND'} ne 'transparent');
 
 			$img->set( 
    				y_tick_number	=> 10,
@@ -1628,12 +1899,20 @@ sub execute {
    				legend_placement	=> 'RB',
    				x_label_position	=> 1/2,
    				y_long_ticks => 1,
-   				transparent	=> 0,
+   				transparent	=> (($$props{'BACKGROUND'} eq 'transparent') ? 1 : 0),
 			    zero_axis	=> 1,
 			    values_vertical => 1,
+			    x_labels_vertical => (($$props{'X-ORIENT'} eq 'VERTICAL') ? 1 : 0),
 			    overwrite	=> 0,
 				cycle_clrs => ((scalar(@$data) > 2) ? 0 : 1)
 			);
+
+			my $gdimg = $img->gd();
+			$gdimg->copy($bgimg, 0, 0, 0, 0, $$props{'WIDTH'}, $$props{'HEIGHT'})
+				if ($bgimg);
+			draw_signature($gdimg, $$props{'SIGNATURE'})
+				if ($$props{'SIGNATURE'});
+
 			$img->set_legend(@colnames)
 				if (scalar(@$data) > 2);
 #
@@ -1651,7 +1930,8 @@ sub execute {
 			else {
 				$img->plot($data);
 			}
-			$sth->{'chart_image'} = $img->gd->png();
+			$sth->{'chart_image'} = ($$props{'FORMAT'} eq 'JPEG') ? 
+				$img->gd->jpeg() : $img->gd->png();
 			next;
 		}
 #
@@ -1670,13 +1950,15 @@ sub execute {
 			$j = 0 if ($j >= scalar(@$shapelist));
 		}
 
-		$img = DBD::Chart::Plot->new($$props{'WIDTH'}, $$props{'HEIGHT'});
+		$img = DBD::Chart::Plot->new($$props{'WIDTH'}, $$props{'HEIGHT'}, $bgimg);
 		$img->setOptions( 'xAxisLabel' => $$props{'X-AXIS'})
 			if ($$props{'X-AXIS'});
 		$img->setOptions( 'yAxisLabel' => $$props{'Y-AXIS'})
 			if ($$props{'Y-AXIS'});
 		$img->setOptions( 'zAxisLabel' => $$props{'Z-AXIS'})
 			if ($$props{'Z-AXIS'});
+		$img->setOptions( 'xAxisVert' => (($$props{'X-ORIENT'} eq 'VERTICAL') ? 1 : 0))
+			if ($$props{'X-ORIENT'});
 			
 		$img->setOptions( 'title' => $$props{'TITLE'})
 			if ($$props{'TITLE'});
@@ -1691,6 +1973,14 @@ sub execute {
 			
 		$img->setOptions( 'yLog' => 1)
 			if ($$props{'Y-LOG'});
+			
+		$img->setOptions( 'keepOrigin' => 1)
+			if ($$props{'KEEPORIGIN'});
+			
+		$img->setOptions( 'bgColor' => $$props{'BACKGROUND'});
+			
+		$img->setOptions( 'signature' => $$props{'SIGNATURE'})
+			if ($$props{'SIGNATURE'});
 			
 		$img->setOptions( 'symDomain' => 1)
 			if (! $numtype{$$types[0]});
@@ -1713,7 +2003,7 @@ sub execute {
 					if ($$props{'SHOWPOINTS'});
 				$img->setPoints($$data[0], $$data[$k], $$data[$k+1], $propstr);
 			}
-			$sth->{'chart_image'} = $img->plot();
+			$sth->{'chart_image'} = $img->plot($$props{'FORMAT'});
 			next;
 		}
 
@@ -1733,7 +2023,7 @@ sub execute {
 			}
 			$img->setPoints($$data[0], $$data[$k], $propstr);
 		}
-		$sth->{'chart_image'} = $img->plot();
+		$sth->{'chart_image'} = $img->plot($$props{'FORMAT'});
 	}
     return 1;
 }
@@ -1847,9 +2137,9 @@ sub FETCH {
 }
 
 sub DESTROY { undef }
-}
 
 1;
+}
     __END__
 
 =head1 NAME
@@ -1914,7 +2204,15 @@ See L<GD(3)>, L<GD::Graph(3)> for details about the graphing engines.
 
 =item GD X.XX minimum
 
-=item GD::TextUtils X.XX minimum
+=item GD::Text X.XX minimum
+
+=item libpng
+
+=item zlib
+
+=item libgd
+
+=item jpeg-6b
 
 =back
 

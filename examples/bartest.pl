@@ -14,9 +14,13 @@ $sth->execute('Midwest', 1234.56);
 $sth->execute('Southwest', -4569.78);
 $sth->execute('Northwest', 8456.78);
 
-$rsth = $dbh->prepare('SELECT BARCHART FROM bars ' .
-'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Region\' AND Y-AXIS=\'Revenue\' AND ' .
-'TITLE = \'Revenue By Region\' AND COLOR=(red, green, lyellow, blue, orange)');
+$rsth = $dbh->prepare(
+"SELECT BARCHART FROM bars 
+	WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Region\' 
+	AND Y-AXIS=\'Revenue\' AND TITLE = \'Revenue By Region\' 
+	AND COLOR=(red, green, lyellow, blue, orange)
+	AND SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'
+	AND X-ORIENT=\'VERTICAL\' AND BACKGROUND=lgray");
 
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
