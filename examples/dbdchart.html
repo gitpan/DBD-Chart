@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.41 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.43 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -247,8 +247,9 @@ produces the image<p><center>
 <h2>DESCRIPTION</h2><p>
 
 DBI driver abstraction for rendering pie charts, bar charts, line, point, area, and
-candlestick graphs. The default output format is PNG; JPEG format can be generated
-by setting the FORMAT property (see below).<br>
+candlestick graphs. The default output format is PNG; JPEG and GIF format can be generated
+by setting the FORMAT property (see below), assuming the appropriate supporting
+libraries and modules are installed.<br>
 <b>BE ADVISED:</b> This is <b>BETA</B> software, and subject to change at the
 whim of the author(s). <p>
 
@@ -263,13 +264,24 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>CURRENT VERSION</h2><p>
 
-Release 0.41<p>
+Release 0.43<p>
 
-<a href="http://home.earthlink.net/~darnold/dbdchart/dbdchart041.zip">ZIP version</a><br>
-<a href="http://home.earthlink.net/~darnold/dbdchart/DBD-Chart-0.41.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart043.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.43.tar.gz">.tar.gz version</a>
 
 <a name="history"></a>
 <h2>CHANGE HISTORY</h2><p>
+
+Release 0.43:
+<ul>
+<li>fix to support GIF via older GD packages (many thanks to Peter Scott!)
+<li>other cosmetic fixes
+</ul>
+
+Release 0.42:
+<ul>
+<li>fix to support X-ORIENT='HORIZONTAL' on symbolic domains, candlesticks
+</ul>
 
 Release 0.41:
 <ul>
@@ -449,15 +461,15 @@ for line, area, point, and candlestick graphs.
 <li><b>BACKGROUND</b> - sets the background color; default white. single value only, from
 list of legal colors or <code>transparent</code>.
 <li><b>LOGO</b> - sets a background image; default none, single value only. Accepts a filename 
-(optionally including path info) of an image file of either PNG or JPEG format. The image
-will be centered under the graph image. If the image size is less than the defined
+(optionally including path info) of an image file of either PNG, JPEG, or GIF format. 
+The image will be centered under the graph image. If the image size is less than the defined
 specified WIDTH and/or HEIGHT, the BACKGROUND color will be used to fill to the edges. If
 the image exceeds the WIDTH and/or HEIGHT, the image will be clipped to fit.
 <li><b>SIGNATURE</b> - sets a signature string to be printed in tiny font in the
 lower right hand corner of the image; single value, text string only, default none. 
 E.g. "Copyright(C) 2001, GOWI Systems. All rights reserved.".
-<li><b>FORMAT</b> - sets the output image format, either PNG or JPEG. Single value,
-string, either 'PNG' or 'JPEG' (case insensitive).
+<li><b>FORMAT</b> - sets the output image format, either PNG, JPEG, or GIF. Single value,
+string, either 'PNG','JPEG', or 'GIF' (case insensitive).
 <li><b>X-ORIENT</b> - sets the display angle of the X-axis tick labels; single value,
 case-insensitive string, either 'horizontal' or 'vertical', default horizontal.
 <li><b>KEEPORIGIN</b> - forces the origin axes (0,0) in the image; single value, either
@@ -505,6 +517,8 @@ of the GD package provided by ActiveState does not appear to include the jpeg-6b
 library, and the Makefile for the jpeg-6b library only builds a static library,
 rather than a DLL. To render JPEG format graphics requires building the jpeg 
 library and then building the libgd package to include JPEG support.
+<li>Support for GIF image formats requires a compatible version of the GD
+modules (pre 1.20).
 <li>Y-MIN and Y-MAX currently only apply to barcharts and are subject to the 
 restrictions of the GD::Graph::barchart module (i.e., the range must include
 zero and all the defined data points).
@@ -660,15 +674,24 @@ $dbh->type_info()
 	<td align=center>INSERT of string literal used bad column index variable</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.41</td>
+</tr><tr>
+	<td align=center>7</td>
+	<td align=center>2001-Oct-01</td>
+	<td align=center>0.41</td>
+	<td align=center>X-ORIENT='HORIZONTAL' didn't work with symbolic domains, candlesticks</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.42</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
 
 <ul>
+<li>SVG support
+<li>XML template support
 <li>FONT property to select fonts
 <li>Support derived tables to layer graphs in an image
 <li>clipped barcharts (i.e., Y axis starts > zero)
-<li> (X, Y, Z) (i.e., true 3 axis) barcharts
+<li>(X, Y, Z) (i.e., true 3 axis) barcharts
 <li>Box & whisker charts
 <li>Gantt charts ?
 <li>surfacemaps ?
@@ -683,6 +706,8 @@ $dbh->type_info()
 Many thanks to all the authors of the various GD, PNG,JPEG, and zlib modules.
 Special thanks to all the initial victims, er, users for their comments,
 complaints, and suggestions.<p>
+Special thanks to <a href="mailto:Peter@PSDT.com">Peter Scott</a>
+for the GIF support and a few other fixes!
 
 <a name="refs"></a>
 <h2>REFERENCES</h2><p>
@@ -704,7 +729,7 @@ complaints, and suggestions.<p>
 Copyright (c) 2001, Dean Arnold, USA<br>
 Affiliations:<br>
 <ul>
-<!-- <li><a href="http://www.baseline-consulting.com">Baseline Consulting</a>,<br> -->
+<li><a href="http://www.presicient.com">Presicient Corp.</a>,<br>
 <li><a href="http://www.mylines.com">MyLines.com</a>,<br>
 <li><a href="http://home.earthlink.net/~darnold">Homepage</a>
 </ul><p>
@@ -732,7 +757,7 @@ I reserve the right to provide support for this software
 to individual sites under a separate (possibly fee-based)
 agreement.<p>
 
-<center><i>Last updated June 1, 2001</i>
+<center><i>Last updated October 11, 2001</i>
 
 </body></html>
 

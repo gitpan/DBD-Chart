@@ -1,11 +1,12 @@
 #2345678901234567890123456789012345678901234567890123456789012345678901234567890
+use strict;
 {
 package DBD::Chart;
 
 use DBI;
 
-@EXPORT = qw(); # Do NOT @EXPORT anything.
-$VERSION = '0.42';
+#@EXPORT = qw(); # Do NOT @EXPORT anything.
+$DBD::Chart::VERSION = '0.43';
 
 #
 #   Copyright (c) 2001, Dean Arnold
@@ -14,6 +15,10 @@ $VERSION = '0.42';
 #   License or the Artistic License, as specified in the Perl README file.
 #
 #	History:
+#
+#		0.43	2001-Oct-11 P. Scott
+#			Allow a 'gif' (or any future format supported by
+#			GD::Image) FORMAT and GIF logos, added use Carp.
 #
 #		0.42	2001-Sep-29 D. Arnold
 #			fix to support X-ORIENT='HORIZONTAL' on candlestick and symbolic
@@ -33,32 +38,32 @@ $VERSION = '0.42';
 #		0.20	2001-Mar-12	D. Arnold
 #			Coded.
 #
-$drh = undef;
-$err = 0;
-$errstr = '';
-$state = '00000';
-%charts = ();	#	defined chart list; hash of (name, property hash)
-$seqno = 1;	# id for each CREATEd chart so we don't access stale names
+$DBD::Chart::drh = undef;
+$DBD::Chart::err = 0;
+$DBD::Chart::errstr = '';
+$DBD::Chart::state = '00000';
+%DBD::Chart::charts = ();	#	defined chart list; hash of (name, property hash)
+$DBD::Chart::seqno = 1;	# id for each CREATEd chart so we don't access stale names
 
 sub driver {
 #
 #	if we've already been init'd, don't do it again
 #
-	return $drh if $drh;
+	return $DBD::Chart::drh if $DBD::Chart::drh;
 	my($class, $attr) = @_;
 	$class .= '::dr';
 	
-	$drh = DBI::_new_drh($class,
+	$DBD::Chart::drh = DBI::_new_drh($class,
 		{
 			'Name' => 'Chart',
-			'Version' => $VERSION,
+			'Version' => $DBD::Chart::VERSION,
 			'Err' => \$DBD::Chart::err,
 			'Errstr' => \$DBD::Chart::errstr,
 			'State' => \$DBD::Chart::state,
 			'Attribution' => 'DBD::Chart by Dean Arnold'
 		});
-	DBI->trace_msg("DBD::Chart v.$VERSION loaded on $^O\n", 1);
-	return $drh;
+	DBI->trace_msg("DBD::Chart v.$DBD::Chart::VERSION loaded on $^O\n", 1);
+	return $DBD::Chart::drh;
 }
 
 1;
@@ -68,8 +73,7 @@ sub driver {
 #	check on attributes
 #
 {   package DBD::Chart::dr; # ====== DRIVER ======
-$imp_data_size = 0;
-use strict;
+$DBD::Chart::dr::imp_data_size = 0;
 
 # we use default (dummy) connect method
 
@@ -79,8 +83,8 @@ sub DESTROY { undef }
 }
 
 {   package DBD::Chart::db; # ====== DATABASE ======
-    $imp_data_size = 0;
-    use strict;
+    $DBD::Chart::db::imp_data_size = 0;
+    use Carp;
 
 use DBI qw(:sql_types);
 
@@ -1088,9 +1092,9 @@ sub DESTROY {
 
 {   package DBD::Chart::st; # ====== STATEMENT ======
 use DBI qw(:sql_types);
+use Carp;
 
-$imp_data_size = 0;
-use strict;
+$DBD::Chart::st::imp_data_size = 0;
 
 use GD;
 use GD::Graph::pie;
@@ -1224,8 +1228,10 @@ sub validate_properties {
 
 sub add_logo {
 	my ($logo, $imgw, $imgh, $bgcolor) = @_;
-	if ($logo!~/\.(png|jpg|jpeg)$/i) {
-		$DBD::Chart::errstr = 
+	my $pat = GD::Image->can('newFromGif') ? 'png|jpe?g|gif' : 'png|jpe?g';
+	if ($logo!~/\.($pat)$/i) {
+	  $DBD::Chart::errstr = GD::Image->can('newFromGif') ?
+	'Unrecognized logo file format. File qualifier must be .png, .jpg, .jpeg, or .gif.' :
 	'Unrecognized logo file format. File qualifier must be .png, .jpg, or .jpeg.';
 		$DBD::Chart::err = -1;
 		return undef;
@@ -1237,7 +1243,8 @@ sub add_logo {
 		return undef;
 	}
 	my $logoimg = ($logo=~/\.png$/i) ? GD::Image->newFromPng(*LOGO) :
-		GD::Image->newFromJpeg(*LOGO);
+	  ($logo=~/\.gif$/i) ? GD::Image->newFromGif(*LOGO) :
+	    GD::Image->newFromJpeg(*LOGO);
 	close(LOGO);
 	if (! $logoimg) {
 		$DBD::Chart::errstr = 'GD cannot read logo file.';
@@ -1853,9 +1860,10 @@ sub execute {
 
 			draw_signature($gdimg, $$props{'SIGNATURE'})
 				if ($$props{'SIGNATURE'});
-
-			$sth->{'chart_image'} = ($$props{'FORMAT'} eq 'JPEG') ? 
-				$img->gd->jpeg() : $img->gd->png();
+			my $fmt = $$props{'FORMAT'} || 'png';
+			croak("FORMAT $fmt not recognized by GD::Image")
+			        unless $img->gd->can($fmt = lc $fmt);
+			$sth->{'chart_image'} = $img->gd->$fmt();
 			next;
 		}
 		
@@ -1942,8 +1950,10 @@ sub execute {
 			else {
 				$img->plot($data);
 			}
-			$sth->{'chart_image'} = ($$props{'FORMAT'} eq 'JPEG') ? 
-				$img->gd->jpeg() : $img->gd->png();
+			my $fmt = $$props{'FORMAT'} || 'png';
+			croak("FORMAT $fmt not recognized by GD::Image")
+			        unless $img->gd->can($fmt = lc $fmt);
+			$sth->{'chart_image'} = $img->gd->$fmt();
 			next;
 		}
 #
@@ -2249,16 +2259,17 @@ whip up a PPM in the future.
 
 For Unix, extract it with
 
-    gzip -cd DBD-Chart-0.42.tar.gz | tar xf -
+    gzip -cd DBD-Chart-0.43.tar.gz | tar xf -
 
 and then enter the following:
 
-    cd DBD-Chart-0.42
+    cd DBD-Chart-0.43
     perl Makefile.PL
     make
-    make test
 
-If any tests fail, let me know. Otherwise go on with
+Sorry, no tests are available yet. After you install, you can
+run the scripts in the 'examples' subdirectory and examine the
+resulting images.
 
     make install
 

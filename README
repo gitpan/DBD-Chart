@@ -66,16 +66,16 @@ DESCRIPTION
 
     For Unix, extract it with
 
-        gzip -cd DBD-Chart-0.42.tar.gz | tar xf -
+        gzip -cd DBD-Chart-0.43.tar.gz | tar xf -
 
     and then enter the following:
 
-        cd DBD-Chart-0.42
+        cd DBD-Chart-0.43
         perl Makefile.PL
         make
-        make test
 
-    If any tests fail, let me know. Otherwise go on with
+    Sorry, no tests are available yet. After you install, you can run the
+    scripts in the 'examples' subdirectory and examine the resulting images.
 
         make install
 

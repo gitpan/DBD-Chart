@@ -8,6 +8,10 @@
 #
 #	Change History:
 #
+#	0.43	2001-Oct-11		 P. Scott
+#		Allow a 'gif' (or any future format supported by
+#		GD::Image) format to be called in plot().
+#
 #	0.42	2001-Sep-29		Dean Arnold
 #		- fixed xVertAxis handling for candlestick and symbolic domains
 #
@@ -25,7 +29,7 @@
 
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.42';
+$DBD::Chart::Plot::VERSION = '0.43';
 
 use GD;
 use strict;
@@ -267,7 +271,7 @@ sub setOptions {
 }
 
 sub plot {
-	my ($obj, $format) = @_;
+	my ($obj, $format) = (shift, lc shift);
 
 	if ($obj->{'bgColor'}) {
 		my $color = ($obj->{$obj->{'bgColor'}}) ? $obj->{$obj->{'bgColor'}} :
@@ -281,8 +285,7 @@ sub plot {
 	$obj->plotAxes;
 	$obj->plotData;
 
-	return (($format) && ($format eq 'jpeg')) ? 
-		$obj->{'img'}->jpeg : $obj->{'img'}->png;
+	return ($format) && $obj->{'img'}->$format;
 }
 
 # sets min and max values of all data (xl, yl, xh, yh)
