@@ -1,13 +1,13 @@
 # -*- perl -*-
 
-require 5.005;
+require 5.6.0;
 use strict;
 use vars qw($DBI_INC_DIR);
 require ExtUtils::MakeMaker;
 
-eval { require 5.005 } or die << 'EOD';
+eval { require 5.6.0 } or die << 'EOD';
 #######################################
-#	This module requires a minimum Perl version of 5.005
+#	This module requires a minimum Perl version of 5.6.0
 #	Please upgrade!
 #######################################
 EOD
@@ -28,15 +28,13 @@ my %opts =
      );
 
 if ($ExtUtils::MakeMaker::VERSION >= 5.43) {
-    $opts{'AUTHOR'} = 'Dean Arnold (darnold@earthlink.net)';
+    $opts{'AUTHOR'} = 'Dean Arnold (darnold@presicient.com)';
     $opts{'ABSTRACT'} = 'Chart driver for DBI module';
     $opts{'PREREQ_PM'} = \%prereq;
 }
 my $ok = 1;
 $ok &&= CheckModule('DBI', '1.13');
 $ok &&= CheckModule('GD', '1.13');
-$ok &&= CheckModule('GD::Graph', '1.13');
-$ok &&= CheckModule('GD::Graph3d', '0.55');
 $ok &&= CheckModule('GD::Text', '0.80');
 
 if (!$ok) {

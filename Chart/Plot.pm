@@ -1,12 +1,20 @@
+#23456789012345678901234567890123456789012345678901234567890123456789012345
 #
-# DBD::Chart::Plot -- Two dimensional plotting engine for DBD::Chart
+# DBD::Chart::Plot -- Plotting engine for DBD::Chart
 #
-#	Copyright (C) 2001 by Dean Arnold <darnold@earthlink.net>
+#	Copyright (C) 2001 by Dean Arnold <darnold@presicient.net>
 #
-#   You may distribute under the terms of either the GNU General Public
-#   License or the Artistic License, as specified in the Perl README file.
+#   You may distribute under the terms of the Artistic License, 
+#	as specified in the Perl README file.
 #
 #	Change History:
+#
+#	0.50	2001-Oct-14		 D. Arnold
+#		Add barchart, piechart engine
+#		Add iconic barcharts, pointshapes
+#		Add 3D, 3 axis barcharts
+#		Add HTML imagemap generation
+#		Increase axis label text length
 #
 #	0.43	2001-Oct-11		 P. Scott
 #		Allow a 'gif' (or any future format supported by
@@ -26,20 +34,24 @@
 #	0.10	Feb 20, 2001	Dean Arnold
 #		- Coded.
 #
-
+require 5.6.0;
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.43';
+$DBD::Chart::Plot::VERSION = '0.50';
 
 use GD;
 use strict;
-
+#
+#	list of valid colors
+#
 my @clrlist = qw(
 	white lgray	gray dgray black lblue blue dblue gold lyellow	
 	yellow	dyellow	lgreen	green dgreen lred red dred lpurple	
 	purple dpurple lorange orange pink dpink marine	cyan	
 	lbrown dbrown );
-
+#
+#	RGB of valid colors
+#
 my %colors = (
 	white	=> [255,255,255], 
 	lgray	=> [191,191,191], 
@@ -72,7 +84,9 @@ my %colors = (
 	dbrown	=> [165,42,42],
 	transparent => [1,1,1]
 );
-
+#
+#	pointshapes
+#
 my %shapes = (
 'fillsquare', 1,
 'opensquare', 2,
@@ -81,11 +95,111 @@ my %shapes = (
 'filldiamond', 5,
 'opendiamond', 6,
 'fillcircle', 7,
-'opencircle', 8);
-
+'opencircle', 8,
+'icon', 9);
+#
+#	logarithmic steps for axis scaling
+#
 my @logsteps = (0, log(2)/log(10), log(3)/log(10), log(4)/log(10), 
 	log(5)/log(10), 1.0);
+#
+#	index of vertex pts for 3-D barchart
+#	polygonal visible faces
+#
+my @polyverts = ( 
+[ 1*2, 2*2,	3*2, 4*2 ],	# top face
+[ 0*2, 1*2, 4*2, 5*2 ],	# front face
+[ 4*2, 3*2, 6*2, 5*2 ]	# side face
+);
+#
+# indices of 3-D projection vertices
+#	mapped to line segments
+#
+my @vert2lines = (
+1*2, 4*2, 	# top front l-r
+0*2, 1*2,	# left front b-t
+0*2, 5*2,	# bottom front l-r
+4*2, 5*2,	# right front b-t
+1*2, 2*2,	# top left f-r
+2*2, 3*2,	# top rear l-r
+3*2, 4*2,   # right top r-f
+3*2, 6*2,   # right rear t-b
+5*2, 6*2,   # right bottom r-f
+);
+
+#
+#	indices of 3-D projection of axes planes
+#
+my @axesverts = (
+	0*2, 1*2,	# left wall
+	1*2, 3*2,
+	3*2, 2*2,
+	2*2, 0*2,
+		
+# rear wall
+	3*2, 6*2,	# trl to trr
+	6*2, 5*2,	# trr to brr
+	5*2, 1*2,	# brr to brl
+
+# floor		
+	9*2, 10*2,	# brr to brl
+	10*2, 7*2,	# brl to brf
 	
+	9*2, 8*2,	# brr to brf
+	7*2, 8*2,	# blf to brf
+);
+#
+#	font sizes
+#
+my ($sfw,$sfh) = (gdSmallFont->width, gdSmallFont->height);
+my ($tfw,$tfh) = (gdTinyFont->width, gdTinyFont->height);
+
+my %valid_attr = qw(
+	width 1
+	height 1
+	genMap 1
+	mapType 1
+	mapURL 1
+	mapScript 1
+	horizMargin 1
+	vertMargin 1
+	xAxisLabel 1
+	yAxisLabel 1
+	zAxisLabel 1
+	xLog 1
+	yLog 1
+	zLog 1
+	title 1
+	signature 1
+	legend 1
+	showValues 1
+	horizGrid 1
+	vertGrid 1
+	xAxisVert 1
+	keepOrigin 1
+	bgColor 1
+	threed 1
+	icons 1
+	symDomain 1
+	timeDomain 1
+	gridColor 1
+	textColor 1
+	font 1
+	logo 1
+);
+my @lines = ( 
+[ 0*2, 4*2,	5*2, 1*2 ],	# top face
+[ 0*2, 1*2, 3*2, 2*2 ],	# front face
+[ 1*2, 5*2, 7*2, 3*2 ]	# side face
+);
+#
+#	URI escape map
+#
+my %escapes = ();
+for (0..255) {
+    $escapes{chr($_)} = sprintf("%%%02X", $_);
+}
+
 sub new {
     my $class = shift;
     my $obj = {};
@@ -94,176 +208,605 @@ sub new {
 
     return $obj;
 }
-
+#
+#	Plot object members:
+#
+#	img - GD::Image object
+#	width - image width in pixels
+#	height - image height in pixels
+#	signature - signature string
+#	genMap - 1 => generate HTML imagemap
+#	horizMargin - image horizontal margins in pixels
+#	vertMargin - image vertical margins in pixels
+#	data - data points to be plotted
+#	props - graph properties
+#	plotCnt - number of plots in graph
+#	xl, xh, yl, yh, zl, zh - min/max of each axis
+#	xscale, yscale, zscale - scaling factors for assoc. axis
+#	horizEdge, vertEdge - horizontal/vertical edge location
+#	horizStep, vertStep - horizontal/vertical pixel increment
+#	haveScale - calculated min/max is valid
+#	xAxisLabel, yAxisLabel, zAxisLabel - label for assoc. axis
+#	title - title string
+#	xLog, yLog, zLog - 1 => assoc axis is logarithmic
+#	errmsg - last error msg
+#	keepOrigin - force (0,0[,0]) into graph
+#	imgMap - HTML imagemap text
+#	symDomain - 1 => domain is symbolic
+#	timeDomain - 1 => domain is temporal
+#	icon - name of icon image file for iconic barcharts
+#	logo - name of background logo image file
+#
 sub init {
-	my ($obj, $w, $h, $bgimg) = @_;
+	my ($obj, $w, $h) = @_;
 
-  #  create an image object
-	$obj->{'img'} = ($w) ? new GD::Image($w, $h) : new GD::Image(400, 300);
-	$obj->{'width'} = ($w) ? $w : 400;
-	$obj->{'height'} = ($w) ? $h : 300;
-	$obj->{'img'}->copy($bgimg, 0, 0, 0, 0, $w-1, $h-1)
-  		if ($bgimg);
+	$w = 400 unless $w;
+	$h = 300 unless $h;
+	my $img = new GD::Image($w, $h);
+	
+	my $white = $img->colorAllocate(@{$colors{white}});
+	my $black = $img->colorAllocate(@{$colors{black}}); 
 
-# set image margins
-	$obj->{'horizMargin'} = 50;
-	$obj->{'vertMargin'} = 70;
+	$obj->{width} = $w;
+	$obj->{height} = $h;
+	$obj->{img} = $img;
+
+# imagemap attributes
+  	$obj->{genMap} = undef;	# name of map
+  	$obj->{imgMap} = '';		# contains resulting map text
+  	$obj->{mapType} = 'HTML';	# default HTML
+  	$obj->{mapURL} = '';		# base URL for hotspots
+  	$obj->{mapScript} = '';	# base script call for hotspots
+  		
+# image margins
+	$obj->{horizMargin} = 50;
+	$obj->{vertMargin} = 70;
 
 # create an empty array for point arrays and properties
-	$obj->{'data'} = [ ];
-	$obj->{'props'} = [ ];
-	$obj->{'plotCnt'} = 0;
+	$obj->{data} = [ ];
+	$obj->{props} = [ ];
+	$obj->{plotCnt} = 0;
 
 # used for pt2pxl()
-	($obj->{'xl'}, $obj->{'xh'}, $obj->{'yl'}, $obj->{'yh'}) = (0,0,0,0);
-	($obj->{'xscale'}, $obj->{'yscale'}) = (0,0);
-	($obj->{'horizEdge'}, $obj->{'vertEdge'}, 
-		$obj->{'horizStep'}, $obj->{'vertStep'}) = (0,0,0,0);
-	$obj->{'haveScale'} = 0; # last calculated min and max still valid
+	$obj->{xl} = undef;
+	$obj->{xh} = undef;
+	$obj->{yl} = undef;
+	$obj->{yh} = undef;
+	$obj->{zl} = undef;
+	$obj->{zh} = undef;
+	$obj->{xscale} = 0;
+	$obj->{yscale} = 0;
+	$obj->{zscale} = 0;
+	$obj->{horizEdge} = 0;
+	$obj->{vertEdge} = 0;
+	$obj->{horizStep} = 0;
+	$obj->{vertStep} = 0;
+	$obj->{Xcard} = 0;		# cardinality of 3-axis barcharts
+	$obj->{Zcard} = 0;
+	$obj->{plotWidth} = 0;	# true plot width; height; depth
+	$obj->{plotHeight} = 0;
+	$obj->{plotDepth} = 0;
+	$obj->{brushWidth} = 0; # width of bars or candlesticks
+	$obj->{brushDepth} = 0;
+	$obj->{rangeSum} = 0;	# running total for piecharts
+	$obj->{haveScale} = 0;	# 1} = last calculated min & max still valid
 
-	($obj->{'xAxisLabel'}, $obj->{'yAxisLabel'}) = ('','');
-	($obj->{'xLog'}, $obj->{'yLog'}) = (0,0);
-	$obj->{'title'} = '';
-	$obj->{'errmsg'} = '';
-	$obj->{'keepOrigin'} = 0;
-	$obj->{'bgColor'} = 'white' if (! $bgimg);
+# axis label strings
+	$obj->{xAxisLabel} = '';
+	$obj->{yAxisLabel} = '';
+	$obj->{zAxisLabel} = '';
 
-#  allocate some colors
-	$obj->{'white'} = $obj->{'img'}->colorAllocate(@{$colors{'white'}});
-	$obj->{'black'} = $obj->{'img'}->colorAllocate(@{$colors{'black'}}); 
-	$obj->{'transparent'} = 
-		$obj->{'img'}->colorAllocate(@{$colors{'transparent'}}); 
-	$obj->{'img'}->transparent($obj->{'transparent'});
-	
-	$obj->{'img'}->interlaced('true');
+	$obj->{xLog} = 0;		# 1 => log10 scaling
+	$obj->{yLog} = 0;
+	$obj->{zLog} = 0;
 
-# black border
-	$obj->{'img'}->rectangle( 0, 0,	$obj->{'width'}-1, $obj->{'height'}-1,
-		$obj->{'black'});
+	$obj->{title} = '';
+	$obj->{signature} = '';
+	$obj->{legend} = 0; 	# 1 => render legend
+	$obj->{showValues} = 0; # 1 => print datapoint values
+	$obj->{horizGrid} = 0;	# 1 => print y-axis gridlines
+	$obj->{vertGrid} = 0;	# 1 => print x-axis gridlines
+	$obj->{xAxisVert} = 0;	# 1 => print x-axis label vertically
+	$obj->{errmsg} = '';	# error result of last operation
+	$obj->{keepOrigin} = 0; # 1 => force origin into graph
+	$obj->{threed} = 0;		# 1 => use 3-D effect
+	$obj->{logo} = undef;
+		
+	$obj->{icons} = [ ];	# array of icon filenames
+		
+	$obj->{symDomain} = 0;	# 1 => use symbolic domain
+	$obj->{timeDomain} = undef; # defines format of temporal domain labels
+
+#  allocate some oft used colors
+	$obj->{white} = $white;
+	$obj->{black} = $black; 
+	$obj->{transparent} = $img->colorAllocate(@{$colors{'transparent'}});
+
+#	for now these aren't used, but someday we'll let them be configured
+	$obj->{bgColor} = $white; # background color
+	$obj->{gridColor} = $black;
+	$obj->{textColor} = $black;
+	$obj->{font} = 'gd';
+
+# set image basic properties
+	$img->transparent($obj->{transparent});
+	$img->interlaced('true');
+	$img->rectangle( 0, 0, $w-1, $h-1, $obj->{black});
 }
 
+#
+#	compare function for numeric sort
+#
 sub numerically { $a <=> $b }
 
-sub setPoints {
-	my ($obj, $xary, $y1ary, $y2ary, $props) = @_;
+sub setCandlePoints {
+	my ($obj, $xary, @ranges) = @_;
+	my $props = pop @ranges;
+	my ($xmin, $ymin, $xmax, $ymax) = 
+		($obj->{xl}, $obj->{yl}, $obj->{xh}, $obj->{yh});
+
+	my $num_ranges = @ranges;
+	$obj->{errmsg} = 'Missing a min or max range array.', return undef
+		if ($num_ranges != 2);
+
+	my $baseary = ($obj->{data}) ? $obj->{data}->[0] : undef;
+	$obj->{errmsg} = 'Domain does not match prior domain.', return undef
+		if ($baseary && ((3 * scalar @$xary) != scalar @$baseary));
+
+	foreach my $yary (@ranges) {
+		$obj->{errmsg} = 'Unbalanced dataset.',
+		return undef
+			if ($#$xary != $#$yary);
+	}
+
 	my @ary = ();
-	my %xhash = ();
-	my $i;
-	$props = $y2ary if (! ref $y2ary);
-	my $yary = $y1ary;
-	
-	if ($#$xary != $#$yary) {
-		$obj->{'errmsg'} = 'Unbalanced dataset.';
-		return undef;
-	}
-
-# validate and construct array of points
-	if (! ref $y2ary) {
-		for ($i = 0; $i <= $#$xary; $i++) {
-#
-#	eliminate undefined data points
-#
-			next if ((! defined($$xary[$i])) || (! defined($$yary[$i])));
-
-			$obj->{'errmsg'} = "Non-numeric domain value $$xary[$i]." and
-				return undef
-				if ((! $obj->{'symDomain'}) && 
-					($$xary[$i]!~/^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/));
-			
-			$obj->{'errmsg'} = "Non-numeric range value $$yary[$i]." and
-				return undef
-				if ($$yary[$i] !~ /^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/);
-		
-			if (((! $obj->{'symDomain'}) && ($obj->{'xLog'}) && ($$xary[$i] <= 0)) ||
-				(($obj->{'yLog'}) && ($$yary[$i] <= 0))) {
-				$obj->{'errmsg'} = 'Negative value supplied for logarithmic axis.';
-				return undef;
-			}
-
-			if ($obj->{'symDomain'}) {
-				push(@ary, $$xary[$i], 
-					($obj->{'yLog'} ? log($$yary[$i])/log(10) : $$yary[$i]));
-			}
-			else {
-				$xhash{$$xary[$i]} = $$yary[$i];
-			}
-		}
-#
-#	make sure domain values are in ascending order
-#
-		if (! $obj->{'symDomain'}) {
-			my @xsorted = sort numerically keys(%xhash);
-
-			foreach $i (@xsorted) {
-#
-#	if either xLog or yLog is defined, apply to appropriate dataset now
-#
-				push(@ary, ($obj->{'xLog'} ? log($i)/log(10) : $i), 
-					($obj->{'yLog'} ? log($xhash{$i})/log(10) : $xhash{$i}));
-			}
-		}
-# record the dataset
-		push(@{$obj->{'data'}}, \@ary);
-		push(@{$obj->{'props'}}, ($props ? $props : 'nopoints'));
-
-		$obj->{'haveScale'} = 0; # invalidate any prior min-max calculations
-		return 1;
-	}
-#
-#	must be candlestick, which means X-axis is uniformly distributed,
-#	possibly non-numeric
-#
+	my $yaryl = $ranges[0];
+	my $yaryh = $ranges[1];
+	my $i = 0;
 	for ($i = 0; $i <= $#$xary; $i++) {
 #
 #	eliminate undefined data points
 #
-		next if ((! defined($$xary[$i])) || (! defined($$y1ary[$i])));
+		next unless defined($$xary[$i]);
+#
+#	domains must match
+#
+		$obj->{errmsg} = 'Domain value ' . $$xary[$i] .
+			' does not match previous dataset.', 
+		return undef
+			if ($baseary && ($$xary[$i] ne $$baseary[$i*3]));
+#
+#	store datapts as 
+#	($xval[0], [ ylow[0], yhi[0] ],...$xval[M], [ ylow[M], yhi[M] ])
+#
+		my ($yl, $yh) = (0, 0);
+		push(@ary, $$xary[$i]);
+		
+		push(@ary, undef, undef),
+		next 
+			unless (defined($$yaryl[$i]) && defined($$yaryh[$i]));
 
-		$obj->{'errmsg'} = "Non-numeric range value $$y1ary[$i]." and
-			return undef
-			if ($$y1ary[$i] !~ /^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/);
+		$obj->{errmsg} = 'Non-numeric range value ' . $$yaryl[$i] . '.',
+		return undef
+			unless ($$yaryl[$i]=~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
+
+		$obj->{errmsg} = 'Non-numeric range value ' . $$yaryh[$i] . '.',
+		return undef
+			unless ($$yaryh[$i]=~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
 		
-		$obj->{'errmsg'} = "Non-numeric range value $$y2ary[$i]." and
-			return undef
-			if ($$y2ary[$i] !~ /^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/);
-		
-		if ($$y1ary[$i] > $$y2ary[$i]) {
-			$obj->{'errmsg'} = 'Range min value greater than range max value.';
-			return undef;
-		}
+		$obj->{errmsg} = 'Range min value greater than range max value.',
+		return undef
+			if ($$yaryl[$i] > $$yaryh[$i]);
 			
-		if (($obj->{'yLog'}) && (($$y1ary[$i] <= 0) || ($$y2ary[$i] <= 0))) {
-			$obj->{'errmsg'} = 'Negative value supplied for logarithmic axis.';
-			return undef;
-		}
+		$obj->{errmsg} = 
+			'Negative value supplied for logarithmic axis.',
+		return undef
+			if ($obj->{yLog} && (($$yaryl[$i] <= 0) || 
+					($$yaryh[$i] <= 0)));
 
-		push(@ary, $$xary[$i],
-			[ ($obj->{'yLog'} ? log($$y1ary[$i])/log(10) : $$y1ary[$i]),
-			($obj->{'yLog'} ? log($$y2ary[$i])/log(10) : $$y2ary[$i]) ] );
+		$yl = ($obj->{yLog} ? log($$yaryl[$i])/log(10) : $$yaryl[$i]);
+		$yh = ($obj->{yLog} ? log($$yaryh[$i])/log(10) : $$yaryh[$i]);
+		$ymin = $yl unless (defined($ymin) && ($ymin <= $yl));
+		$ymax = $yh unless (defined($ymax) && ($ymax >= $yh));
+		push(@ary, $yl, $yh);
+	} # end for
+# record the dataset; use stack to support future multi-graph images
+	push(@{$obj->{data}}, \@ary);
+	push(@{$obj->{props}}, $props);
+#
+#	set min/max range values here, and the width of the sticks
+#
+	$obj->{xl} = 1;
+	$obj->{xh} = $i;
+	$obj->{yl} = $ymin;
+	$obj->{yh} = $ymax;
+	$obj->{brushWidth} = 2;
+	$obj->{haveScale} = 0; # invalidate any prior min-max calculations
+	return 1;
+}
+
+sub set3DBarPoints {
+	my ($obj, $xary, $yary, $zary, $props) = @_;
+	my ($ymin, $ymax) = ($obj->{yl}, $obj->{yh});
+#
+#	verify:
+#		2 range sets if 3-axis
+#		each rangeset has same number of elements as domain
+#
+	my $hasZaxis = ($obj->{zAxisLabel});
+	
+	$obj->{errmsg} = '3-axis chart requires 2 ranges.', 
+	return undef
+		if ($hasZaxis && (! $props));
+
+	$props = $zary, $zary = undef
+		unless $hasZaxis;
+
+	my @zs = ();
+	my %zhash = ();
+	my %xhash = ();
+	my @xs = ();
+	my ($xval, $zval) = (0,1);
+	my $i = 0;
+	if ($hasZaxis) {
+
+		$obj->{errmsg} = 'Unbalanced dataset.',
+		return undef
+			if (($#$xary != $#$yary) || ($#$xary != $#$zary));
+#
+#	collect distinct Z and X values, and correlate them
+#	with the assoc. Y value via hashes
+#
+		for ($i = 0; $i <= $#$zary; $i++) {
+			$zval = $$zary[$i];
+			push(@zs, $zval),
+			$zhash{$zval} = { }
+				unless $zhash{$zval};
+			$zhash{$zval}->{$$xary[$i]} = $$yary[$i];
+		}
+		for ($i = 0; $i <= $#$xary; $i++) {
+			$xval = $$xary[$i];
+			next if $xhash{$xval};
+			push(@xs, $xval);
+			$xhash{$xval} = 1;
+		}
+	}
+	else {
+		$obj->{errmsg} = 'Unbalanced dataset.',
+		return undef
+			if ($#$xary != $#$yary);
+#
+#	synthesize Z axis values so we can process same as true 3 axis
+#
+		push(@zs, 1);
+		$zhash{1} = { };
+		for ($i = 0; $i <= $#$xary; $i++) {
+			$zhash{1}->{$$xary[$i]} = $$yary[$i];
+		}
+		for ($i = 0; $i <= $#$xary; $i++) {
+			$xval = $$xary[$i];
+			next if $xhash{$xval};
+			push(@xs, $xval);
+			$xhash{$xval} = 1;
+		}
+	}
+	$obj->{zValues} = \@zs;
+	$obj->{xValues} = \@xs;
+#
+#	sort datapoints in order Z from back to front,
+#		X from left to right
+#	(i.e., GROUP BY Z, X ORDER BY Z DESCENDING, X ASCENDING)
+#	the order of appearance in the input arrays determines
+#	what "front, back, left, and right" mean
+#
+#	Since X and Z are always symbolic, we generate numeric pseudo values
+#	for them based on order of appearance in the input arrays
+#
+	my $zCard = scalar @zs;	# go from last Z value forward
+	my $xCard = scalar @xs;
+	my ($znum, $xnum, $y) = (0,0,0);
+	my @ary = ();
+	for (my $z = $zCard; $z > 0; $z--) {
+		foreach my $x (1..$xCard) {
+			$y = $zhash{$zs[$z-1]}->{$xs[$x-1]};
+#
+#	data is stored in output array as (X, Ymin, Ymax, Z, ...)
+#
+			$obj->{errmsg} = "Non-numeric range value $y.",
+			return undef
+				unless ($y=~/^[+-]?\.?\d\d*(\.\d*)?([Ee][+-]?\d+)?$/);
+		
+			$obj->{errmsg} = 
+				'Negative value supplied for logarithmic axis.',
+			return undef
+				if (($obj->{yLog}) && ($y <= 0));
+
+			$y = log($y)/log(10) if ($obj->{yLog});
+			$ymin = $y unless (defined($ymin) && ($ymin <= $y));
+			$ymax = $y unless (defined($ymax) && ($ymax >= $y));
+			push(@ary, $x, ($y >= 0) ? 0 : $y, ($y < 0) ? 0 : $y, $z);
+		}
+	}
+# record the dataset; use stack to support future multi-graph images
+	push(@{$obj->{data}}, \@ary);
+	push(@{$obj->{props}}, $props);
+	$obj->{xl} = 1;
+	$obj->{xh} = $xCard;
+	$obj->{yl} = $ymin;
+	$obj->{yh} = $ymax;
+	$obj->{zl} = 1;
+	$obj->{zh} = $zCard;
+	$obj->{Xcard} = $xCard;
+	$obj->{Zcard} = $zCard;
+	$obj->{haveScale} = 0;	# invalidate prior min-max calculations
+
+	return 1;
+}
+
+#
+#	2-Axis barchart
+#
+sub set2DBarPoints {
+	my ($obj, $xary, $yary, $props) = @_;
+
+	$obj->{errmsg} = 'Unbalanced dataset.',
+	return undef
+		if ($#$xary != $#$yary);
+			
+	my $baseary = ($obj->{data}) ? $obj->{data}->[0] : undef;
+	$obj->{errmsg} = 'Domain does not match prior domain.', 
+	return undef
+		if ($baseary && ((3 * scalar @$xary) != scalar @$baseary));
+
+	$obj->{errmsg} = 'Unbalanced dataset.',
+	return undef
+		if ($#$xary != $#$yary);
+
+	my ($x, $y) = (0,0);
+	my @ary = ();
+	my ($i, $ymin, $ymax);
+	for ($i = 0; $i <= $#$xary; $i++) {
+#
+#	eliminate undefined data points
+#
+		next unless defined($$xary[$i]);
+#
+#	domains must match
+#
+		$x = $$xary[$i];
+		$y = $$yary[$i];
+		$obj->{errmsg} = 'Domain value ' . $x . 
+			' does not match previous dataset.', 
+		return undef
+			if ($baseary && ($x ne $$baseary[$i*3]));
+#
+#	store datapts as same as candlesticks w/ pseudo min (or max)
+#	($xval[0], 0, yval[0])
+#
+		push(@ary, $x);
+		push(@ary, undef),
+		next 
+			unless defined($y);
+
+		$obj->{errmsg} = "Non-numeric range value $y.";
+		return undef
+			unless ($y =~ /^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
+		
+		$obj->{errmsg} =
+			'Negative value supplied for logarithmic axis.',
+		return undef
+			if (($obj->{yLog}) && ($y <= 0));
+
+		$y = $obj->{yLog} ? log($y)/log(10) : $y;
+		$ymin = $y unless (defined($ymin) && ($ymin <= $y));
+		$ymax = $y unless (defined($ymax) && ($ymax >= $y));
+		push(@ary, ($y >= 0) ? 0 : $y, ($y < 0) ? 0 : $y);
+	}
+# record the dataset; use stack to support future multi-graph images
+	push(@{$obj->{data}}, \@ary);
+	push(@{$obj->{props}}, $props);
+	
+	$obj->{xl} = 1;
+	$obj->{xh} = $i;
+	$obj->{yl} = $ymin;
+	$obj->{yh} = $ymax;
+	$obj->{haveScale} = 0;	# invalidate any prior min-max calculations
+
+}
+
+sub setPiePoints {
+	my ($obj, $xary, $yary, $props) = @_;
+		
+	my @ary = ();
+	$obj->{errmsg} = 'Unbalanced dataset.',
+	return undef
+		if ($#$xary != $#$yary);
+	
+	my $xtotal = 0;
+	for (my $i = 0; $i <= $#$xary; $i++) {
+		$obj->{errmsg} = 
+			'Negative range values not permitted for piecharts.',
+		return undef
+			if ($$yary[$i] < 0);
+
+		push(@ary, $$xary[$i], $$yary[$i]);
+		$xtotal += $$yary[$i];
+	}
+	push(@{$obj->{data}}, \@ary);
+	push(@{$obj->{props}}, $props);
+	$obj->{rangeSum} = $xtotal;
+	$obj->{haveScale} = 0; # invalidate any prior min-max calculations
+	return 1;
+}
+
+sub setBoxPoints {
+	my ($obj, $xary, $props) = @_;
+	my @ary = sort numerically @$xary;
+	my ($xl, $xh) = ($obj->{xl}, $obj->{xh});
+	push(@{$obj->{data}}, \@ary);
+	push(@{$obj->{props}}, $props);
+	$obj->{xl} = $ary[0] 
+		unless (defined($xl) && ($ary[0] > $xl));
+	$obj->{xh} = $ary[$#ary] 
+		unless (defined($xh) && ($ary[$#ary] < $xh));
+#
+#	create dummy Y bounds
+#
+	$obj->{yl} = 1;
+	$obj->{yh} = 100 * (scalar(@{$obj->{data}}));
+
+	$obj->{numRanges} = 0;
+	$obj->{haveScale} = 0; # invalidate any prior min-max calculations
+	return 1;
+}
+#
+#	variable arglist:
+#
+#	for line/point/area graphs, 2-axis barcharts:
+#		setPoints($plotobj, \@xarray, \@yarray1, $props)
+#	for 3-axis barcharts, surfacemaps:
+#		setPoints($plotobj, \@xarray, \@yarray, \@zarray, $props)
+#	for candlesticks, barcharts:
+#		setPoints($plotobj, \@xarray, \@ylow, \@yhigh, $props)
+#	for piecharts:
+#		setPoints($plotobj, \@xarray, \@yarray, $props)
+#	for box&whisker:
+#		setPoints($plotobj, \@xarray, $props)
+#	for Gantt:
+#		setPoints($plotobj, \@tasks, \@assigned, \@dependents, \@start,
+#			\@end, \@status, \@comment, $props)
+#
+#	NOTE: graph type properties must be set prior to setting graph points
+#	Each domain/rangeset must be separately defined with its properties
+#	(e.g., a barchart with N domains requires N setPoints calls)
+#
+sub setPoints {
+	my ($obj, $xary, @ranges) = @_;
+	my $props = pop @ranges;
+
+	return $obj->setCandlePoints($xary, @ranges, $props)
+		if ($props=~/\bcandle\b/);
+
+	return $obj->set3DBarPoints($xary, @ranges, $props)
+		if (($props=~/\bbar\b/) && ($obj->{zAxisLabel} || $obj->{threed}));
+
+	return $obj->set2DBarPoints($xary, @ranges, $props)
+		if ($props=~/\bbar\b/);
+
+	return $obj->setPiePoints($xary, @ranges, $props)
+		if ($props=~/\bpie\b/);
+
+	return $obj->setBoxPoints($xary, @ranges, $props)
+		if ($props=~/\bbox\b/);
+#
+#	must be line/point/area, verify ranges have same num of elements
+#	as domain
+#
+	my $yary = $ranges[0];
+
+	$obj->{errmsg} = 'Unbalanced dataset.',
+	return undef
+		if ($#$xary != $#$yary);
+
+	my @ary = ();
+	my %xhash = ();
+	my $i;
+	my ($x, $y) = (0,0);
+	my ($xmin, $xmax, $ymin, $ymax) = 
+		($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh});
+	for ($i = 0; $i <= $#$xary; $i++) {
+#
+#	eliminate undefined data points
+#
+		next unless (defined($$xary[$i]) && defined($$yary[$i]));
+		
+		$x = $$xary[$i];
+		$obj->{errmsg} = "Non-numeric domain value $x.",
+		return undef
+			unless ($obj->{symDomain} ||
+				($x=~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/));
+
+		$y = $$yary[$i];
+		$obj->{errmsg} = "Non-numeric range value $y.",
+		return undef
+			if ($y!~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
+		
+		$obj->{errmsg} = 'Negative value supplied for logarithmic axis.',
+		return undef
+			unless (
+				($obj->{symDomain} || (! $obj->{xLog}) || ($x > 0)) &&
+				((! $obj->{yLog}) || ($y > 0)));
+
+		$y = $obj->{yLog} ? log($y)/log(10) : $y;
+		$ymin = $y unless (defined($ymin) && ($ymin <= $y));
+		$ymax = $y unless (defined($ymax) && ($ymax >= $y));
+
+		push(@ary, $x, $y), next
+			if ($obj->{symDomain});
+
+		$xhash{$x} = $y;
+	}
+#
+#	make sure domain values are in ascending order
+#
+	if (! $obj->{symDomain}) {
+		my @xsorted = sort numerically keys(%xhash);
+
+		foreach $i (@xsorted) {
+#
+#	if either xLog or yLog is defined, apply to appropriate dataset now
+#
+			$x = $obj->{xLog} ? log($i)/log(10) : $i;
+			$xmin = $x unless (defined($xmin) && ($xmin <= $x));
+			$xmax = $x unless (defined($xmax) && ($xmax >= $x));
+			push(@ary, $x, $xhash{$i});
+		}
+	}
+	else {
+		$xmin = 0;
+		$xmax = $i;
 	}
 # record the dataset
-	push(@{$obj->{'data'}}, \@ary);
-	push(@{$obj->{'props'}}, ($props ? 'candle ' . $props : 'candle nopoints'));
+	push(@{$obj->{data}}, \@ary);
+	push(@{$obj->{props}}, ($props ? $props : 'nopoints'));
+	$obj->{yl} = $ymin;
+	$obj->{yh} = $ymax;
+	$obj->{xl} = $xmin;
+	$obj->{xh} = $xmax;
+	$obj->{haveScale} = 0;	# invalidate any prior min-max calculations
 
-	$obj->{'haveScale'} = 0; # invalidate any prior min-max calculations
 	return 1;
 }
 
 sub error {
   my $obj = shift;
-  return $obj->{'errmsg'};
+  return $obj->{errmsg};
 }
 
 sub setOptions {
 	my ($obj, %hash) = @_;
 
-	for (keys (%hash)) {
+	foreach (keys (%hash)) {
 #
 #	we need a lot more error checking here!!!
 #
-		if (($_ eq 'bgColor') && (! $colors{$hash{$_}})) {
-			$obj->{'errmsg'} = "Unrecognized color $hash{$_}.";
-			return undef;
+		$obj->{errmsg} = "Unrecognized attribute $_.",
+		return undef
+			unless ($valid_attr{$_});
+		
+		if ($_=~/^(bg|grid|text)Color$/) {
+			$obj->{errmsg} = "Unrecognized color $hash{$_} for $_.",
+			return undef
+				unless $colors{$hash{$_}};
+			my $color = $hash{$_};
+#
+#	if its a predefined color, reuse it
+#	else allocate it
+#
+			$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
+				unless $obj->{$color};
+			$obj->{$_} = $obj->{$color};
+			next;
 		}
 		$obj->{$_} = $hash{$_};
 	}
@@ -271,147 +814,231 @@ sub setOptions {
 }
 
 sub plot {
-	my ($obj, $format) = (shift, lc shift);
+	my ($obj, $format) = @_;
+	$format = lc $format;
+#
+#	first fill with bg color
+#
+	my $color;
+	$obj->{img}->fill(1, 1, $obj->{bgColor} );
+#
+#	then add any defined logo
+	$obj->addLogo if $obj->{logo};
 
-	if ($obj->{'bgColor'}) {
-		my $color = ($obj->{$obj->{'bgColor'}}) ? $obj->{$obj->{'bgColor'}} :
-			$obj->{'img'}->colorAllocate(@{$colors{$obj->{'bgColor'}}});
-		$obj->{'img'}->fill(1, 1, $color );
-	}
+	$obj->{numRanges} = scalar @{$obj->{data}};
+	my $rc = 1;
+	
+	my $props = $obj->{props}->[0];
 
-	$obj->computeScales unless $obj->{'haveScale'};
-	$obj->drawTitle if $obj->{'title'}; # vert offset may be increased
-	$obj->drawSignature if $obj->{'signature'}; # vert offset may be increased
-	$obj->plotAxes;
-	$obj->plotData;
+	$obj->{symDomain} = 1
+		if ($props=~/\b(candle|bar)\b/i);
 
-	return ($format) && $obj->{'img'}->$format;
+	$rc = $obj->computeScales()
+		unless ($obj->{haveScale} || ($props=~/\bpie\b/i));
+	return undef unless $rc;
+	
+	$obj->drawTitle if $obj->{title}; # vert offset may be increased
+	$obj->drawSignature if $obj->{signature};
+
+	return (($obj->plotPie) ? 
+		(($format) && $obj->{img}->$format) : undef)
+		if ($props=~/\bpie\b/i);
+
+	return (($obj->plot3DAxes && $obj->plot3DBars) ? 
+		(($format) && $obj->{img}->$format) : undef)
+		if (($props=~/\bbar\b/i) && ($obj->{zAxisLabel} || $obj->{threed}));
+
+	return (($obj->plotAxes && $obj->plot2DBars) ? 
+		(($format) && $obj->{img}->$format) : undef)
+		if ($props=~/\bbar\b/i);
+
+	return (($obj->plotBoxAxes && $obj->plotBox) ? 
+		(($format) && $obj->{img}->$format) : undef)
+		if ($props=~/\bbox\b/i);
+	
+	return (($obj->plotAxes && $obj->plotCandles) ? 
+		(($format) && $obj->{img}->$format) : undef)
+		if ($props=~/\bcandle\b/i);
+#
+#	must be line/point/area graph
+#
+	return ($obj->plotAxes && $obj->plotData) ? 
+		(($format) && $obj->{img}->$format) : undef;
 }
 
-# sets min and max values of all data (xl, yl, xh, yh)
-# also sets xscale, yscale, and edge values used in pt2pxl
+sub getMap {
+	my ($obj) = @_;
+	my $mapname = $obj->{genMap};
+
+	return "\$$mapname = [\n" . $obj->{imgMap} . " ];"
+		if (uc $obj->{mapType} eq 'PERL');
+
+	return 	"<MAP NAME=\"$mapname\">" . 
+		$obj->{imgMap} . "\n</MAP>\n";
+}
+
+# 
+# sets xscale, yscale, and edge values used in pt2pxl
+#	also adjusts min or max of barcharts to clip away origin
+#
 sub computeScales {
 	my $obj = shift;
-	my ($i, $ary, $xl, $yl, $xh, $yh, $tl, $th, $props);
+	my ($xl, $yl, $zl, $xh, $yh, $zh) = 
+		($obj->{xl}, $obj->{yl}, $obj->{zl}, $obj->{xh}, $obj->{yh}, 
+			$obj->{zh});
+	my $i;
+	my $props = $obj->{props}->[0];
 
 # if no data, set arbitrary bounds
-	($xl, $yl, $xh, $yh) = (0,0,1,1) and return
-		if (! @{$obj->{'data'}});
-
-# cycle through the datasets looking for min and max values
-	$ary = ${$obj->{'data'}}[0];
-	$props = ${$obj->{'props'}}[0];
-	$xl = $$ary[0];
-	$xh = $$ary[0];
-	$yl = $$ary[1];
-	$yh = $$ary[1];
-   	if (ref $yl) {
-    	$tl = $yl;
-    	$yl = $$tl[0];
-    	$yh = $$tl[1];
-    	$xl = 0;
-    	$xh = 1;
-    }
-    elsif ($obj->{'symDomain'}) { 
-    	$tl = 1; 
-    	$xl = 0;
-    	$xh = 1;
-    }
-    
-	foreach $ary (@{$obj->{'data'}}) {
-		for ($i=0; $i<$#{$ary}; $i++) {
-			if (! defined($tl)) {
-				$xl = ($xl > $$ary[$i]) ? $$ary[$i] : $xl;
-				$xh = ($xh < $$ary[$i]) ? $$ary[$i] : $xh;
-			}
-			$i++;
-	    	if (ref $$ary[$i]) {
-		    	$tl = $$ary[$i];
-				$yl = ($yl > $$tl[0]) ? $$tl[0] : $yl;
-				$yh = ($yh < $$tl[1]) ? $$tl[1] : $yh;
-		    }
-		    else {
-				$yl = ($yl > $$ary[$i]) ? $$ary[$i] : $yl;
-				$yh = ($yh < $$ary[$i]) ? $$ary[$i] : $yh;
-			}
-		}
-		$th = (scalar(@$ary)-1)/2;
-		$xh = $th if (defined($tl) && ($xh < $th));
-	}
+	($xl, $yl, $zl, $xh, $yh, $zh) = (0,0,0,1,0,1) and return
+		if (! @{$obj->{data}});
 #
 #	if keepOrigin, make sure (0,0) is included
 #	(but only if not in logarithmic mode)
 #
-	if ($obj->{'keepOrigin'}) {
-		if (! $obj->{'xLog'}) {
+	if ($obj->{keepOrigin}) {
+		if ((! $obj->{xLog}) && (! $obj->{symDomain})) {
 			$xl = 0 if ($xl > 0);
 			$xh = 0 if ($xh < 0);
 		}
-		if (! $obj->{'yLog'}) {
+		if (! $obj->{yLog}) {
 			$yl = 0 if ($yl > 0);
 			$yh = 0 if ($yh < 0);
 		}
+#
+#	doesn't apply to Z axis (yet)
+#
 	}
 	
-# set axis ranges for widest dataset
-	($obj->{'xl'}, $obj->{'xh'}, $obj->{'yl'}, $obj->{'yh'}) = 
-		$obj->computeRanges($xl, $xh, $yl, $yh);
+# set axis ranges for widest/tallest/deepest dataset
+	$obj->computeRanges($xl, $xh, $yl, $yh, $zl, $zh);
+	$obj->{yl} = 0 if (($props=~/\bbar\b/i) && ($yl == 0));
+	($xl, $xh, $yl, $yh, $zl, $zh) = 
+		($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh}, 
+			$obj->{zl}, $obj->{zh});
+
+	if (($props=~/\bbar\b/) && ($yl > 0) && (! $obj->{keepOrigin})) {
+#
+#	adjust mins to clip away from origin
+#
+		my $incr = ($obj->{zAxisLabel}) ? 4 : 3;
+		foreach my $data (@{$obj->{data}}) {
+			for ($i = 1; $i <= $#$data; $i+=$incr) {
+				$$data[$i] = $yl;
+			}
+		}
+	}
 #
 #	heuristically adjust image margins to fit labels
 #
-	my ($sfw,$sfh) = (gdSmallFont->width, gdSmallFont->height);
-	my ($tfw,$tfh) = (gdTinyFont->width, gdTinyFont->height);
-	($xl, $xh, $yl, $yh) = ($obj->{'xl'}, $obj->{'xh'}, $obj->{'yl'}, $obj->{'yh'});
-
 	my ($botmargin, $topmargin) = (40, 40);
-	$botmargin += (3 * $tfh) if ($obj->{'legend'});
+	$botmargin += (3 * $tfh) if ($obj->{legend});
 #
 #	compute space needed for X axis labels
 #
 	my $maxlen = 0;
-	if ($obj->{'symDomain'}) {
-		my $ary = ${$obj->{'data'}}[0];
-		for (my $i = 0; $i < $#$ary; $i+=2) {
-			$maxlen = length($$ary[$i]) if (length($$ary[$i]) > $maxlen);
-			$i++ if (ref $$ary[$i+1]);	# candlesticks
+	my ($tl, $th);
+	if ($obj->{symDomain}) {
+		my $ary = $obj->{zAxisLabel} ? $obj->{xValues} : $obj->{data}->[0];
+		my $incr = ($props=~/\b(bar|candle)\b/i) ?
+			(($obj->{zAxisLabel}) ? 1 : 3) : 2;
+		for (my $i = 0; $i < $#$ary; $i+=$incr) {
+			$maxlen = length($$ary[$i]) 
+				if (length($$ary[$i]) > $maxlen);
 		}
 	}
 	else {
-		my ($txl, $txh) = ($obj->{'xLog'}) ? (10**$xl, 10**$xh) : ($xl, $xh);
-		$maxlen = (length($txh) > length($txl)) ? length($txh) : length($txl);
+		($tl, $th) = ($obj->{xLog}) ? (10**$xl, 10**$xh) : ($xl, $xh);
+		$maxlen = (length($th) > length($tl)) ? length($th) : length($tl);
 	}
+	$maxlen = 25 if ($maxlen > 25);
+	$maxlen = 7 if ($maxlen < 7);
 	$botmargin += (($sfw * $maxlen) + 10);
 #
 #	compute space needed for Y axis labels
 #
 	my ($rtmargin, $ltmargin) = (40, 20);
-	my ($tyl, $tyh) = ($obj->{'yLog'}) ? (10**$yl, 10**$yh) : ($yl, $yh);
-	$maxlen = (length($tyh) > length($tyl)) ? length($tyh) : length($tyl);
+	($tl, $th) = ($obj->{yLog}) ? (10**$yl, 10**$yh) : ($yl, $yh);
+	$maxlen = (length($th) > length($tl)) ? length($th) : length($tl);
+	$maxlen = 25 if ($maxlen > 25);
+	$maxlen = 7 if ($maxlen < 7);
 	$ltmargin += (($sfw * $maxlen) + 10);
-
+#
+#	compute space needed for Z axis labels
+#
+	if ($obj->{zAxisLabel}) {
+		my $ary = $obj->{zValues};
+		for (my $i = 0; $i <= $#$ary; $i++) {
+			$maxlen = length($$ary[$i])
+				if (length($$ary[$i]) > $maxlen);
+		}
+		$maxlen = 25 if ($maxlen > 25);
+		$maxlen = 7 if ($maxlen < 7);
+		$rtmargin += ($sfw * $maxlen);
+	}
+#
 # calculate axis scales 
-	$obj->{'xscale'} = ($obj->{'width'} - $ltmargin - $rtmargin) / ($xh - $xl);
-	$obj->{'yscale'} = ($obj->{'height'} - $topmargin - $botmargin) / ($yh - $yl);
+	if ($obj->{zAxisLabel} || $obj->{threed}) {
+		my $tht = $obj->{height} - $topmargin - $botmargin;
+		my $twd = $obj->{width} - $ltmargin - $rtmargin;
+#
+#	compute ratio of Z values to X values
+#	to adjust percent of plot area reserved for
+#	depth. Max is 40%, min is 10%
+#
+		my $xzratio = 
+			$obj->{Zcard}/($obj->{Xcard}*(scalar @{$obj->{data}}));
+#		$xzratio = 0.1 if ($xzratio < 0.1);
+#
+#	compute actual height as adjusted height x (1 - depth ratio)
+#	actual depth is based on 30 deg. rotation of adjusted
+#	width x depth ratio
+#	actual width is adjust width - the 30 deg. rotation effect
+#
+		$obj->{plotWidth} = int($twd / ($xzratio*sin(3.1415926/6) + 1));
+		$obj->{plotDepth} = int(($twd - $obj->{plotWidth})/sin(3.1415926/6));
+		$obj->{plotHeight} = int($tht - ($obj->{plotDepth}*cos(3.1415926/6)));
+		$obj->{xscale} = $obj->{plotWidth}/($xh - $xl);
+		$obj->{yscale} = $obj->{plotHeight}/($yh - $yl);
+		$obj->{zscale} = $obj->{plotDepth}/($zh - $zl);
+	}
+	else {
+#	keep true width/height for future reference
+		$obj->{xscale} = ($obj->{width} - $ltmargin - $rtmargin)/($xh - $xl);
+		$obj->{yscale} = ($obj->{height} - $topmargin - $botmargin)/($yh - $yl);
+		$obj->{plotWidth} = $obj->{width} - $ltmargin - $rtmargin;
+		$obj->{plotHeight} = $obj->{height} - $topmargin - $botmargin;
+	}
 
-	$obj->{'horizEdge'} = $ltmargin;
-	$obj->{'vertEdge'} = $obj->{'height'} - $botmargin;
-
-	$obj->{'haveScale'} = 1;
+	$obj->{horizEdge} = $ltmargin;
+	$obj->{vertEdge} = $obj->{height} - $botmargin;
+#
+#	compute spacing info for bar/candles
+#
+	return undef
+		if (($props=~/\b(bar|candle)\b/i) && 
+			(! $obj->{zAxisLabel}) &&
+			(! $obj->computeSpacing(lc $1)));
+	
+	$obj->{haveScale} = 1;
 }
 
 # computes the axis ranges for the input (min,max) tuple
 # also computes axis step size for ticks
 sub computeRanges {
-  my ($obj, $xl, $xh, $yl, $yh) = @_;
-  my ($tmp, $om) = (0,0);
-  my @sign = ();
+ 	my ($obj, $xl, $xh, $yl, $yh, $zl, $zh) = @_;
+ 	my ($tmp, $om) = (0,0);
+ 	my @sign = ();
 
-	($obj->{'horizStep'}, $obj->{'vertStep'}) = (1,1) and 
-		return (0,1,0,1)
-		if (($xl == $xh) || ($yl == $yh));
+	($obj->{horizStep}, $obj->{vertStep}, $obj->{depthStep}) = (1,1,1),
+	($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh}, $obj->{zl}, $obj->{zh}) = 
+		(0,1,0,1, 0,1)
+		if (($xl == $xh) || ($yl == $yh) || 
+			(defined($zl) && ($zl == $zh)) );
 		
-	foreach ($xl, $xh, $yl, $yh) {
-		push @sign, (($_ < 0) ? -1 : (! $_) ? 0 : 1);
+	foreach ($xl, $xh, $yl, $yh, $zl, $zh) {
+		push @sign, (($_ < 0) ? -1 : (! $_) ? 0 : 1)
+			if defined($_);
 	}
 #
 #	tick increment/value algorithm:
@@ -422,149 +1049,590 @@ sub computeRanges {
 #	num_of_ticks = int((max - min)/scale) + 2;
 #	step_pixels = int(image_width/num_of_ticks)
 #
-	my $xr = (log($xh - $xl))/log(10);
-	my $xd = $xr - int($xr);
-	$obj->{'horizStep'} = ($xd < 0.4) ? (10 ** (int($xr) - 1)) :
-		(($xd >= 0.87) ? (10 ** int($xr)) : (5 * ( 10 ** (int($xr) - 1))) );
+	my ($xr, $xd);
+	$xr = (log($xh - $xl))/log(10),
+	$xd = $xr - int($xr)
+		unless ($obj->{symDomain});
+	$obj->{horizStep} = ($obj->{symDomain}) ? 1 : ($xd < 0.4) ? (10 ** (int($xr) - 1)) :
+		(($xd >= 0.87) ? (10 ** int($xr)) : (5 * (10 ** (int($xr) - 1))));
 
+	$yh = $yl * 2 if ($yh == $yl);
 	$xr = (log($yh - $yl))/log(10);
 	$xd = $xr - int($xr);
-	$obj->{'vertStep'} = ($xd < 0.4) ? (10 ** (int($xr) - 1)) :
-		(($xd >= 0.87) ? (10 ** int($xr)) : (5 * ( 10 ** (int($xr) - 1))) );
+	$obj->{vertStep} = ($xd < 0.4) ? (10 ** (int($xr) - 1)) :
+		(($xd >= 0.87) ? (10 ** int($xr)) : (5 * (10 ** (int($xr) - 1))));
 
-	my ($xm, $ym) = ($obj->{'horizStep'}, $obj->{'vertStep'});
+	if ($obj->{zAxisLabel} || $obj->{threed}) {
+		$xr = (log($zh - $zl))/log(10),
+		$xd = $xr - int($xr)
+			unless $obj->{symDomain};
+		$obj->{depthStep} = ($obj->{symDomain}) ? 1 : 
+			($xd < 0.4) ? (10 ** (int($xr) - 1)) :
+			(($xd >= 0.87) ? (10 ** int($xr)) : (5 * (10 ** (int($xr) - 1))));
+	}
+	my ($xm, $ym, $zm) = ($obj->{horizStep}, $obj->{vertStep}, 
+		$obj->{depthStep});
+
+	($zl, $zh) = (0.5, 1.5) if ($obj->{symDomain} && defined($zl) && ($zl == $zh));
+	($xl, $xh) = (0.5, 1.5) if ($obj->{symDomain} && ($xl == $xh));
 # fudge a little in case limit equals min or max
-	return (
-		((! $xm) ? 0 : $xm * (int(($xl-0.00001*$sign[0])/$xm) + $sign[0] - 1)),
-		((! $xm) ? 0 : $xm * (int(($xh-0.00001*$sign[1])/$xm) + $sign[1] + 1)),
-		((! $ym) ? 0 : $ym * (int(($yl-0.00001*$sign[2])/$ym) + $sign[2] - 1)),
-		((! $ym) ? 0 : $ym * (int(($yh-0.00001*$sign[3])/$ym) + $sign[3] + 1)));
+	$obj->{zl} = ((! $zm) ? 0 : $zm * (int(($zl-0.00001*$sign[4])/$zm) + $sign[4] - 1)),
+	$obj->{zh} = ((! $zm) ? 0 : $zm * (int(($zh-0.00001*$sign[5])/$zm) + $sign[5] + 1))
+		if defined($zl);
+	$obj->{xl} = (! $xm) ? 0 : $xm * (int(($xl-0.00001*$sign[0])/$xm) + $sign[0] - 1);
+	$obj->{xh} = (! $xm) ? 0 : $xm * (int(($xh-0.00001*$sign[1])/$xm) + $sign[1] + 1);
+	$obj->{yl} = (! $ym) ? 0 : $ym * (int(($yl-0.00001*$sign[2])/$ym) + $sign[2] - 1);
+	$obj->{yh} = (! $ym) ? 0 : $ym * (int(($yh-0.00001*$sign[3])/$ym) + $sign[3] + 1);
+	return 1;
+}
+#
+#	compute bar spacing
+#
+sub computeSpacing {
+	my ($obj, $type) = @_;
+#
+#	candlestick, use fixed bar width and adjust spacers
+#
+	$obj->{brushWidth} = 2,
+	return 1
+		if ($type eq 'candle');
+#
+#	compute number of domain values
+#
+	my $domains = ($obj->{Xcard}) ? 1 :
+		(scalar @{$obj->{data}->[0]})/3;
+	my $bars = ($obj->{Xcard}) ? $obj->{Xcard} : (scalar @{$obj->{data}});
+	my $spacer = 10;
+	my $width = $obj->{plotWidth};
+	my $pxlsperdom = int($width/($domains+1)) - $spacer;
+
+	$obj->{errmsg} = 'Insufficient width for number of domain values.',
+	return undef
+		if ($pxlsperdom < 2);
+#
+#	compute width of each bar from number of bars per domain value
+#
+	my $pxlsperbar = int($pxlsperdom/$bars);
+
+	$obj->{errmsg} = 'Insufficient width for number of ranges or values.',
+	return undef
+		if ($pxlsperbar < 2);
+
+	$obj->{brushWidth} = $pxlsperbar;
+	return 1;
 }
 
-# draws all the datasets in $obj->{'data'}
-sub plotData {
+sub plot2DBars {
 	my $obj = shift;
-	my ($i, $k, $ary, $px, $py, $prevpx, $prevpy, $pyt, $pyb);
-	my ($color, $shape, $line, $img, $prop);
+	my ($i, $k, $ary, $px, $py, $pyt, $pyb);
+	my ($color, $prop, $s);
 	my @props = ();
-	my $legend = $obj->{'legend'};
-	my ($xl, $xh, $yl, $yh) = ($obj->{'xl'}, $obj->{'xh'}, $obj->{'yl'}, $obj->{'yh'});
-	my ($w,$h) = (gdTinyFont->width, gdTinyFont->height);
-# legend is left justified underneath
-	my ($p2x, $p2y) = $obj->pt2pxl ($xl, $yl);
-	my $legend_ht = $obj->{'height'} - 40 - 20 - (2 * $h);
-	my $legend_wd = 10;
-	my $legend_maxht = $obj->{'height'} - 40;
-	my $marker;
-
-	$img = $obj->{'img'};	
+	my $legend = $obj->{legend};
+	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, $obj->{yl}, 
+		$obj->{yh});
+	my ($brush, $ci, $t);
+	my ($useicon, $marker, $boff);
+	my $img = $obj->{img};	
 	
- 	for ($k = 0; $k < scalar(@{$obj->{'data'}}); $k++) {
+ 	for ($k = 0; $k < scalar(@{$obj->{data}}); $k++) {
 		$color = 'black';
-		$shape = undef;
-		$line = 'line';
 
-		$ary = ${$obj->{'data'}}[$k];
-		my $t = ${$obj->{'props'}}[$k];
+		$ary = $obj->{data}->[$k];
+		$t = $obj->{props}->[$k];
 		$t=~s/\s+/ /g;
+		$t = lc $t;
 		@props = split (' ', $t);
 		foreach $prop (@props) {
-			$prop = lc $prop;
-			$color = $prop and next
+			$color = $prop, next
 				if ($colors{$prop});
-			$shape = $shapes{$prop} and next
-				if ($shapes{$prop});
-			if ($prop eq 'points') {
-				$shape = $shapes{'fillcircle'};
-				next;
-			}
-					
-			$shape = undef and next 
-				if ($prop eq 'nopoints');
-			$line = $prop
-				if ($prop=~/^(line|noline|fill|bar|candle)$/);
+#
+#	if its iconic, load the icon image
+#
+			$marker = $obj->{icons}->[$k]
+				if (($prop eq 'icon') && $obj->{icons} && 
+					$obj->{icons}->[$k]);
 		}
-		$obj->{$color} = $obj->{'img'}->colorAllocate(@{$colors{$color}})
-			if (! $obj->{$color});
-			
-		my $yoff = ($shape) ? 9 : 2;
-#
-#	generate pointshape if requested
-#
-		$marker = $obj->make_marker($shape, $color)
-			if ($shape);
+		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
+			unless $obj->{$color};
+
+		$marker = $obj->getIcon($marker, 1)
+			if ($marker);
 #
 #	render legend if requested
 #
-		if (($legend) && ($$legend[$k])) {
-			$legend_ht += 3*$h/2;
-			if ($legend_ht > $legend_maxht) {
-				$legend_ht = $obj->{'height'} - 40 - 20 - ($h/2);
-				$legend_wd += 85;
-			}
-  			$img->string (gdTinyFont, $legend_wd + 25, $legend_ht,
-				$$legend[$k], $obj->{$color});
-  			$img->line($legend_wd, $legend_ht+4, $legend_wd+20, 
-  				$legend_ht+4, $obj->{$color})
-  				if (! $shape);
-			$img->copy($marker, $legend_wd+5, $legend_ht, 0, 0, 9, 9)
-				if ($shape);
-		}
+		$obj->drawLegend($k, $color, $marker, $$legend[$k])
+			if (($legend) && ($$legend[$k]));
+#
+#	generate brush to draw bars
+#
+		$brush = new GD::Image($obj->{brushWidth}, 1),
+		$ci = $brush->colorAllocate(@{$colors{$color}}),
+		$brush->filledRectangle(0,0,$obj->{brushWidth},0,$ci),
+		$img->setBrush($brush)
+			unless $marker;
 
-		if (ref $$ary[1]) {
+		my $bars  = scalar @{$obj->{data}};
 #
-#	Candlestick:
+#	compute the center data point, then
+#	adjust horizontal location based on brush width
+#	and data set number
 #
-#	generate brush to draw sticks
-#
-			my $brush = new GD::Image(2,2);
-			my $ci = $brush->colorAllocate(@{$colors{$color}});
-			$brush->filledRectangle(0,0,1,1,$ci); # wide line
-			$img->setBrush($brush);
+		$boff = int($obj->{brushWidth}/2),
+		my $ttlw = int($bars * $boff);
+		my $xoffset = ($k * $obj->{brushWidth}) - $ttlw 
+			+ $boff;
 
-# draw the rest of the points and lines 
-			for ($i=0, my $j = 1; $i < scalar(@$ary)/2; $i++, $j+=2) {
+		for (my $i = 0; $i <= $#$ary; $i += 3) {
 
 # get top and bottom points
-				my $r = $$ary[$j];
-				($px, $pyb) = $obj->pt2pxl ( $i, $$r[0] );
-				($px, $pyt) = $obj->pt2pxl ( $i, $$r[1] );
-
-# draw pointshape if requested
-				$img->copy($marker, $px-4, $pyb-4, 0, 0, 9, 9) or
-					$img->copy($marker, $px-4, $pyt-4, 0, 0, 9, 9)
-					if ($shape);
-					
-# draw top/bottom values if requested
+			($px, $pyb) = $obj->pt2pxl ( ($i/3)+1, $$ary[$i+1] );
+			($px, $pyt) = $obj->pt2pxl ( ($i/3)+1, $$ary[$i+2] );
+			$px += $xoffset;
 				
-				$img->string(gdTinyFont,$px-10,$pyb, 
-					(($obj->{'yLog'}) ? 10**($$r[0]) : $$r[0]), $obj->{$color}) or
-				$img->string(gdTinyFont,$px-10,$pyt-$yoff,
-					(($obj->{'yLog'}) ? 10**($$r[1]) : $$r[1]), $obj->{$color})
-					if ($obj->{'showValues'});
-
 # draw line between top and bottom
-				$img->line($px, $pyb, $px, $pyt, gdBrushed);
-			}
-			next;
+			$img->line($px, $pyb, $px, $pyt, gdBrushed)
+				unless $marker;
+#
+#	unless its iconic
+#
+			$obj->drawIcons($marker, $px, $pyb, $pyt)
+				if $marker;
+
+# update imagemap if requested
+			$obj->updateImagemap('RECT', $$ary[$i+2], $k, $$ary[$i], 
+				$$ary[$i+2], undef, $px-$boff, $pyt, $px+$boff, $pyb)
+				if $obj->{genMap};
+#
+#	draw vertical values for bars
+#	NOTE: if max length of values is less than bar width,
+#	draw horizontally!!!
+#
+			$img->stringUp(gdTinyFont, $px-int($sfw/2), $pyt-4, 
+				(($obj->{yLog}) ? 10**($$ary[$i+2]) : 
+					$$ary[$i+2]), $obj->{textColor})
+				if $obj->{showValues};
+		}
+	}
+	return 1;
+}
+
+sub plotCandles {
+	my $obj = shift;
+	my ($k, $ary, $px, $py, $pyt, $pyb);
+	my ($color, $img, $prop, $s);
+	my @props = ();
+	my $legend = $obj->{legend};
+	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, $obj->{yl}, 
+		$obj->{yh});
+	my ($marker, $markw, $markh, $yoff, $wdelta, $hdelta);
+
+	$img = $obj->{img};	
+
+ 	for ($k = 0; $k < scalar(@{$obj->{data}}); $k++) {
+		$color = 'black';
+		$marker = undef;
+
+		$ary = $obj->{data}->[$k];
+		my $t = $obj->{props}->[$k];
+		$t=~s/\s+/ /g;
+		$t = lc $t;
+		@props = split (' ', $t);
+		foreach $prop (@props) {
+			$color = $prop, next
+				if ($colors{$prop});
+#
+#	generate pointshape if requested
+#
+			$marker = $prop,
+			next
+				if (($shapes{$prop}) && ($prop ne 'icon'));
+#
+#	if its iconic, load the icon image
+#
+			$marker = $obj->{icons}->[$k],
+			next
+				if (($prop eq 'icon') && $obj->{icons} && 
+					$obj->{icons}->[$k]);
+
+
+			$marker = 'fillcircle',
+			next
+				if ((! $marker) && ($prop eq 'points'));
+					
+			$marker = undef, next 
+				if ($prop eq 'nopoints');
+		}
+		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
+			unless $obj->{$color};
+		
+		if ($marker) {
+			$marker = ($shapes{$marker}) ? $obj->make_marker($marker, $color) :
+				$obj->getIcon($marker);
+			return undef unless $marker;
+			($markw, $markh) = $marker->getBounds();
+			$wdelta = $markw>>1;
+			$hdelta = $markh>>1;
 		}
 
+		$yoff = ($marker) ? $markh : 2;
+#
+#	render legend if requested
+#
+		$obj->drawLegend($k, $color, $marker, $$legend[$k])
+			if ($legend && $$legend[$k]);
+#
+#	generate brush to draw sticks/bars
+#
+		my $brush = new GD::Image($obj->{brushWidth}, 1);
+		my $ci = $brush->colorAllocate(@{$colors{$color}});
+		$brush->filledRectangle(0,0,$obj->{brushWidth},0,$ci);
+				# wide line
+		$img->setBrush($brush);
+
+		my $bars  = scalar @{$obj->{data}};
+#
+#	compute the center data point, then
+#	adjust horizontal location based on brush width
+#	and data set number
+#
+		my $ttlw = int(($bars * $obj->{brushWidth})/2);
+		my $xoffset = ($k * $obj->{brushWidth}) - $ttlw 
+			+ int($obj->{brushWidth}/2);
+		for (my $i = 0; $i <= $#$ary; $i += 3) {
+
+# get top and bottom points
+			($px, $pyb) = $obj->pt2pxl ( ($i/3)+1, $$ary[$i+1] );
+			($px, $pyt) = $obj->pt2pxl ( ($i/3)+1, $$ary[$i+2] );
+			$px += $xoffset;
+				
+# draw line between top and bottom
+			$img->line($px, $pyb, $px, $pyt, gdBrushed);
+				
+# draw pointshape if requested: use marker w&h!!!
+			$img->copy($marker, $px-$wdelta, $pyb-$hdelta, 0, 0, 
+				$markw-1, $markh-1),
+			$img->copy($marker, $px-$wdelta, $pyt-$hdelta, 0, 0, 
+				$markw-1, $markh-1)
+				if ($marker);
+
+# update imagemap if requested
+			$obj->updateImagemap('CIRCLE', $$ary[$i+2], $k, $$ary[$i], 
+				$$ary[$i+2], undef, $px, $pyt, 4),
+			$obj->updateImagemap('CIRCLE', $$ary[$i+1], $k, $$ary[$i], 
+				$$ary[$i+1], undef, $px, $pyb, 4)
+				if ($obj->{genMap});
+				
+# draw top/bottom values if requested
+			if ($obj->{showValues}) {
+				$img->string(gdTinyFont,$px-10,$pyb, 
+					(($obj->{yLog}) ? 10**($$ary[$i+1]) : 
+						$$ary[$i+1]), $obj->{textColor}),
+				$img->string(gdTinyFont,$px-10,$pyt-$yoff,
+					(($obj->{yLog}) ? 10**($$ary[$i+2]) : 
+						$$ary[$i+2]), $obj->{textColor})
+			}	# end for each stick
+		}
+	}
+	return 1;
+}
+
+sub computeMedian {
+	my ($ary, $lo, $hi) = @_;
+	my $size = $hi - $lo +1;
+	my $midi = $size>>1;
+	$midi-- unless ($size & 1);
+	$midi += $lo;
+	return ($size & 1) ? $$ary[$midi] : (($$ary[$midi] + $$ary[$midi+1])/2);
+}
+
+sub computeBox {
+	my ($obj, $k) = @_;
+	my ($median, $uq, $lq, $lex, $uex, $midpt, $iqr, $val);
+	
+	my $ary = $obj->{data}->[$k];
+	my $size = $#$ary;
+#
+#	compute median
+	$median = computeMedian($ary, 0, $size);
+#
+#	compute quartiles
+	$midpt = ($size)>>1;
+	$midpt-- unless ($size & 1);
+	$lq = computeMedian($ary, 0, $midpt);
+	$midpt += ($size & 1) ? 1 : 2;
+	$uq = computeMedian($ary, $midpt, $size);
+#
+#	compute extremes within 1.5 IQR of median
+	$iqr = $uq - $lq;
+	$lex = $lq - ($iqr*1.5);
+	$uex = $uq + ($iqr*1.5);
+	$lex = $$ary[0] if ($lex < $$ary[0]);
+	$uex = $$ary[$#$ary] if ($uex > $$ary[$#$ary]);
+	
+	return ($median, $lq, $uq, $lex, $uex);
+}
+
+sub plotBox {
+	my $obj = shift;
+
+	my $legend = $obj->{legend};
+	
+	for (my $k = 0; $k <= $#{$obj->{data}}; $k++) {
+#
+#	compute median, quartiles, and extremes
+#
+		my ($median, $lq, $uq, $lex, $uex) = $obj->computeBox($k);
+
+		my $yoff = 100 * $k;
+		my $ary = $obj->{data}->[$k];
+		my @props = split(' ', $obj->{props}->[$k]);
+		my $color = 'black';
+		my ($val, $xoff);
+		foreach $val (@props) {
+			$color = $val
+				if ($colors{$val});
+		}
+		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
+			unless $obj->{$color};
+			
+		$obj->drawLegend($k, $color, undef, $$legend[$k])
+			if (($legend) && ($$legend[$k]));
+#
+#	draw the box
+		my ($p1x, $p1y) = $obj->pt2pxl($lq, $yoff+50);
+		my ($p2x, $p2y) = $obj->pt2pxl($uq, $yoff+10);
+		my $img = $obj->{img};
+
+		$img->rectangle($p1x, $p1y, $p2x, $p2y, $obj->{$color});
+		$img->rectangle($p1x+1, $p1y+1, $p2x-1, $p2y-1, $obj->{$color});
+
+		$xoff = int(length($lq) * $tfw/2),
+		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $lq, $obj->{textColor}),
+		$xoff = int(length($uq) * $tfw/2),
+		$img->string(gdTinyFont,$p2x-$xoff,$p1y-$tfh, $uq, $obj->{textColor})
+			if ($obj->{showValues});
+	
+		$obj->updateImagemap('RECT', "$median\[$lq..$uq\]", 0, $median, $lq, $uq, $p1x, $p1y, $p2x, $p2y)
+			if ($obj->{genMap});
+#
+#	draw median line
+		($p1x, $p1y) = $obj->pt2pxl($median, $yoff+55);
+		($p2x, $p2y) = $obj->pt2pxl($median, $yoff+5);
+		$img->line($p1x, $p1y, $p2x, $p2y, $obj->{$color});
+
+		$xoff = int(length($median) * $tfw/2),
+		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $median, $obj->{textColor})
+			if ($obj->{showValues});
+#
+#	draw whiskers
+		($p1x, $p1y) = $obj->pt2pxl($lex, $yoff+30);
+		($p2x, $p2y) = $obj->pt2pxl($lq, $yoff+30);
+		$img->line($p1x, $p1y, $p2x, $p2y, $obj->{$color});
+
+		$xoff = int(length($lex) * $tfw/2),
+		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $lex, $obj->{textColor})
+			if ($obj->{showValues});
+		$obj->updateImagemap('CIRCLE', $lex, 0, $lex, undef, undef, $p1x, $p1y, 4)
+			if ($obj->{genMap});
+
+		($p1x, $p1y) = $obj->pt2pxl($uq, $yoff+30);
+		($p2x, $p2y) = $obj->pt2pxl($uex, $yoff+30);
+		$img->line($p1x, $p1y, $p2x, $p2y, $obj->{$color});
+
+		$xoff = int(length($uex) * $tfw/2),
+		$img->string(gdTinyFont,$p2x-$xoff,$p2y-$tfh, $uex, $obj->{textColor})
+			if ($obj->{showValues});
+		$obj->updateImagemap('CIRCLE', $uex, 0, $uex, undef, undef, $p2x, $p2y, 4)
+			if ($obj->{genMap});
+#
+#	plot outliers; we won't show values here
+#
+		my $marker = $obj->make_marker('filldiamond', $color);
+		foreach $val (@$ary) {
+			last if ($val >= $lex);
+			($p1x, $p1y) = $obj->pt2pxl($val, $yoff+30);
+			$img->copy($marker, $p1x-4, $p1y-4, 0, 0, 9, 9);
+		}
+		for (my $i = $#$ary; ($i > 0) && ($uex < $$ary[$i]); $i--) {
+			($p1x, $p1y) = $obj->pt2pxl($$ary[$i], $yoff+30);
+			$img->copy($marker, $p1x-4, $p1y-4, 0, 0, 9, 9);
+		}
+	}	# end for each plot
+	return 1;
+}
+
+sub plotBoxAxes {
+	my $obj = shift;
+	my ($p1x, $p1y, $p2x, $p2y);
+	my $img = $obj->{img};
+	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, 
+		$obj->{yl}, $obj->{yh});
+
+	my $yaxpt = ((! $obj->{yLog}) && ($yl < 0) && ($yh > 0)) ? 0 : $yl;
+	my $xaxpt = ((! $obj->{xLog}) && ($xl < 0) && ($xh > 0)) ? 0 : $xl;
+#
+#	X axis
+	($p1x, $p1y) = $obj->pt2pxl($xl, $yaxpt);
+	($p2x, $p2y) = $obj->pt2pxl($xh, $yaxpt);
+	$img->line($p1x, $p1y, $p2x, $p2y, $obj->{gridColor});
+#
+#	draw X axis label
+	my ($len, $xStart);
+	($p2x, $p2y) = $obj->pt2pxl($xh, $yl),
+	$len = $sfw * length($obj->{xAxisLabel}),
+	$xStart = ($p2x+$len/2 > $obj->{width}-10)
+		? ($obj->{width}-10-$len) : ($p2x-$len/2),
+	$img->string(gdSmallFont, $xStart, $p2y+ int(4*$sfh/3), 
+		$obj->{xAxisLabel}, $obj->{textColor})
+		if ($obj->{xAxisLabel});
+#
+# draw ticks and labels
+# 
+	my ($i,$px,$py);
+#
+#	for LOG(X):
+#
+	my $powk;
+	if ($obj->{xLog}) {
+		$i = $xl;
+		my $n = 0;
+		my $k = $i;
+		while ($i < $xh) {
+			$k = $i + $logsteps[$n++];
+
+			($px,$py) = $obj->pt2pxl($k, 
+				((($obj->{yLog}) || 
+				($obj->{vertGrid}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
+			($p1x, $p1y) = ($obj->{vertGrid}) ? 
+				$obj->pt2pxl($k, $yh) : ($px, $py+2);
+			$py -= 2 if (! $obj->{vertGrid});
+			$img->line($px, $py, $px, $p1y, $obj->{gridColor});
+			$py += 2 if (! $obj->{vertGrid});
+
+			$powk = 10**$k,
+			$img->stringUp(gdSmallFont, $px-$sfh/2, 
+				$py+length($powk)*$sfw, $powk, $obj->{textColor})
+				if ($n == 1);
+
+			($n, $i)  = (0 , $k )
+				if ($n == scalar(@logsteps));
+		}
+	}
+	else {
+	    my $step = $obj->{horizStep}; 
+    
+		for ($i = $xl; $i <= $xh; $i += $step ) {
+			($px,$py) = $obj->pt2pxl($i, 
+				((($obj->{yLog}) || 
+				($obj->{vertGrid}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
+			($p1x, $p1y) = ($obj->{vertGrid}) ? 
+				$obj->pt2pxl($i, $yh) : ($px, $py+2);
+			$py -= 2 if (! $obj->{vertGrid});
+			$img->line($px, $py, $px, $p1y, $obj->{gridColor});
+			$py += 2 if (! $obj->{vertGrid});
+
+			$img->stringUp(gdSmallFont, $px-($sfh>>1), 
+				$py+2+length($i)*$sfw, $i, $obj->{textColor}), next
+				if ($obj->{xAxisVert});
+
+			$img->string(gdSmallFont, $px-length($i)*($sfw>>1), 
+				$py+($sfh>>1), $i, $obj->{textColor});
+		}
+	}
+	return 1;
+}
+
+# draws all the datasets in $obj->{data}
+sub plotData {
+	my $obj = shift;
+	my ($i, $k, $ary, $px, $py, $prevpx, $prevpy, $pyt, $pyb);
+	my ($color, $line, $img, $prop, $s, $voff);
+	my @props = ();
+	my $legend = $obj->{legend};
+	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, $obj->{yl}, 
+		$obj->{yh});
+# legend is left justified underneath
+	my ($p2x, $p2y) = $obj->pt2pxl ($xl, $yl);
+	my ($marker, $markw, $markh, $yoff, $wdelta, $hdelta);
+
+	$img = $obj->{img};	
+	
+ 	for ($k = 0; $k < scalar(@{$obj->{data}}); $k++) {
+		$color = 'black';
+		$marker = undef;
+		$line = 'line';
+
+		$ary = $obj->{data}->[$k];
+		my $t = $obj->{props}->[$k];
+		$t=~s/\s+/ /g;
+		$t = lc $t;
+		@props = split (' ', $t);
+		foreach $prop (@props) {
+			$color = $prop, next
+				if ($colors{$prop});
+
+			$marker = $prop,
+			next
+				if ($shapes{$prop} && ($prop ne 'icon'));
+#
+#	if its iconic, load the icon image
+#
+			$marker = $obj->{icons}->[$k],
+			next
+				if (($prop eq 'icon') && $obj->{icons} && 
+					$obj->{icons}->[$k]);
+
+			$marker = 'fillcircle',
+			next
+				if ((! $marker) && ($prop eq 'points'));
+					
+			$marker = undef, next 
+				if ($prop eq 'nopoints');
+
+			$line = $prop
+				if ($prop=~/^(line|noline|fill)$/);
+		}
+		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
+			unless $obj->{$color};
+		
+		if ($marker) {
+			$marker = ($shapes{$marker}) ? $obj->make_marker($marker, $color) :
+				$obj->getIcon($marker);
+			return undef unless $marker;
+			($markw, $markh) = $marker->getBounds();
+			$wdelta = $markw>>1;
+			$hdelta = $markh>>1;
+		}
+		my $yoff = ($marker) ? $markh : 2;
+#
+#	render legend if requested
+#
+		$obj->drawLegend($k, $color, $marker, $$legend[$k])
+			if ($legend && $$legend[$k]);
+#
+#	line/point/area charts
+#
 # draw the first point 
-		($px, $py) = $obj->pt2pxl((($obj->{'symDomain'}) ? 0 : $$ary[0]),
+		($px, $py) = $obj->pt2pxl((($obj->{symDomain}) ? 0 : $$ary[0]),
 			$$ary[1] );
 
-		$img->copy($marker, $px-4, $py-4, 0, 0, 9, 9)
-			if ($shape);
+		$img->copy($marker, $px-$wdelta, $py-$hdelta, 0, 0, $markw-1, 
+			$markh-1)
+			if ($marker);
 
-		if ($obj->{'showValues'}) {
+		$s = ($obj->{symDomain}) ? 
+			(($obj->{yLog}) ? 10**($$ary[1]) : $$ary[1]) : 
+			'(' . (($obj->{xLog}) ? 10**($$ary[0]) : $$ary[0]) . ',' . 
+			(($obj->{yLog}) ? 10**($$ary[1]) : $$ary[1]) . ')'
+			if (($obj->{genMap}) || ($obj->{showValues}));
 			
-			my $s = ($obj->{'symDomain'}) ? 
-				(($obj->{'yLog'}) ? 10**($$ary[1]) : $$ary[1]) : 
-				'(' . (($obj->{'xLog'}) ? 10**($$ary[0]) : $$ary[0]) . ',' . 
-				(($obj->{'yLog'}) ? 10**($$ary[1]) : $$ary[1]) . ')';
-			
-			$img->string(gdTinyFont,$px-20,$py-$yoff, $s, $obj->{$color})
-		}
+		$obj->updateImagemap('CIRCLE', $s, $k, $$ary[0], $$ary[1], undef, 
+			$px, $py, 4)
+			if ($obj->{genMap});
+
+		$voff = (length($s) * $tfw)>>1,
+		$img->string(gdTinyFont,$px-$voff,$py-$yoff, $s, $obj->{textColor})
+			if ($obj->{showValues});
 #
 #	we need to heuristically sort data sets to optimize the view of 
 #	overlapping areagraphs...for now the user will need to be smart 
@@ -579,22 +1647,26 @@ sub plotData {
 		for ($i=2; $i < @$ary; $i+=2) {
 
 # get next point
-			($px, $py) = $obj->pt2pxl((($obj->{'symDomain'}) ? $i>>1 : $$ary[$i]), 
-				$$ary[$i+1] );
+			($px, $py) = $obj->pt2pxl((($obj->{symDomain}) ?
+				$i>>1 : $$ary[$i]), $$ary[$i+1] );
 
 # draw point, maybe
-			$img->copy($marker, $px-4, $py-4, 0, 0, 9, 9)
-				if ($shape);
+			$img->copy($marker, $px-$wdelta, $py-$hdelta, 0, 0, $markw, 
+				$markh)
+				if ($marker);
 
-			if ($obj->{'showValues'}) {
-
-				my $s = ($obj->{'symDomain'}) ? 
-					(($obj->{'yLog'}) ? 10**($$ary[1]) : $$ary[1]) : 
-					'(' . (($obj->{'xLog'}) ? 10**($$ary[0]) : $$ary[0]) . ',' . 
-					(($obj->{'yLog'}) ? 10**($$ary[1]) : $$ary[1]) . ')';
+			$s = ($obj->{symDomain}) ? 
+				(($obj->{yLog}) ? 10**($$ary[$i+1]) : $$ary[$i+1]) : 
+				'(' . (($obj->{xLog}) ? 10**($$ary[$i]) : $$ary[$i]) . ',' . 
+				(($obj->{yLog}) ? 10**($$ary[$i+1]) : $$ary[$i+1]) . ')';
 			
-				$img->string(gdTinyFont,$px-20,$py-$yoff, $s, $obj->{$color})
-			}
+			$obj->updateImagemap('CIRCLE', $s, $k, $$ary[$i], $$ary[$i+1], 
+				undef, $px, $py, 4)
+				if ($obj->{genMap});
+
+			$voff = (length($s) * $tfw)>>1,
+			$img->string(gdTinyFont,$px-$voff,$py-$yoff, $s, $obj->{textColor})
+				if ($obj->{showValues});
 
 # draw line from previous point, maybe
 			$img->line($prevpx, $prevpy, $px, $py, $obj->{$color})
@@ -602,90 +1674,128 @@ sub plotData {
 			($prevpx, $prevpy) = ($px, $py);
 		}
 	}
+	return 1;
+}
+
+sub drawLegend {
+	my ($obj, $k, $color, $shape, $text) = @_;
+#
+#	add the dataset to the legend using current color
+#	and shape (if any)
+#
+	$shape = $obj->make_marker('fillsquare', $color)
+		unless $shape;
+
+	my $legend_wd = (int($k/3) * 85) + 10;
+	my $legend_maxht = $obj->{height} - 40;
+
+	my $legend_ht = $obj->{height} - 40 - 20 - (2 * $tfh) + 
+		(($k%3) * (3*$tfh/2));
+
+	my $img = $obj->{img};
+	my $legend = $obj->{legend};
+	$img->string (gdTinyFont, $legend_wd + 25, $legend_ht,
+		$$legend[$k], $obj->{$color});
+
+	$img->line($legend_wd, $legend_ht+4, $legend_wd+20, 
+		$legend_ht+4, $obj->{$color});
+
+	my ($w, $h);
+	($w, $h) = $shape->getBounds(),
+	$img->copy($shape, $legend_wd+5, $legend_ht, 0, 0, $w-1, $w-1)
+		if ($shape);
 }
 
 # compute pixel coordinates from datapoint
 sub pt2pxl {
-	my ($obj, $x, $y) = @_;
+	my ($obj, $x, $y, $z) = @_;
 
 	return (
-		int($obj->{'horizEdge'} + ($x - $obj->{'xl'}) * $obj->{'xscale'}),
-		int($obj->{'vertEdge'} - ($y - $obj->{'yl'}) * $obj->{'yscale'})
-	 );
+		int($obj->{horizEdge} + ($x - $obj->{xl}) * $obj->{xscale}),
+		int($obj->{vertEdge} - ($y - $obj->{yl}) * $obj->{yscale})
+	 ) unless defined($z);
+#
+#	translate x,y,z into x,y
+#
+	my $tx = ($x - $obj->{xl}) * $obj->{xscale};
+	my $ty = ($y - $obj->{yl}) * $obj->{yscale};
+	my $tz = ($z - $obj->{zl}) * $obj->{zscale};
+	my $xoff = $obj->{horizEdge};
+	my $yoff = $obj->{height} - $obj->{vertEdge};
+	return
+		$xoff + int($tx + ($tz * 0.433)),
+		$obj->{vertEdge} - int($ty + ($tz * 0.25));
 }
-
 # draw the axes, labels, title, grid/ticks and tick labels
+
 sub plotAxes {
-# axes run from data points: x -- ($xl,0) ($xh,0);
-#                            y -- (0,$yl) (0,$yh);
-
 	my $obj = shift;
-	my ($sfw,$sfh) = (gdSmallFont->width, gdSmallFont->height);
-	my ($tfw,$tfh) = (gdTinyFont->width, gdTinyFont->height);
-
 	my ($p1x, $p1y, $p2x, $p2y);
-	my $img = $obj->{'img'};
-	my ($xl, $xh, $yl, $yh) = ($obj->{'xl'}, $obj->{'xh'}, 
-		$obj->{'yl'}, $obj->{'yh'});
+	my $img = $obj->{img};
+	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, 
+		$obj->{yl}, $obj->{yh});
 
-	my $yaxpt = ((! $obj->{'yLog'}) && ($yl < 0) && ($yh > 0)) ? 0 : $yl;
-	my $xaxpt = ((! $obj->{'xLog'}) && ($xl < 0) && ($xh > 0)) ? 0 : $xl;
-	$xaxpt = $xl if ($obj->{'symDomain'});
+	my $yaxpt = ((! $obj->{yLog}) && ($yl < 0) && ($yh > 0)) ? 0 : $yl;
+	my $xaxpt = ((! $obj->{xLog}) && ($xl < 0) && ($xh > 0)) ? 0 : $xl;
+	my $props = $obj->{props}->[0];
+	$xaxpt = $xl if ($obj->{symDomain});
 	
-	if ($obj->{'vertGrid'} || $obj->{'horizGrid'}) {
+	if ($obj->{vertGrid} || $obj->{horizGrid}) {
 #
 #	gridded, create a rectangle
 #
 		($p1x, $p1y) = $obj->pt2pxl ($xl, $yl);
 		($p2x, $p2y) = $obj->pt2pxl ($xh, $yh);
 
-  		$img->rectangle( $p1x, $p1y, $p2x, $p2y, $obj->{'black'});
+  		$img->rectangle( $p1x, $p1y, $p2x, $p2y, $obj->{gridColor});
 #
 #	hilight the (0,0) axes, if available
 #
-		my $brush = new GD::Image(3,3);
-		my $white = $brush->colorAllocate(255, 255, 255);
-		my $black = $brush->colorAllocate(0, 0, 0);
-		$brush->filledRectangle(0,0,2,2,$black); # wide line
-		$img->setBrush($brush);
 #	draw X-axis
 		($p1x, $p1y) = $obj->pt2pxl($xl, $yaxpt);
 		($p2x, $p2y) = $obj->pt2pxl($xh, $yaxpt);
-		$img->line($p1x, $p1y, $p2x, $p2y, gdBrushed);
+		$img->filledRectangle($p1x, $p1y-1,$p2x, $p2y-1,$obj->{gridColor}); # wide line
 #	draw Y-axis
 		($p1x, $p1y) = $obj->pt2pxl($xaxpt, $yl);
 		($p2x, $p2y) = $obj->pt2pxl($xaxpt, $yh);
-		$img->line($p1x, $p1y, $p2x, $p2y, gdBrushed);
+		$img->filledRectangle($p1x-1, $p2y,$p2x+1, $p1y,$obj->{gridColor}); # wide line
   	}
   	else {
 #
 #	X axis
 		($p1x, $p1y) = $obj->pt2pxl($xl, $yaxpt);
 		($p2x, $p2y) = $obj->pt2pxl($xh, $yaxpt);
-		$img->line($p1x, $p1y, $p2x, $p2y, $obj->{'black'});
+		$img->line($p1x, $p1y, $p2x, $p2y, $obj->{gridColor});
+#
+#	draw at bottom if yl < 0
+		($p1x, $p1y) = $obj->pt2pxl($xl, $yl),
+		($p2x, $p2y) = $obj->pt2pxl($xh, $yl),
+		$img->line($p1x, $p1y, $p2x, $p2y, $obj->{gridColor})
+			if ($yl < 0);
 	}
-
-	if ($obj->{'xAxisLabel'}) {
-		($p2x, $p2y) = $obj->pt2pxl($xh, $yl);
-		my $len = $sfw * length($obj->{'xAxisLabel'});
-		my $xStart = ($p2x+$len/2 > $obj->{'width'}-10)
-			? ($obj->{'width'}-10-$len) : ($p2x-$len/2);
-		$img->string(gdSmallFont, $xStart, $p2y+4*$sfh/3, 
-			$obj->{'xAxisLabel'}, $obj->{'black'});
-	}
+#
+#	draw X axis label
+	my ($len, $xStart);
+	($p2x, $p2y) = $obj->pt2pxl($xh, (
+		$obj->{vertGrid} || $obj->{horizGrid}) ? $yl : $yaxpt),
+	$len = $sfw * length($obj->{xAxisLabel}),
+	$xStart = ($p2x+$len/2 > $obj->{width}-10)
+		? ($obj->{width}-10-$len) : ($p2x-$len/2),
+	$img->string(gdSmallFont, $xStart, $p2y+ int(4*$sfh/3), 
+		$obj->{xAxisLabel}, $obj->{textColor})
+		if ($obj->{xAxisLabel});
 
 # Y axis
-	($p1x, $p1y) = $obj->pt2pxl ($xaxpt, $yl);
-	($p2x, $p2y) = $obj->pt2pxl ((($obj->{'vertGrid'}) ? $xl : $xaxpt), $yh);
+	($p1x, $p1y) = $obj->pt2pxl($xaxpt, $yl);
+	($p2x, $p2y) = $obj->pt2pxl((($obj->{vertGrid}) ? $xl : $xaxpt), $yh);
 	
-	$img->line($p1x, $p1y, $p2x, $p2y, $obj->{'black'})
-		if ((! $obj->{'vertGrid'}) && (! $obj->{'horizGrid'}));
+	$img->line($p1x, $p1y, $p2x, $p2y, $obj->{gridColor})
+		if ((! $obj->{'vertGrid'}) && (! $obj->{horizGrid}));
 
-	if ($obj->{'yAxisLabel'}) {
-		my $xStart = $p2x - length($obj->{'yAxisLabel'}) * ($sfw >> 1);
-		$img->string(gdSmallFont, ($xStart>10 ? $xStart : 10), $p2y - 3*$sfh/2,
-			  $obj->{'yAxisLabel'},  $obj->{'black'});
-	}
+	$xStart = $p2x - length($obj->{yAxisLabel}) * ($sfw >> 1),
+	$img->string(gdSmallFont, ($xStart>10 ? $xStart : 10), 
+		$p2y - 3*($sfh>>1), $obj->{yAxisLabel},  $obj->{textColor})
+		if ($obj->{yAxisLabel});
 #
 # draw ticks and labels
 # 
@@ -695,63 +1805,68 @@ sub plotAxes {
 #
 #	for LOG(X):
 #
-	if ($obj->{'xLog'}) {
+	my $powk;
+	if ($obj->{xLog}) {
 		$i = $xl;
 		my $n = 0;
 		my $k = $i;
 		while ($i < $xh) {
 			$k = $i + $logsteps[$n++];
 
-			($px,$py) = $obj->pt2pxl($k, 
-				((($obj->{'yLog'}) || 
-				($obj->{'vertGrid'}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
-			($p1x, $p1y) = ($obj->{'vertGrid'}) ? 
+			($px,$py) = $obj->pt2pxl($k, $yl);
+#				((($obj->{yLog}) || 
+#				($obj->{vertGrid}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
+			($p1x, $p1y) = ($obj->{vertGrid}) ? 
 				$obj->pt2pxl($k, $yh) : ($px, $py+2);
-			$py -= 2 if (! $obj->{'vertGrid'});
-			$img->line($px, $py, $px, $p1y, $obj->{'black'});
-			$py += 2 if (! $obj->{'vertGrid'});
-			if ($n == 1) {
-				my $powk = 10**$k;
-				$img->stringUp(gdSmallFont, $px-$sfh/2, $py+length($powk)*$sfw, 
-					$powk, $obj->{'black'});
-			}
+			$py -= 2 unless $obj->{vertGrid};
+			$img->line($px, $py, $px, $p1y, $obj->{gridColor});
+			$py += 2 unless $obj->{vertGrid};
+
+			$powk = 10**$k,
+			$img->stringUp(gdSmallFont, $px-$sfh/2, 
+				$py+length($powk)*$sfw, $powk, $obj->{textColor})
+				if ($n == 1);
+
 			($n, $i)  = (0 , $k )
 				if ($n == scalar(@logsteps));
 		}
 	}
-	elsif (($obj->{'symDomain'}) || ($obj->{'props'}=~/^candle /)) {
+	elsif ($obj->{symDomain}) {
 #
-# Candlestick or symbolic domain
+# symbolic domain
 #
-		my $ary = ${$obj->{'data'}}[0];
+		my $ary = $obj->{data}->[0];
     
     	my $prevx = 0;
-		for ($i = 0, $j = 0; $i < $xh; $i++, $j+=2 ) {
-			($px,$py) = $obj->pt2pxl($i, 
-				((($obj->{'yLog'}) || 
-				($obj->{'vertGrid'}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
-			($p1x, $p1y) = ($obj->{'vertGrid'}) ? 
+    	my $incr = ($props=~/\b(bar|candle)\b/i) ? 3 : 2;
+    	my $offset = ($props=~/\b(bar|candle)\b/i) ? 0 : 1;
+		for ($i = ($props=~/\b(bar|candle)\b/i) ? 1 : 0, $j = 0; 
+			$i < $xh-$offset; $i++, $j += $incr ) {
+			($px,$py) = $obj->pt2pxl($i, $yl);
+#				((($obj->{yLog}) || 
+#				($obj->{vertGrid}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
+			($p1x, $p1y) = ($obj->{vertGrid}) ? 
 				$obj->pt2pxl($i, $yh) : ($px, $py+2);
-			$py -= 2 if (! $obj->{'vertGrid'});
-			$img->line($px, $py, $px, $p1y, $obj->{'black'});
-			$py += 2 if (! $obj->{'vertGrid'});
-			next if (!defined($$ary[$j]));
+			$py -= 2 unless $obj->{vertGrid};
+			$img->line($px, $py, $px, $p1y, $obj->{gridColor});
+			$py += 2 unless $obj->{vertGrid};
+			next unless defined($$ary[$j]);
 #
 #	truncate long labels
 #
 			$txt = $$ary[$j];
-			$txt = substr($txt, 0, 7) . '...' 
-				if (length($txt) > 10);
+			$txt = substr($txt, 0, 22) . '...' 
+				if (length($txt) > 25);
 
-			if (defined($obj->{'xAxisVert'}) && ($obj->{'xAxisVert'} == 0)) {
+			if (defined($obj->{xAxisVert}) && ($obj->{xAxisVert} == 0)) {
 #
 #	skip the label if it would overlap
 #
 				next if (((length($txt)+1) * $sfw) > ($px - $prevx));
 				$prevx = $px;
 
-				$img->string(gdSmallFont, $px-length($txt)*($sfw>>1), $py+($sfh>>1), 
-					$txt, $obj->{'black'});
+				$img->string(gdSmallFont, $px-length($txt)*($sfw>>1), 
+					$py+($sfh>>1), $txt, $obj->{textColor});
 			}
 			else {
 #
@@ -760,31 +1875,31 @@ sub plotAxes {
 				next if (($sfh+1) > ($px - $prevx));
 				$prevx = $px;
 
-				$img->stringUp(gdSmallFont, $px-($sfh>>1), $py+2+length($txt)*$sfw, 
-					$txt, $obj->{'black'})
+				$img->stringUp(gdSmallFont, $px-($sfh>>1), 
+					$py+2+length($txt)*$sfw, $txt, $obj->{textColor})
 			}
 		}
 	}
 	else {
-	    $step = $obj->{'horizStep'}; 
+	    $step = $obj->{horizStep}; 
     
 		for ($i = $xl; $i <= $xh; $i += $step ) {
-			($px,$py) = $obj->pt2pxl($i, 
-				((($obj->{'yLog'}) || 
-				($obj->{'vertGrid'}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
-			($p1x, $p1y) = ($obj->{'vertGrid'}) ? 
+			($px,$py) = $obj->pt2pxl($i, $yl);
+#				((($obj->{yLog}) || 
+#				($obj->{vertGrid}) || ($yl > 0) || ($yh < 0)) ? $yl : 0));
+			($p1x, $p1y) = ($obj->{vertGrid}) ? 
 				$obj->pt2pxl($i, $yh) : ($px, $py+2);
-			$py -= 2 if (! $obj->{'vertGrid'});
-			$img->line($px, $py, $px, $p1y, $obj->{'black'});
-			$py += 2 if (! $obj->{'vertGrid'});
-			if ($obj->{'xAxisVert'}) {
-				$img->stringUp(gdSmallFont, $px-($sfh>>1), $py+2+length($i)*$sfw, 
-					$i, $obj->{'black'})
-			}
-			else {
-				$img->string(gdSmallFont, $px-length($i)*($sfw>>1), $py+($sfh>>1), 
-					$i, $obj->{'black'});
-			}
+			$py -= 2 if (! $obj->{vertGrid});
+			$img->line($px, $py, $px, $p1y, $obj->{gridColor});
+			$py += 2 if (! $obj->{vertGrid});
+
+			$img->stringUp(gdSmallFont, $px-($sfh>>1), 
+				$py+2+length($i)*$sfw, $i, $obj->{textColor})
+				if ($obj->{xAxisVert});
+
+			$img->string(gdSmallFont, $px-length($i)*($sfw>>1), 
+				$py+($sfh>>1), $i, $obj->{textColor})
+				unless ($obj->{xAxisVert});
 		}
 	}
 #
@@ -792,51 +1907,54 @@ sub plotAxes {
 #
 #	for LOG(Y):
 #
-	if ($obj->{'yLog'}) {
+	if ($obj->{yLog}) {
 		$i = $yl;
 		my $n = 0;
 		my $k = $i;
 		while ($i < $yh) {
 			$k = $i + $logsteps[$n++];
 			($px,$py) = $obj->pt2pxl(
-				((($obj->{'xLog'}) || ($obj->{'horizGrid'})) ? $xl : $xaxpt), $k);
-			($p1x, $p1y) = ($obj->{'horizGrid'}) ? 
+				((($obj->{xLog}) || ($obj->{horizGrid})) ? 
+				$xl : $xaxpt), $k);
+			($p1x, $p1y) = ($obj->{horizGrid}) ? 
 				$obj->pt2pxl($xh, $k) : ($px+2, $py);
-			$px -=2 if (! $obj->{'horizGrid'});
-			$img->line($px, $py, $p1x, $py, $obj->{'black'});
-			$px +=2 if (! $obj->{'horizGrid'});
+			$px -=2 if (! $obj->{horizGrid});
+			$img->line($px, $py, $p1x, $py, $obj->{gridColor});
+			$px +=2 if (! $obj->{horizGrid});
 			if ($n == 1) {
 				my $powk = 10**$k;
-				$img->string(gdSmallFont, $px-5-length($powk)*$sfw, $py-($sfh>>1), 
-					$powk, $obj->{'black'});
+				$img->string(gdSmallFont, $px-5-length($powk)*$sfw, 
+					$py-($sfh>>1), $powk, $obj->{textColor});
 			}
 			
 			($n, $i)  = (0 , $k )
 				if ($n == scalar(@logsteps));
 		}
+		return 1;
 	}
-	else {
-		$step = $obj->{'vertStep'};
+
+	$step = $obj->{vertStep};
 #
 #	if y tick step < (2 * sfh), skip every other label
 #
-		($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : $xaxpt), $yl);
-		($p1x,$p1y) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : $xaxpt), $yl+$step);
-		my $skip = ($p1y - $py < ($sfh<<1)) ? 1 : 0;
+	($px,$py) = $obj->pt2pxl((($obj->{horizGrid}) ? $xl : $xaxpt), $yl);
+	($p1x,$p1y) = $obj->pt2pxl((($obj->{horizGrid}) ? $xl : $xaxpt), 
+		$yl+$step);
+	my $skip = ($p1y - $py < ($sfh<<1)) ? 1 : 0;
 
-		for ($i=$yl, $j = 0; $i <= $yh; $i+=$step, $j++ ) {
-			($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : $xaxpt), $i);
-			($p1x, $p1y) = ($obj->{'horizGrid'}) ? 
-				$obj->pt2pxl($xh, $i) : ($px+2, $py);
-			$px -=2 if (! $obj->{'horizGrid'});
-			$img->line($px, $py, $p1x, $py, $obj->{'black'});
-			$px +=2 if (! $obj->{'horizGrid'});
+	for ($i=$yl, $j = 0; $i <= $yh; $i+=$step, $j++ ) {
+		($px,$py) = $obj->pt2pxl((($obj->{horizGrid}) ? $xl : $xaxpt), $i);
+		($p1x, $p1y) = ($obj->{horizGrid}) ? 
+			$obj->pt2pxl($xh, $i) : ($px+2, $py);
+		$px -=2 if (! $obj->{horizGrid});
+		$img->line($px, $py, $p1x, $py, $obj->{gridColor});
+		$px +=2 if (! $obj->{horizGrid});
 
-			next if (($skip) && ($j&1));
-			$img->string(gdSmallFont, $px-5-length($i)*$sfw, $py-($sfh>>1), 
-				$i, $obj->{'black'});
-		}
+		next if (($skip) && ($j&1));
+		$img->string(gdSmallFont, $px-5-length($i)*$sfw, $py-($sfh>>1), 
+			$i, $obj->{textColor});
 	}
+	return 1;
 }
 
 sub drawTitle {
@@ -844,45 +1962,48 @@ sub drawTitle {
 	my ($w,$h) = (gdMediumBoldFont->width, gdMediumBoldFont->height);
 
 # centered below chart
-	my ($px,$py) = ($obj->{'width'}/2, $obj->{'height'} - 40);
+	my ($px,$py) = ($obj->{width}/2, $obj->{height} - 40);
 
-	($px,$py) = ($px - length ($obj->{'title'}) * $w/2, $py+$h/2);
-	$obj->{'img'}->string (gdMediumBoldFont, $px, $py, 
-		$obj->{'title'}, $obj->{'black'}); 
+	($px,$py) = ($px - length ($obj->{title}) * $w/2, $py+$h/2);
+	$obj->{img}->string (gdMediumBoldFont, $px, $py, 
+		$obj->{title}, $obj->{textColor}); 
 }
 
 sub drawSignature {
 	my ($obj) = @_;
-	my $fw = (gdTinyFont->width * length($obj->{'signature'})) - 5;
+	my $fw = ($tfw * length($obj->{signature})) + 5;
 # in lower right corner
-	my ($px,$py) = ($obj->{'width'} - $fw, $obj->{'height'} - (gdTinyFont->height * 2));
+	my ($px,$py) = ($obj->{width} - $fw, $obj->{height} - ($tfh * 2));
 
-	$obj->{'img'}->string (gdTinyFont, $px, $py, 
-		$obj->{'signature'}, $obj->{'black'}); 
+	$obj->{img}->string (gdTinyFont, $px, $py, 
+		$obj->{signature}, $obj->{textColor}); 
 }
 
 sub fill_region
 {
 	my ($obj, $ci, $ary) = @_;
-	my $img = $obj->{'img'};
+	my $img = $obj->{img};
 
-	my ($xl, $xh, $yl, $yh) = ($obj->{'xl'}, $obj->{'xh'}, 
-		$obj->{'yl'}, $obj->{'yh'});
-
+	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, 
+		$obj->{yl}, $obj->{yh});
+	my($x, $y);
+	
 	# Create a new polygon
 	my $poly = GD::Polygon->new();
 
 	my @bottom;
 
+	$xl = 0 if $obj->{symDomain};
 	my ($xbot, $ybot) = $obj->pt2pxl($xl, (($yl >= 0) ? $yl : 0));
 	
 	# Add the data points
 	for (my $i = 0; $i < @$ary; $i += 2)
 	{
-		my $value = $$ary[$i];
-		next unless defined $value;
+		next unless defined($$ary[$i]);
 
-		my ($x, $y) = $obj->pt2pxl($$ary[$i], $$ary[$i+1]);
+		($x, $y) = $obj->pt2pxl(
+			$obj->{symDomain} ? $i>>1 : $$ary[$i], 
+			$$ary[$i+1]);
 		$poly->addPt($x, $y);
 		push @bottom, [$x, $ybot];
 	}
@@ -899,74 +2020,657 @@ sub fill_region
 	1;
 }
 
-sub make_marker
-{
+sub make_marker {
 	my ($obj, $mtype, $mclr) = @_;
 
 	my $brush = new GD::Image(9,9);
 	my $white = $brush->colorAllocate(255, 255, 255);
 	my $clr = $brush->colorAllocate(@{$colors{$mclr}});
 	$brush->transparent($white);
+	$mtype = $shapes{$mtype};
 
 # square, filled	
-	if ($mtype == 1) {
-		$brush->filledRectangle(0,0,6,6,$clr);
-		return $brush;
-	}
+	$brush->filledRectangle(0,0,6,6,$clr),
+	return $brush
+		if ($mtype == 1);
+
 # Square, open
-	if ($mtype == 2) {
-		$brush->rectangle( 0, 0, 6, 6, $clr ); 
-		return $brush;
-	}
+	$brush->rectangle( 0, 0, 6, 6, $clr ),
+	return $brush
+		if ($mtype == 2);
 
 # Cross, horizontal
-	if ($mtype == 3) {
-		$brush->line( 0, 4, 8, 4, $clr );
-		$brush->line( 4, 0, 4, 8, $clr ); 
-		return $brush;
-	}
+	$brush->line( 0, 4, 8, 4, $clr ),
+	$brush->line( 4, 0, 4, 8, $clr ),
+	return $brush
+		if ($mtype == 3);
 
 # Cross, diagonal
-	if ($mtype == 4) {
-		$brush->line( 0, 0, 8, 8, $clr );
-		$brush->line( 8, 0, 0, 8, $clr );
-		return $brush;
-	}
+	$brush->line( 0, 0, 8, 8, $clr ),
+	$brush->line( 8, 0, 0, 8, $clr ),
+	return $brush
+		if ($mtype == 4);
 
 # Diamond, filled
-	if ($mtype == 5) {
-		$brush->line( 0, 4, 4, 8, $clr );
-		$brush->line( 4, 8, 8, 4, $clr );
-		$brush->line( 8, 4, 4, 0, $clr );
-		$brush->line( 4, 0, 0, 4, $clr );
-		$brush->fillToBorder( 4, 4, $clr, $clr ) ;
-		return $brush;
-	}
+	$brush->line( 0, 4, 4, 8, $clr ),
+	$brush->line( 4, 8, 8, 4, $clr ),
+	$brush->line( 8, 4, 4, 0, $clr ),
+	$brush->line( 4, 0, 0, 4, $clr ),
+	$brush->fillToBorder( 4, 4, $clr, $clr ),
+	return $brush
+		if ($mtype == 5);
 
 # Diamond, open
-	if ($mtype == 6) {
-		$brush->line( 0, 4, 4, 8, $clr );
-		$brush->line( 4, 8, 8, 4, $clr );
-		$brush->line( 8, 4, 4, 0, $clr );
-		$brush->line( 4, 0, 0, 4, $clr );
-		return $brush;
-	}
+	$brush->line( 0, 4, 4, 8, $clr ),
+	$brush->line( 4, 8, 8, 4, $clr ),
+	$brush->line( 8, 4, 4, 0, $clr ),
+	$brush->line( 4, 0, 0, 4, $clr ),
+	return $brush
+		if ($mtype == 6);
+
 # Circle, filled
-	if ($mtype == 7) {
-		$brush->arc( 4, 4, 8 , 8, 0, 360, $clr );
-		$brush->fillToBorder( 4, 4, $clr, $clr );
-		return $brush;
-	}
+	$brush->arc( 4, 4, 8 , 8, 0, 360, $clr ),
+	$brush->fillToBorder( 4, 4, $clr, $clr ),
+	return $brush,
+		if ($mtype == 7);
 
 # must be Circle, open
 	$brush->arc( 4, 4, 8, 8, 0, 360, $clr );
 	return $brush;
 }
 
+sub getIcon {
+	my ($obj, $icon, $isbar) = @_;
+	my $pat = GD::Image->can('newFromGif') ? 
+		'png|jpe?g|gif' : 'png|jpe?g';
+
+	$obj->{errmsg} = 
+	'Unrecognized icon file format. File qualifier must be .png, .jpg, ' . 
+		(GD::Image->can('newFromGif') ? '.jpeg, or .gif.' : 'or .jpeg.'),
+	return undef
+		unless ($icon=~/\.($pat)$/i);
+
+	$obj->{errmsg} = "Unable to open icon file $icon.",
+	return undef
+		unless open(ICON, "<$icon");
+
+	my $iconimg = ($icon=~/\.png$/i) ? GD::Image->newFromPng(*ICON) :
+	  ($icon=~/\.gif$/i) ? GD::Image->newFromGif(*ICON) :
+	    GD::Image->newFromJpeg(*ICON);
+	close(ICON);
+	$obj->{errmsg} = "GD cannot read icon file $icon\.",
+	return undef
+		unless $iconimg;
+
+	my ($iconw, $iconh) = $iconimg->getBounds();
+	$obj->{errmsg} = "Icon image $icon too wide for chart image.",
+	return undef
+		if (($isbar && ($iconw > $obj->{brushWidth})) ||
+			($iconw > $obj->{plotWidth}));
+		
+	$obj->{errmsg} = "Icon image $icon too tall for chart image.",
+	return undef
+		if ($iconh > $obj->{plotHeight});
+	return $iconimg;
+}
+
+sub drawIcons {
+	my ($obj, $iconimg, $px, $pyb, $pyt) = @_;
+#
+#	force the icon into the defined image area
+#
+	my ($iconw, $iconh) = $iconimg->getBounds();
+	my $img = $obj->{img};
+	my $remy = $pyb;
+	$px -= int($iconw/2);
+
+	while ($remy > $pyt) {	
+		my $srcY = ($iconh > ($remy - $pyt)) ? 
+			($iconh - ($remy - $pyt)) : 0;
+		my $h = ($iconh > ($remy - $pyt)) ? $remy - $pyt : $iconh;
+		$remy -= $h;
+		$img->copy($iconimg, $px, $remy, 0, $srcY, $iconw, $h);
+	}
+	1;
+}
+
+sub plot3DAxes {
+	my ($obj) = @_;
+	my $img = $obj->{img};
+	my ($xl, $xh, $yl, $yh, $zl, $zh) = 
+		($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh}, $obj->{zl}, $obj->{zh});
+
+	my $numRanges = scalar @{$obj->{data}};
+	my ($xoff, $zcard) = ($obj->{zAxisLabel}) ? 
+		(1.0, $obj->{Zcard}) : (0.9, 1);
+	my $xbarw = $xoff/$numRanges;
+	my $zbarw = ($obj->{zh} - $obj->{zl})/($zcard*2);
+
+	$zl -= (0.8);
+	$zh += $zbarw;
+	my $ycenter = ($yl < 0) ? 0 : $yl;
+	my @v = (
+		$xl, $yl, $zl,	# bottom front left
+		$xl, $yl, $zh,	# bottom rear left
+		$xl, $yh, $zl,	# top front left
+		$xl, $yh, $zh,	# top rear left
+		$xh, $yl, $zl,	# bottom front right
+		$xh, $yl, $zh,	# bottom rear right
+		$xh, $yh, $zh,	# top rear right
+#
+#	in case floor is above bottom of graph
+		$xl, $ycenter, $zl,	# bottom front left
+		$xh, $ycenter, $zl,	# bottom front right
+		$xh, $ycenter, $zh,	# bottom rear right
+		$xl, $ycenter, $zh	# bottom rear left
+	);
+
+	my @xlatverts = ();
+#
+#	generate vertices of cabinet projection
+#
+	my ($i, $j);
+	for ($i = 0; $i <= $#v; $i+=3) {
+		push(@xlatverts, $obj->pt2pxl($v[$i], $v[$i+1], $v[$i+2]));
+	}
+#
+#	draw left and rear wall, and floor
+#
+	for ($i = 0; $i <= $#axesverts; $i+=2) {
+		$img->line($xlatverts[$axesverts[$i]],
+			$xlatverts[$axesverts[$i]+1],
+			$xlatverts[$axesverts[$i+1]],
+			$xlatverts[$axesverts[$i+1]+1], $obj->{gridColor});
+	}
+#
+#	draw grid lines if requested
+#
+	my ($gx, $gy, $hx, $hy);
+	if ($obj->{horizGrid}) {
+		for ($i = $obj->{yl}; $i < $obj->{yh}; $i += $obj->{vertStep}) {
+			($gx, $gy) = $obj->pt2pxl($xl, $i, $zl);
+			($hx, $hy) = $obj->pt2pxl($xl, $i, $zh),
+			$img->line($gx, $gy, $hx, $hy, $obj->{gridColor}),
+			($gx, $gy) = $obj->pt2pxl($xh, $i, $zh),
+			$img->line($gx, $gy, $hx, $hy, $obj->{gridColor}),
+		}
+	}
+# need these later to redraw floor and tick labels
+	$obj->{xlatVerts} = \@xlatverts;
+	1;
+}
+
+sub plot3DTicks {
+#
+#	draw axis tick values
+#
+	my ($obj) = @_;
+	my $img = $obj->{img};
+	my ($xl, $xh, $yl, $yh, $zl, $zh) = 
+		($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh}, $obj->{zl}, $obj->{zh});
+
+	my $numRanges = scalar @{$obj->{data}};
+	my ($xoff, $zcard) = ($obj->{zAxisLabel}) ? 
+		(1.0, $obj->{Zcard}) : (0.9, 1);
+
+	my $xbarw = $xoff/$numRanges;
+	my $zbarw = ($obj->{zh} - $obj->{zl})/($zcard*2);
+	my $data = $obj->{data}->[0];
+	$zl -= (0.8);
+	$zh += $zbarw;
+	my $ycenter = ($yl < 0) ? 0 : $yl;
+	my $i;
+	my $xlatverts = $obj->{xlatVerts};
+
+	my $text = '';
+	my ($gx, $gy, $hx, $hy);
+	if ($obj->{zAxisLabel}) {
+		my $zs = $obj->{zValues};
+		for ($i = 0; $i <= $#$zs; $i++) {
+			($gx, $gy) = $obj->pt2pxl($xh, $ycenter, $i+1+0.8);
+			$text = $$zs[$i];
+			$text = substr($text, 0, 22) . '...' if (length($text) > 25);
+			$img->string(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
+		}
+	}
+	my $xs = $obj->{xValues};
+	for ($i = 0; $i <= $#$xs; $i++) {
+		($gx, $gy) = $obj->pt2pxl($i+(($yl >= 0) ? 1 : 0.5), $yl, ($yl >= 0) ? $zl : $zh);
+		$text = $$xs[$i];
+		$text = substr($text, 0, 22) . '...' if (length($text) > 25);
+		$gy += (length($text) * $sfw) + 5;
+		$img->stringUp(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
+	}
+	for ($i = $obj->{yl}; $i < $obj->{yh}; $i += $obj->{vertStep}) {
+		($gx, $gy) = $obj->pt2pxl($xl, $i, $zl);
+		$text = $i;
+		$text = substr($text, 0, 22) . '...' if (length($text) > 25);
+		$gx -= ((length($text) * $sfw) + 5);
+		$img->string(gdSmallFont, $gx, $gy-($sfw>>1), $text, $obj->{textColor});
+	}
+#
+#	redraw the floor in case we had negative values
+	for ($i = 18; $i <= $#axesverts; $i+=2) {
+		$img->line($$xlatverts[$axesverts[$i]],
+			$$xlatverts[$axesverts[$i]+1],
+			$$xlatverts[$axesverts[$i+1]],
+			$$xlatverts[$axesverts[$i+1]+1], $obj->{gridColor});
+	}
+
+	1;
+}
+
+sub plot3DBars {
+	my ($obj) = @_;
+	
+	my $img = $obj->{img};
+	my $numRanges = scalar @{$obj->{data}};
+	my ($xoff, $zcard) = ($obj->{zAxisLabel}) ? 
+		(1.0, $obj->{Zcard}) : (0.9, 1);
+	my $xbarw = $xoff/$numRanges;
+	my $zbarw = ($obj->{zh} - $obj->{zl})/($zcard*2);
+	my ($xvals, $zvals) = ($obj->{xValues}, $obj->{zValues});
+	my @fronts = ();
+	my @tops = ();
+	my @sides = ();
+	my $legend = $obj->{legend};
+	for (my $k = 0; $k < $numRanges ; $k++) {
+		my $color = 'black';
+		my $ary = $obj->{data}->[$k];
+#
+#	extract properties
+#
+		my $t = $obj->{props}->[$k];
+		$t=~s/\s+/ /g;
+		$t = lc $t;
+		my @props = split (' ', $t);
+		foreach my $prop (@props) {
+#
+#	generate light, medium, and dark version for front,
+#	top, and side faces
+#
+			$color = $prop,
+			push(@tops, $img->colorAllocate(@{$colors{$prop}})),
+			push(@fronts, $img->colorAllocate(int($colors{$prop}->[0] * 0.8), 
+				int($colors{$prop}->[1] * 0.8), int($colors{$prop}->[2] * 0.8))),
+			push(@sides, $img->colorAllocate(int($colors{$prop}->[0] * 0.6), 
+				int($colors{$prop}->[1] * 0.6), int($colors{$prop}->[2] * 0.6)))
+				if ($colors{$prop});
+
+		}
+		$obj->{$color} = $fronts[$#fronts];
+		$obj->drawLegend($k, $color, undef, $$legend[$k])
+			if (($legend) && ($$legend[$k]));
+	}
+#
+#	draw each bar
+	my $numPts = $#{$obj->{data}->[0]};
+	my $ary;
+	for (my $i = 0; $i <= $numPts; $i+=4) {
+		for (my $k = 0; $k < $numRanges; $k++) {
+			$ary = $obj->{data}->[$k];
+			$obj->drawCube($$ary[$i], $$ary[$i+1], $$ary[$i+2], $$ary[$i+3],
+				$k, $fronts[$k], $tops[$k], $sides[$k], 
+				$xoff, $xbarw, $zbarw, $$xvals[$$ary[$i]-1], $$zvals[$$ary[$i+3]-1]);
+		}
+	}
+#
+#	need to redraw floor and ticks
+	$obj->plot3DTicks;
+	return 1;
+}
+
+sub computeSides {
+	my ($x, $xoff, $barw, $k) = @_;
+	
+	return ($x - ($xoff/2) + ($k * $barw), 
+		$x - ($xoff/2) + (($k+1) * $barw));
+}
+
+sub drawCube {
+	my ($obj, $x, $yl, $yh, $z, $k, $front, $top, $side, 
+		$xoff, $xbarw, $zbarw, $xval, $zval) = @_;
+	my ($xl, $xr) = computeSides($x, $xoff, $xbarw, $k);
+	$z++;
+#
+#	generate value coordinates of visible vertices
+	my @v = (
+		$xl, $yl, $z - $zbarw,	# left bottom front
+		$xl, $yh, $z - $zbarw,	# left top front
+		$xl, $yh, $z + $zbarw,	# left top rear
+		$xr, $yh, $z + $zbarw,	# right top rear
+		$xr, $yh, $z - $zbarw,	# right top front
+		$xr, $yl, $z - $zbarw,	# right bottom front
+		$xr, $yl, $z + $zbarw	# right bottom rear
+	);
+	
+	my @xlatverts = ();
+	my $img = $obj->{img};
+	my ($i, $j);
+#
+#	translate value vertices to pixel coordinate using
+#	cabinet projection
+	for ($i = 0; $i < 21; $i+=3) {
+		push(@xlatverts, $obj->pt2pxl($v[$i], $v[$i+1], $v[$i+2]));
+	}
+	my @faces = ($top, $front, $side);
+#
+#	render faces as filled polygons to obscure any prior cubes
+#
+	for ($i = 0; $i < 3; $i++) {
+		my $poly = new GD::Polygon;
+		my $ary = $polyverts[$i];
+		for ($j = 0; $j < 4; $j++) {
+			$poly->addPt($xlatverts[$$ary[$j]],$xlatverts[$$ary[$j]+1]);
+		}
+		$img->filledPolygon($poly, $faces[$i]);
+	}
+	for ($i = 0; $i < 18; $i+=2) {
+		$img->line($xlatverts[$vert2lines[$i]], 
+			$xlatverts[$vert2lines[$i]+1],
+			$xlatverts[$vert2lines[$i+1]],
+			$xlatverts[$vert2lines[$i+1]+1], $obj->{black});
+	}
+#
+#	generate image map for top face only
+#
+	my $y = ($yh > 0) ? $yh : $yl;
+	if ($obj->{genMap}) {
+		my $text = ($zval) ? "($xval, $y, $zval)" : "($xval, $y)";
+		my $ary = $polyverts[0];
+		my @ptsary = ();
+		for ($i = 0; $i < 4; $i++) {
+			push(@ptsary, $xlatverts[$$ary[$i]], $xlatverts[$$ary[$i]+1]);
+		}
+		$obj->updateImagemap('POLY', $text, 0, $xval, $y, $zval, @ptsary);
+	}
+#
+#	render the top text label
+#
+	my $mx = ($xr + $xl)/2;
+	my ($px, $py) = $obj->pt2pxl($mx, $yh, $z - $zbarw);
+	$img->stringUp(gdTinyFont, $px, $py-10, $y, $obj->{textColor});
+	1;
+}
+
+sub abs { my $x = shift; return ($x < 0) ? -1*$x : $x; }
+
+sub plotPie {
+	my ($obj) = @_;
+	my $ary = $obj->{data}->[0];
+#
+#	extract properties
+#
+	my @colormap = ();
+	my $t = $obj->{props}->[0];
+	$t=~s/\s+/ /g;
+	$t = lc $t;
+	my @props = split (' ', $t);
+	my $img = $obj->{img};
+	foreach my $prop (@props) {
+		push(@colormap, $img->colorAllocate(@{$colors{$prop}}))
+			if ($colors{$prop});
+	}
+#
+#	render each wedge, in clockwise order, starting from 12 o'clock
+#
+	my $i = 0;
+#
+#	compute sum of wedge values
+#	and max length of wedge labels
+#
+	my $total = 0;
+	my $arc = 0;
+	my $maxlen = 0;
+	my $len = 0;
+	for ($i = 0; $i <= $#$ary; $i+=2) { 
+		$total += $$ary[$i+1]; 
+		$len = length($$ary[$i]) + 6;
+		$len = 25 if ($len > 25);
+		$maxlen = $len if ($len > $maxlen);
+	}
+	$maxlen++;
+	$maxlen *= $tfw;
+	$obj->{errmsg} = 'Insufficient image size for graph.',
+	return undef
+		if ($maxlen * 2 > ($obj->{width} * 0.5));
+#
+#	compute center coords and radius of pie
+#
+	my $xcenter = int($obj->{width}/2);
+	my $ycenter = int(($obj->{height}/2) - 30);
+	my $radius = $xcenter - $maxlen - 10;
+	$radius = $ycenter - 10 if ($ycenter - 10 < $radius);
+	$img->arc($xcenter, $ycenter, $radius*2, $radius*2, 0, 360, $obj->{black});
+	$img->line($xcenter, $ycenter, $xcenter, $ycenter - $radius, $obj->{black});
+#
+#	now draw each wedge
+#
+	my $w = 0;
+	my $j = 0;
+	for ($i = 0, $j = 0; $i <= $#$ary; $i+=2, $j++) { 
+		$w = $$ary[$i+1];
+		my $color = $colormap[$j%(scalar @colormap)];
+		$arc = $obj->drawWedge($arc, $color, $xcenter, 
+			$ycenter, $radius, $w/$total, $$ary[$i], $w);
+	}
+	return 1;
+}
+
+sub drawWedge {
+	my ($obj, $arc, $color, $xcenter, $ycenter, $radius, $pct, $text, $val) = @_;
+	my $img = $obj->{img};
+#
+#	locate coords at 80% of radius that bisects the wedge;
+#	we'll use this to fill the color and apply the text
+#
+	my ($x, $y, $fx, $fy);
+#
+#	if imagemap, generate 10 degree coordinates up 
+#	to the arc of the wedge
+#
+	if ($obj->{genMap}) {
+		my $tarc = 0;
+
+		my @ptsary = ($xcenter, $ycenter);
+		while ($tarc <= (2 * 3.1415926 * $pct)) {
+			($x, $y) = computeCoords($xcenter, $ycenter, $radius, 
+				$arc + $tarc);
+			push(@ptsary, $x, $y);
+			last if ((2 * 3.1415926 * $pct) - $tarc < (2 * 3.1415926/36));
+			$tarc += (2 * 3.1415926/36);
+				
+		}
+		if ($tarc < (2 * 3.1415926 * $pct)) {
+			($x, $y) = computeCoords($xcenter, $ycenter, $radius, 
+				$arc + (2 * 3.1415926 * $pct));
+			push(@ptsary, $x, $y);
+		}
+		$obj->updateImagemap('POLY', 
+			"$val(" . (int($pct * 1000)/10) . '%)', 0, $text, $val, 
+			int(10000*$pct)/100, @ptsary);
+	}
+	my $bisect = $arc + ($pct * 3.1415926);
+	$arc += (2 * 3.1415926 * $pct); 
+
+#	print "Plotting $text with $pct % angle $arc\n";
+	($x, $y) = computeCoords($xcenter, $ycenter, $radius, $arc);
+	($fx, $fy) = computeCoords($xcenter, $ycenter, $radius * 0.6, $bisect);
+	my ($gx, $gy) = computeCoords($xcenter, $ycenter, $radius, $bisect);
+	$img->line($xcenter, $ycenter, $x, $y, $obj->{black});
+	$img->fill($fx, $fy, $color);
+#
+#	render text
+#
+	if ($text) {
+		$gy -= $sfh if (($gx >= $xcenter) && ($gy < $ycenter));
+		$gx = ($gx > $xcenter) ? $gx+$sfw : ($gx == $xcenter) ? 
+			$gx-(length($text) * $sfw/2) :
+			$gx-((length($text)+1) * $sfw);
+		$img->string(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
+	}
+	return $arc;
+}
+
+sub computeCoords {
+	my ($xcenter, $ycenter, $radius, $arc) = @_;
+	my ($x, $y);
+	
+	if ($arc <= 3.1415926/2) {
+		$x = $xcenter + ($radius * sin($arc));
+		$y = $ycenter - ($radius * cos($arc));
+	}
+	elsif ($arc <= 3.1415926) {
+		$x = $xcenter + ($radius * cos($arc - 3.1415926/2));
+		$y = $ycenter + ($radius * sin($arc- 3.1415926/2));
+	}
+	elsif ($arc <= 3.1415926 * 1.5) {
+		$x = $xcenter - ($radius * sin($arc - 3.1415926));
+		$y = $ycenter + ($radius * cos($arc - 3.1415926));
+	}
+	else {
+		$x = $xcenter - ($radius * sin(3.1415926*2 - $arc));
+		$y = $ycenter - ($radius * cos(3.1415926*2 - $arc));
+	}
+	$x = ($x - int($x) >= 0.5) ? int($x)+1 : int($x);
+	$y = ($y - int($y) >= 0.5) ? int($y)+1 : int($y);
+	return ($x, $y);
+}
 1;
 
-__END__
+sub updateImagemap {
+	my ($obj, $shape, $alt, $plotNum, $x, $y, $z, @pts) = @_;
+#
+#	do different for Perl map
+#
+	return $obj->updatePerlImagemap($plotNum, $x, $y, $z, $shape, @pts)
+		if (uc $obj->{mapType} eq 'PERL');
+#
+#	render image map element:
+#	hotspot is an 8 pixel diameter circle centered on datapoint for
+#	lines, points, areas, and candlesticks.
+#	the user can provide both a URL to be invoked, and/or a 
+#	script function to be locally executed, when the hotspot is clicked.
+#	Special variable names $PLOTNUM, $X, $Y, $Z can be specified
+#	anywhere in the URL/script string to be interpolated to the
+#	the equivalent input values
+#
+	$shape = uc $shape;
+	$y = '' unless defined($y);
+	$z = '' unless defined($z);
+	$x =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
+	$y =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
+	$z =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
+	my $imgmap = $obj->{imgMap};
+#
+#	interpolate special variables
+#
+	my $imgURL = $obj->{mapURL};
+	$imgURL=~s/:PLOTNUM\b/$plotNum/g,
+	$imgURL=~s/:X\b/$x/g,
+	$imgURL=~s/:Y\b/$y/g,
+	$imgURL=~s/:Z\b/$z/g
+		if ($imgURL);
+#
+#	interpolate special variables
+#
+	my $imgScript = $obj->{mapScript};
+	$imgScript=~s/:PLOTNUM\b/$plotNum/g,
+	$imgScript=~s/:X\b/$x/g,
+	$imgScript=~s/:Y\b/$y/g,
+	$imgScript=~s/:Z\b/$z/g
+		if ($imgScript);
 
+	$imgmap .= "\n<AREA ALT=\"$alt\" " .
+		(($obj->{mapURL}) ? " HREF=\"$imgURL\" " : ' NOHREF ');
+	$imgmap .= " $imgScript "
+		if ($imgScript);
+
+	$imgmap .= " SHAPE=$shape COORDS=\"" . join(',', @pts) . '">';
+	$obj->{imgMap} = $imgmap;
+	return 1;
+}
+
+sub updatePerlImagemap {
+	my ($obj, $plotNum, $x, $y, $z, $shape, @pts) = @_;
+#
+#	render image map element:
+#	hotspot is an 8 pixel diameter circle centered on datapoint for
+#	lines, points, areas, and candlesticks.
+#
+	my $imgmap = $obj->{imgMap};
+	$imgmap .= ",\n" unless ($imgmap eq '');
+	$imgmap .= 
+"\{
+	plotnum => $plotNum,
+	X => '$x',
+	Y => '$y',
+	Z => '$z',
+	shape => '$shape',
+	coordinates => [ " . join(',', @pts) . "]
+}";
+	$obj->{imgMap} = $imgmap;
+	return 1;
+}
+
+sub formatTime {
+	my ($obj, $timeval) = @_;
+	my $fmt = $obj->{timeDomain};
+	if ($fmt=~/^(YY)?YY[-\.\/]MM(M)?[-\.\/]DD( HH:MM:SS)?$/) {
+		ctime($timeval);
+	}
+
+	my ($hrs, $mins, $secs);
+	$hrs = int($timeval/3600),
+	$mins = int(($timeval - ($hrs * 3600))/60),
+	$secs = $timeval%60,
+	return "$hrs:$mins:$secs"
+		if ($fmt eq 'HH:MM:SS');
+
+	$obj->{errmsg} = "Unrecognized time domain format $fmt.";
+	return undef;
+}
+
+sub addLogo {
+	my ($obj) = @_;
+	my $pat = GD::Image->can('newFromGif') ? 'png|jpe?g|gif' : 'png|jpe?g';
+	my ($logo, $imgw, $imgh) = ($obj->{logo}, $obj->{width}, $obj->{height});
+	my $img = $obj->{img};
+
+	$obj->{errmsg} = 
+	'Unrecognized logo file format. File qualifier must be .png, .jpg, ' .
+		(GD::Image->can('newFromGif') ? '.jpeg, or .gif.' :	'or .jpeg.'),
+	return undef
+		unless ($logo=~/\.($pat)$/i);
+
+	$obj->{errmsg} = 'Unable to open logo file.',
+	return undef
+		unless open(LOGO, "<$logo");
+
+	my $logoimg = ($logo=~/\.png$/i) ? GD::Image->newFromPng(*LOGO) :
+	  ($logo=~/\.gif$/i) ? GD::Image->newFromGif(*LOGO) :
+	    GD::Image->newFromJpeg(*LOGO);
+	close(LOGO);
+	
+	$obj->{errmsg} = 'GD cannot read logo file.',
+	return undef
+		unless $logoimg;
+
+	my ($logow, $logoh) = $logoimg->getBounds();
+#
+#	force the logo into the defined image area
+#
+	my $srcX = ($logow > $imgw) ? ($logow - $imgw)>>1 : 0;
+	my $srcY = ($logoh > $imgh) ? ($logoh - $imgh)>>1 : 0;
+	my $dstX = ($logow > $imgw) ? 0 : ($imgw - $logow)>>1;
+	my $dstY = ($logoh > $imgh) ? 0 : ($imgh - $logoh)>>1;
+	my $h = ($logoh > $imgh) ? $imgh : $logoh;
+	my $w = ($logow > $imgw) ? $imgw : $logow;
+	$img->copy($logoimg, $dstX, $dstY, $srcX, $srcY, $w-1, $h-1);
+	return 1;
+}
+
+__END__
 
 =head1 NAME
 
@@ -982,11 +2686,11 @@ DBD::Chart::Plot - Graph/chart Plotting engine for DBD::Chart
     $img->setPoints(\@xdataset, \@ydataset, 'blue line nopoints');
     
     $img->setOptions (
-        'horizMargin' => 75,
-        'vertMargin' => 100,
-        'title' => 'My Graph Title',
-        'xAxisLabel' => 'my X label',
-        'yAxisLabel' => 'my Y label' );
+        horizMargin => 75,
+        vertMargin => 100,
+        title => 'My Graph Title',
+        xAxisLabel => 'my X label',
+        yAxisLabel => 'my Y label' );
     
     print $img->plot;
 
@@ -1003,7 +2707,10 @@ B<DBD::Chart::Plot> supports the following:
 =item - multiple data set plots
 
 =item - line graphs, areagraphs, scatter graphs, linegraphs w/ points, 
-	and candlestick graphs
+	candlestick graphs, barcharts (2-D, 3-D, and 3-axis), piecharts,
+	and box & whisker charts (aka boxcharts)
+
+=item - optional iconic barcharts or datapoints
 
 =item - a wide selection of colors, and point shapes
 
@@ -1018,13 +2725,15 @@ B<DBD::Chart::Plot> supports the following:
 
 =item - optional symbolic (i.e., non-numeric) domain values
 
-=item - optional X and Y axis labels
+=item - optional X, Y, and Z axis labels
 
 =item - optional X and/or Y logarithmic scaling
 
 =item - optional title
 
 =item - optional adjustment of horizontal and vertical margins
+
+=item - optional HTML or Perl imagemap generation
 
 
 =back
@@ -1056,46 +2765,239 @@ GD.pm requires additional libraries:
 Creates an empty image. If image size is not specified, 
 the default is 400 x 300 pixels. 
 
+=head2 Graph-wide options: setOptions()
+
+
+    $img->setOptions (_title => 'My Graph Title',
+        xAxisLabel => 'my X label',
+        yAxisLabel => 'my Y label',
+        xLog => 0,
+        yLog => 0,
+        horizMargin => $numHorPixels,
+        vertMargin => $numvertPixels,
+        horizGrid => 1,
+        vertGrid => 1,
+        showValues => 1,
+        legend => \@plotnames,
+        genMap => 'a_valid_HTML_anchor_name',
+        mapURL => 'http://some.website.com/cgi-bin/cgi.pl',
+        icon => [ 'redstar.png', 'bluestar.png' ]
+        symDomain => 0
+     );
+
+As many (or few) of the options may be specified as desired.
+
+=item width, height
+
+The width and height of the image in pixels. Default is 400 and 300,
+respectively.
+
+=item genMap, mapType, mapURL, mapScript
+
+COntrol generation of imagemaps. When genMap is set to a legal HTML
+anchor name, an image map of the specified type is created for the image.
+The default type is 'HTML' if no mapType is specified. Legal types are
+'HTML' and 'PERL'.
+
+If mapType is 'PERL', then Perl script compatible text is generated
+representing an array ref of hashrefs containing the following
+attributes:
+
+plotnum => the plot number to which this hashref applies (to support
+multi-range graphs), starting at zero.
+
+x => the domain value for the plot element
+
+y => the range value for the plot element
+
+z => the Z axis value for 3-axis bar charts, if any
+
+shape => the shape of the hotspot area of the plot element, same
+as for HTML: 'RECT', 'CIRCLE', 'POLY'
+
+coordinates => an arrayref of the (x,y) pixel coordinates of the hotspot
+area to be mapped; for CIRCLE shape, its (x-center, y-center, radius),
+for RECT, its (upper-left corner x, upper-left corner y, 
+lower-right corner x, lower-right corner y), and for POLY its the
+set of vertices (x,y)'s.
+
+If the mapType is 'HTML', then either the mapURL or mapScript (or both)
+can be specified. mapURL specifies a legal URL string, e.g., 
+'http://www.mysite.com/cgi-bin/plotproc.pl?plotnum=:PLOTNUM&X=:X&Y=:Y',
+which will be added to the AREA tags generated for each mapped plot element.
+mapScript specifies any legal HTML scripting tag, e.g.,
+'ONCLICK="alert('Got X=:X, Y=:Y')"' to be added to each generated AREA tag.
+
+For both mapURL and mapScript, special variables :PLOTNUM, :X, :Y, :Z
+can be specified which are replaced by the following values when the
+imagemap is generated.
+
+Refer to the IMAGEMAP description at www.presicient.com/dbdchart#imagemap
+for details.
+
+=item horizMargin, vertMargin
+
+Sets the number of pixels around the actual plot area.
+
+=item xAxisLabel, yAxisLabel, zAxisLabel
+
+Sets the label strings for each axis.
+
+=item xLog, yLog
+
+When set to a non-zero value, causes the associated axis to be
+rendered in log10 format. Z axis plots are currently only
+symbolic, so no zLog is supported.
+
+=item title
+
+Sets a title string to be rendered at the bottom center of the image
+in bold text.
+
+=item signature
+
+Sets a string to be rendered in tiny font at the lower right corner of the
+image, e.g., 'Copyright(C) 2001, Presicient Corp.'.
+
+=item legend
+
+Set to an array ref of domain names to be displayed in a legend
+for the various plots.
+The legend is displayed below the chart, left justified and placed
+above the chart title string.
+The legend for each plot is
+printed in the same color as the plot. If a point shape or icon has been specified
+for a plot, then the point shape is printed with the label; otherwise, a small
+line segment is printed with the label. Due to space limitations, 
+the number of datasets plotted should be limited to 8 or less.
+
+=item showValues
+
+When set to a non-zero value, causes the data points for each
+plotted element to be displayed next to hte plot point.
+
+=item horizGrid, vertGrid
+
+Causes grid lines to be drawn completely across the plot area.
+
+=item xAxisVert
+
+When set to a non-zero value, causes the X axis tick labels to be rendered 
+vertically.
+
+=item keepOrigin
+
+When set to a non-zero value, forces the (0,0) data point into the
+graph. Normally, DBD::Chart::Plot will heuristically clip away from the
+origin is the plot never crosses the origin.
+
+=item bgColor
+
+Sets the background color of the image. Default is white.
+
+=item threed
+
+When set to a non-zero value for barcharts, causes the bars to be
+rendered in a 3-D effect.
+
+=item icons
+
+Set to an arrayref of image filenames. The images will be used
+to plot iconic barcharts or individual plot points, if the
+'icon' shape is specified in the property string supplied
+to the setPoints() function (defined below). The array must
+match 1-to-1 with the number of plots in the image; icons
+and predefined point shapes can be mixed in the same image
+by setting the icon arrayref entry to undef for plots using
+predefined shapes in the properties string.
+
+=item symDomain
+
+When set to a non-zero value, causes the domain to be treated
+as discrete symbolic values which are evenly distributed over
+the X-axis. Numeric domains are plotted as scaled values
+in the image.
+
+=item timeDomain - NOT YET SUPPORTED
+
+When set to a valid format string, the domain data points
+are treated as associated temporal values (e.g., date,  time,
+timestamp, interval). The values supplied by setPoints will
+be strings of the specified format (e.g., 'YYYY-MM-DD'), but
+will be converted to numeric time values for purposes of
+plotting, so the domain is treated as continuous numeric
+data, rather than discrete symbolic.
+
+=item gridColor
+
+Sets the color of the axis lines and ticks. Default is black.
+
+=item textColor
+
+Sets the color used to render text in the image. Default is black.
+
+=item font - NOT YET SUPPORTED
+
+Sets the font used to render text in the image. Default is
+default GD fonts (gdMedium, gdSmall, etc.).
+
+=item logo
+
+Specifies the name of an image file to be drawn into the
+background of the image. The logo image is centered in the
+plot image, and will be clipped if the logo size exceeds
+the defined width or height of the plot image.
+
+By default, the graph will be centered within the image, with 50
+pixel margin around the graph border. You can obtain more space for 
+titles or labels by increasing the image size or increasing the
+margin values.
+
+
 =head2 Establish data points: setPoints()
 
     $img->setPoints(\@xdata, \@ydata);
     $img->setPoints(\@xdata, \@ydata, 'blue line');
     $img->setPoints(\@xdata, \@ymindata, \@ymaxdata, 'blue points');
+    $img->setPoints(\@xdata, \@ydata, \@zdata, 'blue bar zaxis');
 
 Copies the input array values for later plotting.
 May be called repeatedly to establish multiple plots in a single graph.
-Returns a postive integer on success and C<undef> on failure. 
+Returns a positive integer on success and C<undef> on failure. 
+The global graph properties should be set (via setOptions())
+prior to setting the data points.
 The error() method can be used to retrieve an error message.
 X-axis values may be non-numeric, in which case the set of domain values
 is uniformly distributed along the X-axis. Numeric X-axis data will be
 properly scaled, including logarithmic scaling is requested.
 
 If two sets of range data (ymindata and ymaxdata in the example above)
-are supplied, a candlestick graph is rendered, in which case the domain
+are supplied, and the properties string does not specify a 3-axis barchart,
+a candlestick graph is rendered, in which case the domain
 data is assumed non-numeric and is uniformly distributed, the first range
 data array is used as the bottom value, and the second range data array
 is used as the top value of each candlestick. Pointshapes may be specified,
 in which case the top and bottom of each stick will be capped with the
-specified pointshape. The range axis may be logarithmically scaled. If value
-display is requested, the range value of both the top and bottom of each stick
-will be printed above and below the stick, respectively.
+specified pointshape. The range axis may be logarithmically scaled. 
+If value display is requested, the range value of both the top and bottom 
+of each stick will be printed above and below the stick, respectively.
 
 B<Plot properties:> Properties of each dataset plot can be set
 with an optional string as the third argument. Properties are separated
 by spaces. The following properties may be set on a per-plot basis
 (defaults in capitals):
 
-    COLOR     LINESTYLE  USE POINTS?   POINTSHAPE 
+    COLOR     CHARTSTYLE  USE POINTS?   POINTSHAPE 
     -----     ---------  -----------   ----------
 	BLACK       LINE        POINTS     FILLCIRCLE
 	white      noline      nopoints    opencircle
-	lgray                              fillsquare  
-	gray                               opensquare
-	dgray                              filldiamond
-	lblue                              opendiamond
-	blue                               horizcross
+	lgray       fill                   fillsquare  
+	gray        bar                    opensquare
+	dgray       pie                    filldiamond
+	lblue       box                    opendiamond
+	blue       zaxis                   horizcross
 	dblue                              diagcross
-	gold
+	gold                               icon
 	lyellow	
 	yellow
 	dyellow
@@ -1121,64 +3023,14 @@ E.g., if you want a red scatter plot (red dots
 but no lines) with filled diamonds, you could specify
 
     $p->setPoints (\@xdata, \@ydata, 'Points Noline Red filldiamond');
-
-=head2 Graph-wide options: setOptions()
-
-    $img->setOptions ('title' => 'My Graph Title',
-        'xAxisLabel' => 'my X label',
-        'yAxisLabel' => 'my Y label',
-        'xLog' => 0,
-        'yLog' => 0,
-        'horizMargin' => $numHorPixels,
-        'vertMargin' => $numvertPixels,
-        'horizGrid' => 1,
-        'vertGrid' => 1,
-        'showValues' => 1,
-        'legend' => \@plotnames,
-        'symDomain' => 0
-     );
-
-As many (or few) of the options may be specified as desired.
-
-Default titles and axis labels are blank. The title will be
-centered in the margin space below the graph.
-The Y axis label will be left justified
-above the Y axis; the X axis label will be placed below the
-right end of the X axis.
-
-By default, the graph will be centered within the image, with 50
-pixel margin around the graph border. You can obtain more space for 
-titles or labels by increasing the image size or increasing the
-margin values.
-
-By default, no grid lines are drawn either horizontally or vertically.
-By setting horizGrid or vertGrid to a non-zero value, grid lines
-will be drawn across or up/down the chart, respectively, from the established 
-Y-axis or X-axis ticks. Both options may be enabled in a single chart.
-
-By default, the (x, y) values are not explicitly printed on the chart;
-setting showValues to a non-zero value will cause the plot point values
-to be printed in the gdTinyFont, centered just above the plotted point.
-
-By default, both the X and Y axes are linearly scaled; logarithmic (base 10)
-scaling can be specified for either axis by setting either 'xLog' or
-'yLog', or both, to non-zero values.
-
-A legend can be displayed below the chart, left justified and placed
-above the chart title string, by setting the 'legend' option to an
-array containing the labels for each plot on the chart, in the same order
-as the datasets are assigned (i.e., label 0 applies to the 1st setPoints(),
-label 1 applies to the 2nd setPoints(), etc.). The legend for each plot is
-printed in the same color as the plot. If a point shape has been specified
-for a plot, then the point shape is printed with the label; otherwise, a small
-line segment is printed with the label. Due to space limitations, 
-the number of datasets plotted should be limited to 8 or less.
-
-Domain values are assumed to be numeric (except for candlestick graphs)
-and may be non-uniformly distributed. If a symbolic domain is desired,
-the 'symDomain' option can be set to a non-zero value, in which case
-the domain dataset is uniformly distributed along the X-axis in the
-same order as the domain dataset array.
+    
+Specifying icon for the pointshape requires setting the
+icon object attribute to a list of compatible image filenames
+(as an arrayref, see below). In that case, the icon images
+are displayed centered on the associated plotpoints. For 2-D 
+barcharts, a stack of the icon is used to display the bars,
+including a proportionally clipped icon image to cap the bar
+if needed.
 
 
 =head2 Draw the image: plot() 
@@ -1205,13 +3057,62 @@ may be omitted if none of the datasets do not cross them at any point.
 Instead, the axes will be drawn on the left and bottom borders
 using the value ranges that appropriately fit the dataset(s).
 
+=head2 Fetch the imagemap: getMap() 
+
+     $img->getMap();
+
+Returns the imagemap for the chart. 
+If no mapType was set, or if mapType was set to HTML.
+the returned value is a valid <MAP...><AREA...></MAP> HTML string.
+If mapType was set to 'Perl', a Perl-compatible arrayref
+declaration string is returned.
+
+The resulting imagemap will be applied as follows:
+
+=item 2 axis 2-D Barcharts
+
+Each bar is mapped individually.
+
+=item Piecharts
+
+Each wedge is mapped. The CGI parameter values are used slightly
+differently than described above:
+
+X=<wedge-label>&Y=<wedge-value>&Z=<wedge-percent>
+
+=item 3-D Barcharts (either 2 or 3 axis)
+
+The top face of each bar is mapped. The Z CGI parameter will be
+empty for 2 axis barcharts.
+
+
+=item Line, point, area graphs
+
+A 4 pixel diameter circle around each datapoint is mapped.
+
+=item Candlestick graphs
+
+A 4 pixel diameter circle around both the top and bottom datapoints
+of each stick are mapped.
+
+
+=item Boxcharts
+
+The area of the box is mapped, and 4-pixel diameter circles
+are mapped at the end of each extreme whisker.
+
+
 =head1 BUGS AND TO DO
 
-=item improved fonts and value display
+=item programmable fonts
 
-=item 3-axis barcharts
+=item temporal domain and ranges
+
+=item symbolic ranges for scatter graphs
 
 =item surfacemaps
+
+=item SVG support
 
 =head1 AUTHOR
 
@@ -1222,6 +3123,4 @@ as specified in the Perl README file.
 
 =head1 SEE ALSO
 
-GD::Graph(1), Chart(1), DBD::Chart. (All available on CPAN).
-
-=cut 
+GD, DBD::Chart. (All available on CPAN).

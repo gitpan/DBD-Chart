@@ -45,7 +45,7 @@ close(OUTF);
 #
 $rsth = $dbh->prepare(
 'SELECT LINEGRAPH FROM candle
-WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND Y-AXIS=\'Price\' AND
+WHERE WIDTH=500 AND HEIGHT=400 AND X-AXIS=\'Date\' AND Y-AXIS=\'Price\' AND
 TITLE = \'Daily Price Range\' AND COLOR=(red, blue) AND SHOWGRID=1 AND
 SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1');
 $rsth->execute;
