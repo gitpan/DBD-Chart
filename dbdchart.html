@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.73 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.74 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD, Quadtree, Gantt">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -71,7 +71,7 @@
 <a href="#refs">References</a><br>
 <a href="#copy">Copyright</a></b>
 </font><p>
-<i>Last updated September 11, 2002</i>
+<i>Last updated September 12, 2002</i>
 </td>
 <td>&nbsp;&nbsp;</td>
 <td align=left valign=top>
@@ -109,10 +109,10 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>Current Version</h2><p>
 
-Release 0.73<p>
+Release 0.74<p>
 
-<a href="http://www.presicient.com/dbdchart/dbdchart073.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.73.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart074.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.74.tar.gz">.tar.gz version</a>
 <p>
 <a name="conform"></a>
 <h2>Prerequisites and Conformance</h2><p>
@@ -1708,6 +1708,12 @@ an imagemap.</i><p>
 <a name="history"></a>
 <h2>Change History</h2><p>
 
+Release 0.74:
+<ul>
+<li>fixed scaling of 3-D barchart with KEEPORIGIN=1
+<li>fixed incorrect values shown on 3-D barcharts/histograms
+</ul>
+<p>
 Release 0.73:
 <ul>
 <li>fixed scaling of 3-D barchart with small datasets
@@ -2021,6 +2027,20 @@ Release 0.10:<p>
 	<td align=left>Icon-related error msgs not being propagated to DBI</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.73</td>
+</tr><tr bgcolor=white>
+	<td align=center>23</td>
+	<td align=center>2002-Sep-11</td>
+	<td align=center>0.73</td>
+	<td align=left>KEEPORIGIN produced bad rendering of 3-D bars</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.74</td>
+</tr><tr bgcolor=white>
+	<td align=center>23</td>
+	<td align=center>2002-Sep-11</td>
+	<td align=center>0.73</td>
+	<td align=left>3-D bars showed bad values when clipped away from origin</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.74</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>

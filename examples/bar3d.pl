@@ -31,6 +31,7 @@ WHERE WIDTH=400 AND HEIGHT=400 AND
 	THREE_D = 1 AND
 	SHOWGRID = 1 AND
 	COLORS=(red, blue) AND
+	SHOWVALUES=1 AND
 	MAPNAME = 'bars3dsample' AND
 	mapURL = 'http://www.presicient.com/samplemap.pl'"
 	);
@@ -59,6 +60,7 @@ WHERE WIDTH=400 AND HEIGHT=400 AND
 	THREE_D = 1 AND
 	SHOWGRID = 1 AND
 	COLORS=(red, blue) AND
+	SHOWVALUES=1 AND
 	MAPNAME = 'bars3dsample' AND
 	mapURL = 'http://www.presicient.com/samplemap.pl'"
 	);
@@ -89,6 +91,7 @@ WHERE WIDTH=400 AND HEIGHT=400 AND
 	THREE_D = 1 AND
 	SHOWGRID = 1 AND
 	COLORS=(red, blue) AND
+	SHOWVALUES=1 AND
 	MAPNAME = 'bars3dsample' AND
 	mapURL = 'http://www.presicient.com/samplemap.pl'"
 	);
@@ -119,6 +122,7 @@ WHERE WIDTH=400 AND HEIGHT=400 AND
 	THREE_D = 1 AND
 	SHOWGRID = 1 AND
 	COLORS=(red, blue) AND
+	SHOWVALUES=1 AND
 	MAPNAME = 'bars3dsample' AND
 	mapURL = 'http://www.presicient.com/samplemap.pl'"
 	);
@@ -146,6 +150,7 @@ WHERE WIDTH=400 AND HEIGHT=400 AND
 	THREE_D = 1 AND
 	SHOWGRID = 1 AND
 	COLORS=(red, blue) AND
+	SHOWVALUES=1 AND
 	MAPNAME = 'bars3dsample' AND
 	mapURL = 'http://www.presicient.com/samplemap.pl'"
 	);

@@ -16,6 +16,8 @@
 #		improve error reporting for iconic too wide,
 #			icon format unsupported
 #		fix for odd segmented quadtrees
+#		fix scaling for 3-D bars when KEEPORIGIN=1
+#		fix SHOWVALUES for 3-D bars when clipped from origin
 #
 #	0.72	2002-Aug-17		D. Arnold
 #		fix showvalues for nonstacked bars/histos/candles
@@ -1330,7 +1332,8 @@ sub computeScales {
 #	(but only if not in logarithmic mode)
 #
 	if ($obj->{keepOrigin}) {
-		unless ($obj->{xLog} || $obj->{symDomain}) {
+		unless ($obj->{xLog} || $obj->{symDomain} ||
+			$obj->{zAxisLabel} || $obj->{threed}) {
 			$xl = 0 if ($xl > 0);
 			$xh = 0 if ($xh < 0);
 		}
@@ -3484,8 +3487,8 @@ sub drawCube {
 		$py += (($y < 0) ? (($xwidth < ($obj->{yMaxlen} * $tfw)) ? 10 + $valsz : 10) : -10) 
 			unless $ishisto;
 	}
-	$y = $yh - $yl if (($yh > 0) && ($yl > 0));
-	$y = $yl - $yh if (($yh < 0) && ($yl < 0));
+	$y = $yh - $yl if ($stacked && ($yh > 0) && ($yl > 0));
+	$y = $yl - $yh if ($stacked && ($yh < 0) && ($yl < 0));
 	push(@$showvals, $px, $py, $y, ($xwidth > ($obj->{yMaxlen} * $tfw)));
 	return 1;
 }
@@ -3504,6 +3507,7 @@ sub renderCubeValues {
 		$py = shift @$val_stack;
 		$y = shift @$val_stack;
 		$xwidth = shift @$val_stack;
+
 		$img->stringUp(gdTinyFont, $px, $py, $y, $obj->{textColor}), next
 			unless ($ishisto || $xwidth);
 		$img->string(gdTinyFont, $px, $py, $y, $obj->{textColor});
