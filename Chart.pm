@@ -1,11 +1,14 @@
 #23456789012345678901234567890123456789012345678901234567890123456789012345
 #
-#   Copyright (c) 2001, Dean Arnold
+#   Copyright (c) 2001,2002, Dean Arnold
 #
 #   You may distribute under the terms of the Artistic License, as 
 #	specified in the Perl README file.
 #
 #	History:
+#
+#		0.62	2002-Apr-22	D. Arnold
+#			Fix for numeric month validation
 #
 #		0.61	2001-Mar-14	D. Arnold
 #			Fix for multicolor histos
@@ -218,7 +221,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.61';
+$DBD::Chart::VERSION = '0.62';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
@@ -965,7 +968,7 @@ sub validate_value {
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = $errstr,
 		return undef
-			unless (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 12)) ||
+			unless (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 13)) ||
 				($mo=~/^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/i)) &&
 				($day < 32) && ($day > 0));
 #
@@ -1017,7 +1020,7 @@ sub validate_value {
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = $errstr,
 		return undef
-			unless (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 12)) ||
+			unless (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 13)) ||
 				($mo=~/^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/i)) &&
 				($day < 32) && ($day > 0) && validate_time($time));
 #
@@ -1624,7 +1627,7 @@ sub validate_value {
 
 		my ($yr, $mo, $day) = ($1, uc $2, $3);
 		return 1
-			if (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 12)) ||
+			if (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 13)) ||
 				($mo=~/^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/i)) &&
 				($day < 32) && ($day > 0));
 	}
@@ -1644,7 +1647,7 @@ sub validate_value {
 		($p=~/^(\d+)[\-\.\/](\w+)[\-\.\/](\d+)\s+(\d+):(\d+):(\d+)(\.\d+)?$/i)) {
 		my ($yr, $mo, $day, $hr, $min, $sec, $subsec) = ($1, $2, uc $3, $4, $5, $6, $7);
 		return 1
-			if (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 12)) ||
+			if (((($mo=~/^\d+$/) && ($mo > 0) && ($mo < 13)) ||
 				($mo=~/^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/i)) &&
 				($day < 32) && ($day > 0) &&
 				($hr < 24) && ($min < 60) && ($sec < 60));
