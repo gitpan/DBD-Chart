@@ -7,6 +7,9 @@
 #
 #	History:
 #
+#		0.63	2002-May-16	D. Arnold
+#			Fix for Gantt date axis alignment
+#
 #		0.62	2002-Apr-22	D. Arnold
 #			Fix for numeric month validation
 #
@@ -221,7 +224,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.62';
+$DBD::Chart::VERSION = '0.63';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;

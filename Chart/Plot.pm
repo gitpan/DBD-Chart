@@ -9,6 +9,9 @@
 #
 #	Change History:
 #
+#	0.63	2002-May-16		D. Arnold
+#		fix for Gantt chart date axis alignment
+#
 #	0.61	2002-Feb-07		D. Arnold
 #		fix for :PLOTNUM imagemap variable in Gantt chart
 #		fix for undef range values
@@ -59,7 +62,7 @@
 require 5.6.0;
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.61';
+$DBD::Chart::Plot::VERSION = '0.63';
 
 use GD;
 use Time::Local;
@@ -1431,6 +1434,16 @@ sub computeRanges {
 	$xd = $xr - int($xr);
 	$obj->{vertStep} = ($xd < 0.4) ? (10 ** (int($xr) - 1)) :
 		(($xd >= 0.87) ? (10 ** int($xr)) : (5 * (10 ** (int($xr) - 1))));
+
+#
+#	align time range steps on 12:00 AM (zero hour) of a day
+#	if histo/gantt
+#
+	$obj->{vertStep} += (86400 - $obj->{vertStep}%86400)
+		if (($obj->{plotTypes} & (HISTO|GANTT)) && 
+			$obj->{timeRange} && 
+			($obj->{timeRange}=~/^YYYY/i) && 
+			($obj->{vertStep}%86400 != 0));
 #
 #	histos switch things
 	$xs = $obj->{horizStep}, 
