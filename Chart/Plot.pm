@@ -8,6 +8,9 @@
 #
 #	Change History:
 #
+#	0.30	Jun 1, 2001		Dean Arnold
+#		- fixed Y-axis tick problem when no grid used
+#
 #	0.20	Mar 10, 2001	Dean Arnold
 #		- added logrithmic graphs
 #		- added area graphs
@@ -19,7 +22,7 @@
 
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.10';
+$DBD::Chart::Plot::VERSION = '0.30';
 
 use GD;
 use strict;
@@ -773,7 +776,7 @@ sub plotAxes {
 		while ($i < $yh) {
 			$k = $i + $logsteps[$n++];
 			($px,$py) = $obj->pt2pxl(
-				((($obj->{'xLog'}) || ($obj->{'horizGrid'})) ? $xl : 0), $k);
+				((($obj->{'xLog'}) || ($obj->{'horizGrid'})) ? $xl : $xaxpt), $k);
 			($p1x, $p1y) = ($obj->{'horizGrid'}) ? 
 				$obj->pt2pxl($xh, $k) : ($px+2, $py);
 			$px -=2 if (! $obj->{'horizGrid'});
@@ -794,12 +797,12 @@ sub plotAxes {
 #
 #	if y tick step < (2 * sfh), skip every other label
 #
-		($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : 0), $yl);
-		($p1x,$p1y) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : 0), $yl+$step);
+		($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : $xaxpt), $yl);
+		($p1x,$p1y) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : $xaxpt), $yl+$step);
 		my $skip = ($p1y - $py < ($sfh<<1)) ? 1 : 0;
 
 		for ($i=$yl, $j = 0; $i <= $yh; $i+=$step, $j++ ) {
-			($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : 0), $i);
+			($px,$py) = $obj->pt2pxl((($obj->{'horizGrid'}) ? $xl : $xaxpt), $i);
 			($p1x, $p1y) = ($obj->{'horizGrid'}) ? 
 				$obj->pt2pxl($xh, $i) : ($px+2, $py);
 			$px -=2 if (! $obj->{'horizGrid'});

@@ -5,7 +5,7 @@ package DBD::Chart;
 use DBI;
 
 @EXPORT = qw(); # Do NOT @EXPORT anything.
-$VERSION = '0.40';
+$VERSION = '0.41';
 
 #
 #   Copyright (c) 2001, Dean Arnold
@@ -14,6 +14,10 @@ $VERSION = '0.40';
 #   License or the Artistic License, as specified in the Perl README file.
 #
 #	History:
+#
+#		0.41	2001-Jun-01 D. Arnold
+#			fix to strip quotes from string literal in INSERT stmt
+#			fix for literal data index in prepare of INSERT
 #
 #		0.40	2001-May-09 D. Arnold
 #			fix for final column definition in CREATE TABLE
@@ -693,15 +697,16 @@ sub prepare {
 					$remnant= $2;
 				}
 				$remnant=~s/^\s*,\s*//;
-				if ((($$ctypes[$i] == SQL_CHAR) || 
-					($$ctypes[$i] == SQL_VARCHAR)) &&
-					(length($str) > $$cprecs[$i])) {
+				if ((($$ctypes[$cnum] == SQL_CHAR) || 
+					($$ctypes[$cnum] == SQL_VARCHAR)) &&
+					(length($str) > $$cprecs[$cnum])) {
 					$DBD::Chart::err = -1;
 					$DBD::Chart::errstr = 
-					"Value for column $i exceeds defined length.";
+					"Value for column $cnum exceeds defined length.";
 					return undef;
 				}
-				$setcols{$cnum} = "\'$str\'";
+#				$setcols{$cnum} = "\'$str\'";
+				$setcols{$cnum} = $str;
 				next;
 			}
 			$DBD::Chart::err = -1;
