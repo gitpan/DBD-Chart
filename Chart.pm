@@ -5,7 +5,7 @@ package DBD::Chart;
 use DBI;
 
 @EXPORT = qw(); # Do NOT @EXPORT anything.
-$VERSION = '0.21';
+$VERSION = '0.40';
 
 #
 #   Copyright (c) 2001, Dean Arnold
@@ -14,6 +14,11 @@ $VERSION = '0.21';
 #   License or the Artistic License, as specified in the Perl README file.
 #
 #	History:
+#
+#		0.40	2001-May-09 D. Arnold
+#			fix for final column definition in CREATE TABLE
+#			added Y-MIN, Y-MAX
+#
 #		0.21	2001-Mar-17 D. Arnold
 #			Remove newlines from SQL stmts in prepare().
 #
@@ -99,7 +104,7 @@ my %typeszs = (
 
 my %inv_pieprop = ('SHAPE', 1, 'SHOWGRID', 1, 
 	'SHOWPOINTS', 1, 'X-AXIS', 1, 'Y-AXIS', 1, 'Z-AXIS', 1, 
-	'SHOWVALUES', 1, 'X-LOG', 1, 'Y-LOG', 1);
+	'SHOWVALUES', 1, 'X-LOG', 1, 'Y-LOG', 1, 'Y-MAX', 1, 'Y-MIN', 1);
 
 my %inv_barprop = ('SHAPE', 1, 'SHOWPOINTS', 1, 'X-LOG', 1);
 
@@ -155,7 +160,7 @@ my %dfltprops = ( 'SHAPE', undef, 'WIDTH', 300, 'HEIGHT', 300,
 	'Y-AXIS', 'Y axis', 'Z-AXIS', undef, 'TITLE', '', 'COLOR', \@dfltcolors, 
 	'SHAPE', undef, 'X-LOG', 0, 'Y-LOG', 0, '3-D', 0, 'BACKGROUND', 'white',
 	'SIGNATURE', undef, 'LOGO', undef, 'X-ORIENT', 'horizontal', 'FORMAT', 'PNG',
-	'KEEPORIGIN', 0
+	'KEEPORIGIN', 0, 'Y-MAX', undef, 'Y-MIN', undef
 	);
 	
 my %mincols = ( 'PIECHART', 2, 'BARCHART', 2, 'POINTGRAPH', 2, 
@@ -165,12 +170,13 @@ my %binary_props = ('SHOWGRID', 1, 'X-LOG', 1, 'Y-LOG', 1, '3-D', 1,
 	'SHOWPOINTS', 1, 'SHOWVALUES', 1, 'KEEPORIGIN', 1);
 	
 my %string_props = ('X-AXIS', 1, 'Y-AXIS', 1, 'Z-AXIS', 1, 'TITLE', 1, 
-	'SIGNATURE', 1, 'LOGO', 1, 'X-ORIENT', 1);
+	'SIGNATURE', 1, 'LOGO', 1, 'X-ORIENT', 1, 'FORMAT', 1);
 
 my %valid_props	= ( 'SHOWVALUES', 1, 'SHOWPOINTS', 1, 'BACKGROUND', 1,
 'KEEPORIGIN', 1, 'SIGNATURE', 1, 'SHOWGRID', 1, 'X-AXIS', 1, 'Y-AXIS', 1,
 'Z-AXIS', 1, 'TITLE', 1, 'COLOR', 1, 'WIDTH', 1, 'HEIGHT', 1, 'SHAPE', 1,
-'X-ORIENT', 1, 'FORMAT', 1, 'LOGO', 1, 'X-LOG', 1, 'Y-LOG', 1, '3-D', 1);
+'X-ORIENT', 1, 'FORMAT', 1, 'LOGO', 1, 'X-LOG', 1, 'Y-LOG', 1, '3-D', 1,
+'Y-MAX', 1, 'Y-MIN', 1);
 
 sub parse_col_defs {
 	my ($req, $cols, $typeary, $typelen, $typescale) = @_;
@@ -181,17 +187,18 @@ sub parse_col_defs {
 	$req =~s/(\S),/$1 ,/g;
 	$req =~s/,(\S)/, $1/g;
 	$req =~s/(\S)\(/$1 \(/g;
+	$req =~s/(\S)\)/$1 \)/g;
 	
 	$req=~s/\s+NOT\s+NULL//ig;
-	$req =~s/\sLONG\s+VARCHAR/ $1/g;
+	$req =~s/\sLONG\s+VARCHAR/ VARCHAR(32000)/g;
 	$req =~s/\sCHAR\s+VARYING/ VARCHAR/g;
 	$req =~s/DOUBLE\s+PRECISION/FLOAT/g;
-	$req =~s/\sNUMERIC\s/ DEC /g;
-	$req =~s/\sREAL\s/ FLOAT /g;
-	$req =~s/\sCHARACTER\s/ CHAR /g;
-	$req =~s/\sINTEGER\s/ INT /g;
-	$req =~s/\sDECIMAL\s/ DEC /g;
-	$req =~s/\sBYTEINT\s/ TINYINT /g;
+	$req =~s/\sNUMERIC\s*/ DEC /g;
+	$req =~s/\sREAL\s*/ FLOAT /g;
+	$req =~s/\sCHARACTER\s*/ CHAR /g;
+	$req =~s/\sINTEGER\s*/ INT /g;
+	$req =~s/\sDECIMAL\s*/ DEC /g;
+	$req =~s/\sBYTEINT\s*/ TINYINT /g;
 #
 #	normalize a bit more
 #
@@ -333,6 +340,23 @@ sub parse_props {
 			}
 			next;
 		}
+		if (($prop eq 'Y-MAX') || ($prop eq 'Y-MIN')) {
+			if ($t!~/^(\d+)\s+AND\s+(.*)$/i) {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = "Invalid value for $prop property.";
+				return (undef, $t);
+			}
+			$props{ $prop } = $1;
+			$t = $2;
+#			if (($prop eq 'Y-MAX') && ($props{$prop} < 0)) {
+			if ((($prop eq 'Y-MAX') && ($props{$prop} < 0)) || 
+				(($prop eq 'Y-MIN') && ($props{$prop} > 0))) {
+				$DBD::Chart::err = -1;
+				$DBD::Chart::errstr = "Invalid value for $prop property.";
+				return (undef, $t);
+			}
+			next;
+		}
 		if ($prop eq 'BACKGROUND') { 
 			if ($t!~/^(\w+)\s+AND\s+(.*)$/i) {
 				$DBD::Chart::err = -1;
@@ -370,38 +394,7 @@ sub parse_props {
 			next;
  		}
 	}
-#
-#	validate properties for chart type
-#
-if (1 == 2) {
-	if ($ctype eq 'PIECHART') {
-		foreach $prop (keys(%inv_pieprop)) {
-			if (defined($props{$prop})) {
-				$DBD::Chart::err = -1;
-				$DBD::Chart::errstr = "Invalid property $prop for PIECHART.";
-				return (undef, $t);
-			}
-		}
-	}
-	elsif ($ctype eq 'BARCHART') {
-		foreach $prop (keys(%inv_barprop)) {
-			if (defined($props{$prop})) {
-				$DBD::Chart::err = -1;
-				$DBD::Chart::errstr = "Invalid property $prop for BARCHART.";
-				return (undef, $t);
-			}
-		}
-	}
-	elsif ($ctype eq 'CANDLESTICK') {
-		foreach $prop (keys(%inv_candle)) {
-			if (defined($props{$prop})) {
-				$DBD::Chart::err = -1;
-				$DBD::Chart::errstr = "Invalid property $prop for CANDLESTICK.";
-				return (undef, $t);
-			}
-		}
-	}
-}
+
 	if (defined($props{'COLOR'})) {
 		my $colors = $props{'COLOR'};
 		foreach $prop (@$colors) {
@@ -1196,6 +1189,11 @@ sub validate_properties {
 
 		next if ((($prop eq 'WIDTH') || ($prop eq 'HEIGHT')) &&
 			(($t=~/^\d+$/) && ($t >= 10) && ($t <= 100000)));
+#
+#	GD::Graph requires zero to be included
+#
+		next if ((($prop eq 'Y-MAX') && ($t > 0)) || 
+			(($prop eq 'Y-MIN') && ($t <= 0)));
 
 		next if (($prop eq 'BACKGROUND') && ($colors{$t}));
 
@@ -1893,6 +1891,11 @@ sub execute {
 			$img->set('bgclr' => $$props{'BACKGROUND'}) 
 				if ($$props{'BACKGROUND'} ne 'transparent');
 
+			$img->set('y_min_value' => $$props{'Y-MIN'}) 
+				if ($$props{'Y-MIN'});
+			$img->set('y_max_value' => $$props{'Y-MAX'}) 
+				if ($$props{'Y-MAX'});
+
 			$img->set( 
    				y_tick_number	=> 10,
    				dclrs	=> $colors,
@@ -2178,7 +2181,7 @@ DBD::Chart - DBI driver abstraction for DBD::Chart::Plot and GD::Graph
 
 =head1 WARNING
 
-THIS IS ALPHA SOFTWARE.
+THIS IS BETA SOFTWARE.
 
 =head1 DESCRIPTION
 
@@ -2230,11 +2233,11 @@ whip up a PPM in the future.
 
 For Unix, extract it with
 
-    gzip -cd DBD-Chart-0.20.tar.gz | tar xf -
+    gzip -cd DBD-Chart-0.40.tar.gz | tar xf -
 
 and then enter the following:
 
-    cd DBD-Chart-0.20
+    cd DBD-Chart-0.40
     perl Makefile.PL
     make
     make test

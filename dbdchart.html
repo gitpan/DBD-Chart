@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.30 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.40 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -55,14 +55,14 @@ DBD::Chart - Perl DBI Driver interface For Rendering Charts and Graphs</h3><p>
         WHERE WIDTH=400 AND HEIGHT=400 AND
         TITLE = \'Sales By Region\' AND 
         COLOR=(red, green, blue, lyellow, lpurple) AND
-        BACKGROUND=lgray AND FOMRAT=\'JPEG\' AND
+        BACKGROUND=lgray AND 
         SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'");
     $rsth->execute;
     $rsth->bind_col(1, \$buf);
     $rsth->fetch;
 </pre><p>
 produces the image<p><center>
-<img src="simppie.jpg" alt="Simple Pie Chart"></center><p>
+<img src="simppie.png" alt="Simple Pie Chart"></center><p>
 <pre>
     #
     # multi-range 3-D bar chart
@@ -249,7 +249,7 @@ produces the image<p><center>
 DBI driver abstraction for rendering pie charts, bar charts, line, point, area, and
 candlestick graphs. The default output format is PNG; JPEG format can be generated
 by setting the FORMAT property (see below).<br>
-<b>BE ADVISED:</b> This is <b>ALPHA</B> software, and subject to change at the
+<b>BE ADVISED:</b> This is <b>BETA</B> software, and subject to change at the
 whim of the author(s). <p>
 
 Why DBD::Chart ? Basically, the idea is to make chart rendering easy for us database 
@@ -263,13 +263,20 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>CURRENT VERSION</h2><p>
 
-Release 0.30<p>
+Release 0.40<p>
 
-<a href="http://home.earthlink.net/~darnold/dbdchart/dbdchart030.zip">ZIP version</a><br>
-<a href="http://home.earthlink.net/~darnold/dbdchart/DBD-Chart-0.30.tar.gz">.tar.gz version</a>
+<a href="http://home.earthlink.net/~darnold/dbdchart/dbdchart040.zip">ZIP version</a><br>
+<a href="http://home.earthlink.net/~darnold/dbdchart/DBD-Chart-0.40.tar.gz">.tar.gz version</a>
 
 <a name="history"></a>
 <h2>CHANGE HISTORY</h2><p>
+
+Release 0.40:<p>
+<ul>
+<li>fix for DECIMAL, INTEGER, etc. last columns in CREATE TABLE</li>
+<li>fix for FORMAT property to properly handle as string value</li>
+<li>added Y-MAX, Y-MIN properties to control Y-axis min/max values for barcharts</li>
+</ul>
 
 Release 0.30:<p>
 <ul>
@@ -450,6 +457,10 @@ case-insensitive string, either 'horizontal' or 'vertical', default horizontal.
 0 or 1, default 0. Normally, line, point, area, and candlestick graphs automatically
 clip away the origin axes if the plot does not cross the origin axis. Set this property
 to 1 to force the origin axis to be included. Ignored for pie or barcharts.
+<li><b>Y-MAX</b> - sets the upper limit on Y-axis values; used for improved rendering of
+barcharts.
+<li><b>Y-MIN</b> - sets the lower limit on Y-axis values; used for improved rendering of
+barcharts.
 </ul><p>
 <b>Restrictions:</b><br>
 <ul>
@@ -487,6 +498,9 @@ of the GD package provided by ActiveState does not appear to include the jpeg-6b
 library, and the Makefile for the jpeg-6b library only builds a static library,
 rather than a DLL. To render JPEG format graphics requires building the jpeg 
 library and then building the libgd package to include JPEG support.
+<li>Y-MIN and Y-MAX currently only apply to barcharts and are subject to the 
+restrictions of the GD::Graph::barchart module (i.e., the range must include
+zero and all the defined data points).
 </ul>
 </li><p>
 <li><code><b>DELETE FROM <i>chartname</i><br>
@@ -566,7 +580,6 @@ frisky, you can try older or newer versions.): <p>
 <li>GD::Graph module 1.32
 <li>GD::Graph3d module 0.55
 <li>GD::Text (<i>aka GDTextUtil</i>) module 0.80
-<!-- <li>DBD::Chart::Plot module 0.10 (included in release package) -->
 </ul>
 
 Be advised that these modules require the following (non-Perl) libraries:<p>
@@ -605,21 +618,25 @@ $dbh->type_info()
 	<td align=center>SQL statements with newlines won't prepare()</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.30</td>
+</tr><tr>
+	<td align=center>2</td>
+	<td align=center>2001-May-09</td>
+	<td align=center>0.30</td>
+	<td align=center>INTEGER column definition as last column in CREATE TABLE causes an error</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.40</td>
+</tr><tr>
+	<td align=center>3</td>
+	<td align=center>2001-May-09</td>
+	<td align=center>0.30</td>
+	<td align=center>FORMAT property not properly handled as string property</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.40</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
 
 <ul>
-<!-- <li>placeholders in SELECT predicate expressions
-<li>BACKGROUND color specification
-<li>image import via LOGO property
-<li>ability to specify label orientation on X axis
-<li>KEEPORIGIN property to force (0,0) in the graph
-<li>FORMAT property to select between PNG and JPEG 
-<li>add syntax to read directly from another statement handle
-(i.e., SELECT LINEGRAPH FROM ? WHERE...)
-<li>auto-skip symbolic labels when they overlap
--->
 <li>FONT property to select fonts
 <li>Support derived tables to layer graphs in an image
 <li>clipped barcharts (i.e., Y axis starts > zero)
@@ -627,6 +644,7 @@ $dbh->type_info()
 <li>Gantt charts ?
 <li>Box & whisker charts ?
 <li>surfacemaps ?
+<li>some limited meta-data capability
 <li> <i>Any suggestions?</i>
 </ul>
 <p>
@@ -686,7 +704,7 @@ I reserve the right to provide support for this software
 to individual sites under a separate (possibly fee-based)
 agreement.<p>
 
-<center><i>Last updated March 16, 2001</i>
+<center><i>Last updated May 10, 2001</i>
 
 </body></html>
 

@@ -40,7 +40,7 @@ close(OUTF);
 $rsth = $dbh->prepare('SELECT POINTGRAPH FROM line ' .
 'WHERE WIDTH=500 AND HEIGHT=300 AND Y-AXIS=\'Sales\' AND X-AXIS=\'Month\' AND ' .
 'TITLE = \'Sales By Region\' AND COLOR=black AND SHOWGRID=0 AND ' .
-'X-ORIENT=\'VERTICAL\' AND SHAPE=filldiamond AND SHOWVALUES=1 AND BACKGROUND=white');
+'X-ORIENT=\'VERTICAL\' AND SHAPE=filldiamond AND SHOWVALUES=1 AND BACKGROUND=transparent');
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;

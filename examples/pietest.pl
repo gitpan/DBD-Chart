@@ -20,11 +20,11 @@ $rsth = $dbh->prepare(
 	TITLE = \'Sales By Region\' AND 
 	COLOR=(red, green, blue, lyellow, lpurple) AND
 	SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'
-	AND FORMAT=\'JPEG\' AND BACKGROUND=lgray");
+	AND	BACKGROUND=lgray");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
-open(OUTF, '>simppie.jpg');
+open(OUTF, '>simppie.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
