@@ -66,11 +66,11 @@ DESCRIPTION
 
     For Unix, extract it with
 
-        gzip -cd DBD-Chart-0.40.tar.gz | tar xf -
+        gzip -cd DBD-Chart-0.42.tar.gz | tar xf -
 
     and then enter the following:
 
-        cd DBD-Chart-0.40
+        cd DBD-Chart-0.42
         perl Makefile.PL
         make
         make test
@@ -84,17 +84,16 @@ DESCRIPTION
     installing in your own directories. the ExtUtils::MakeMaker manpage.
 
 FOR MORE INFO
-    Check out http://home.earthlink.net/~darnold/dbdchart with your favorite
-    browser. It includes all the usage information.
+    Check out http://www.presicient.com/dbdchart with your favorite browser.
+    It includes all the usage information.
 
 AUTHOR AND COPYRIGHT
-    This module is Copyright (C) 2001 by Dean Arnold
+    This module is Copyright (C) 2001 by Presicient Corporation
 
-        Email: darnold@earthlink.net
+        Email: darnold@presicient.com
 
-    You may distribute this module under the terms of either the GNU General
-    Public License or the Artistic License, as specified in the Perl README
-    file.
+    You may distribute this module under the terms of the Artistic License,
+    as specified in the Perl README file.
 
 SEE ALSO
     the DBI(3) manpage

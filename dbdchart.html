@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.41 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.42 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -263,13 +263,18 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>CURRENT VERSION</h2><p>
 
-Release 0.41<p>
+Release 0.42<p>
 
-<a href="http://home.earthlink.net/~darnold/dbdchart/dbdchart041.zip">ZIP version</a><br>
-<a href="http://home.earthlink.net/~darnold/dbdchart/DBD-Chart-0.41.tar.gz">.tar.gz version</a>
+<a href="http://home.earthlink.net/~darnold/dbdchart/dbdchart042.zip">ZIP version</a><br>
+<a href="http://home.earthlink.net/~darnold/dbdchart/DBD-Chart-0.42.tar.gz">.tar.gz version</a>
 
 <a name="history"></a>
 <h2>CHANGE HISTORY</h2><p>
+
+Release 0.42:
+<ul>
+<li>fix to support X-ORIENT='HORIZONTAL' on symbolic domains, candlesticks
+</ul>
 
 Release 0.41:
 <ul>
@@ -660,6 +665,13 @@ $dbh->type_info()
 	<td align=center>INSERT of string literal used bad column index variable</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.41</td>
+</tr><tr>
+	<td align=center>7</td>
+	<td align=center>2001-Oct-01</td>
+	<td align=center>0.41</td>
+	<td align=center>X-ORIENT='HORIZONTAL' didn't work with symbolic domains, candlesticks</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.42</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
@@ -732,7 +744,7 @@ I reserve the right to provide support for this software
 to individual sites under a separate (possibly fee-based)
 agreement.<p>
 
-<center><i>Last updated June 1, 2001</i>
+<center><i>Last updated October 1, 2001</i>
 
 </body></html>
 

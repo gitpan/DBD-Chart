@@ -28,10 +28,11 @@ $sth->execute('2000-06-02', 25.34, 30.50);
 $sth->execute('2000-06-03', 23.34, 28.50);
 $sth->execute('2000-06-04', 20.34, 26.50);
 
-$rsth = $dbh->prepare('SELECT CANDLESTICK FROM candle ' .
-'WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND ' .
-'TITLE = \'Daily Price Range\' AND COLOR=red AND SHOWGRID=1 AND ' .
-'SHAPE=filldiamond AND SHOWPOINTS=1 AND SHOWVALUES=0');
+$rsth = $dbh->prepare(
+'SELECT CANDLESTICK FROM candle
+WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND 
+TITLE = \'Daily Price Range\' AND COLOR=red AND SHOWGRID=1 AND 
+SHAPE=filldiamond AND SHOWPOINTS=1 AND SHOWVALUES=0');
 $rsth->execute(300,400, 'Date', 'Price');
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
@@ -42,10 +43,11 @@ close(OUTF);
 #
 #	use same data to render linegraph with symbolic domain
 #
-$rsth = $dbh->prepare('SELECT LINEGRAPH FROM candle ' .
-'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND Y-AXIS=\'Price\' AND ' .
-'TITLE = \'Daily Price Range\' AND COLOR=(red, blue) AND SHOWGRID=1 AND ' .
-'SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1');
+$rsth = $dbh->prepare(
+'SELECT LINEGRAPH FROM candle
+WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND Y-AXIS=\'Price\' AND
+TITLE = \'Daily Price Range\' AND COLOR=(red, blue) AND SHOWGRID=1 AND
+SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1');
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;

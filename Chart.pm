@@ -5,7 +5,7 @@ package DBD::Chart;
 use DBI;
 
 @EXPORT = qw(); # Do NOT @EXPORT anything.
-$VERSION = '0.41';
+$VERSION = '0.42';
 
 #
 #   Copyright (c) 2001, Dean Arnold
@@ -14,6 +14,10 @@ $VERSION = '0.41';
 #   License or the Artistic License, as specified in the Perl README file.
 #
 #	History:
+#
+#		0.42	2001-Sep-29 D. Arnold
+#			fix to support X-ORIENT='HORIZONTAL' on candlestick and symbolic
+#				domains
 #
 #		0.41	2001-Jun-01 D. Arnold
 #			fix to strip quotes from string literal in INSERT stmt
@@ -163,7 +167,7 @@ my %dfltprops = ( 'SHAPE', undef, 'WIDTH', 300, 'HEIGHT', 300,
 	'SHOWGRID', 0, 'SHOWPOINTS', 0, 'SHOWVALUES', 0, 'X-AXIS', 'X axis', 
 	'Y-AXIS', 'Y axis', 'Z-AXIS', undef, 'TITLE', '', 'COLOR', \@dfltcolors, 
 	'SHAPE', undef, 'X-LOG', 0, 'Y-LOG', 0, '3-D', 0, 'BACKGROUND', 'white',
-	'SIGNATURE', undef, 'LOGO', undef, 'X-ORIENT', 'horizontal', 'FORMAT', 'PNG',
+	'SIGNATURE', undef, 'LOGO', undef, 'X-ORIENT', 'DEFAULT', 'FORMAT', 'PNG',
 	'KEEPORIGIN', 0, 'Y-MAX', undef, 'Y-MIN', undef
 	);
 	
@@ -420,7 +424,7 @@ sub parse_props {
 		}
 	}
 	if (($props{'X-ORIENT'}) && 
-		($props{'X-ORIENT'}!~/^(HORIZONTAL|VERTICAL)$/i)) {
+		($props{'X-ORIENT'}!~/^(HORIZONTAL|VERTICAL|DEFAULT)$/i)) {
 		$DBD::Chart::err = -1;
 		$DBD::Chart::errstr = "Invalid value for 'X-ORIENT' property.";
 		return (undef, $t);
@@ -1203,7 +1207,7 @@ sub validate_properties {
 		next if (($prop eq 'BACKGROUND') && ($colors{$t}));
 
 		next if (($prop eq 'X-ORIENT') && 
-			($t=~/^(HORIZONTAL|VERTICAL)$/i));
+			($t=~/^(HORIZONTAL|VERTICAL|DEFAULT)$/i));
 
  		next if (($prop eq 'COLOR') && ($colors{$t}));
  		
@@ -1965,6 +1969,7 @@ sub execute {
 			if ($$props{'Y-AXIS'});
 		$img->setOptions( 'zAxisLabel' => $$props{'Z-AXIS'})
 			if ($$props{'Z-AXIS'});
+			
 		$img->setOptions( 'xAxisVert' => (($$props{'X-ORIENT'} eq 'VERTICAL') ? 1 : 0))
 			if ($$props{'X-ORIENT'});
 			
@@ -1992,6 +1997,12 @@ sub execute {
 			
 		$img->setOptions( 'symDomain' => 1)
 			if (! $numtype{$$types[0]});
+#
+#	default x-axis label orientation is vertical for candlesticks
+#	and symbollic domains
+#
+		$img->setOptions( 'xAxisVert' => (($$props{'X-ORIENT'} eq 'DEFAULT') ? 1 : 0))
+			if ((! $numtype{$$types[0]}) || ($$dtypes[$i] eq 'CANDLESTICK'));
 			
 		$img->setOptions( 'legend' => \@colnames)
 			if ((($$dtypes[$i] ne 'CANDLESTICK') && (scalar(@$data) > 2)) || 
@@ -2238,11 +2249,11 @@ whip up a PPM in the future.
 
 For Unix, extract it with
 
-    gzip -cd DBD-Chart-0.40.tar.gz | tar xf -
+    gzip -cd DBD-Chart-0.42.tar.gz | tar xf -
 
 and then enter the following:
 
-    cd DBD-Chart-0.40
+    cd DBD-Chart-0.42
     perl Makefile.PL
     make
     make test
@@ -2257,18 +2268,17 @@ on installing in your own directories. L<ExtUtils::MakeMaker>.
 
 =head1 FOR MORE INFO
 
-Check out http://home.earthlink.net/~darnold/dbdchart with your 
+Check out http://www.presicient.com/dbdchart with your 
 favorite browser.  It includes all the usage information.
 
 =head1 AUTHOR AND COPYRIGHT
 
-This module is Copyright (C) 2001 by Dean Arnold
+This module is Copyright (C) 2001 by Presicient Corporation
 
-    Email: darnold@earthlink.net
+    Email: darnold@presicient.com
 
-You may distribute this module under the terms of either the GNU
-General Public License or the Artistic License, as specified in
-the Perl README file.
+You may distribute this module under the terms of the Artistic 
+License, as specified in the Perl README file.
 
 =head1 SEE ALSO
 

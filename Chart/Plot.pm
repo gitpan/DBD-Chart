@@ -8,6 +8,9 @@
 #
 #	Change History:
 #
+#	0.42	2001-Sep-29		Dean Arnold
+#		- fixed xVertAxis handling for candlestick and symbolic domains
+#
 #	0.30	Jun 1, 2001		Dean Arnold
 #		- fixed Y-axis tick problem when no grid used
 #
@@ -22,7 +25,7 @@
 
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.30';
+$DBD::Chart::Plot::VERSION = '0.42';
 
 use GD;
 use strict;
@@ -452,6 +455,7 @@ sub plotData {
 	my $marker;
 
 	$img = $obj->{'img'};	
+	
  	for ($k = 0; $k < scalar(@{$obj->{'data'}}); $k++) {
 		$color = 'black';
 		$shape = undef;
@@ -475,7 +479,7 @@ sub plotData {
 			$shape = undef and next 
 				if ($prop eq 'nopoints');
 			$line = $prop
-				if ($prop=~/^(line|noline|fill)$/);
+				if ($prop=~/^(line|noline|fill|bar|candle)$/);
 		}
 		$obj->{$color} = $obj->{'img'}->colorAllocate(@{$colors{$color}})
 			if (! $obj->{$color});
@@ -730,16 +734,32 @@ sub plotAxes {
 			$py += 2 if (! $obj->{'vertGrid'});
 			next if (!defined($$ary[$j]));
 #
-#	skip the label if it would overlap
+#	truncate long labels
 #
-			next if (($i > 0) && ($px - $prevx <= $sfh+1));
-			$prevx = $px;
-			
 			$txt = $$ary[$j];
 			$txt = substr($txt, 0, 7) . '...' 
 				if (length($txt) > 10);
-			$img->stringUp(gdSmallFont, $px-($sfh>>1), $py+2+length($txt)*$sfw, 
-				$txt, $obj->{'black'})
+
+			if (defined($obj->{'xAxisVert'}) && ($obj->{'xAxisVert'} == 0)) {
+#
+#	skip the label if it would overlap
+#
+				next if (((length($txt)+1) * $sfw) > ($px - $prevx));
+				$prevx = $px;
+
+				$img->string(gdSmallFont, $px-length($txt)*($sfw>>1), $py+($sfh>>1), 
+					$txt, $obj->{'black'});
+			}
+			else {
+#
+#	skip the label if it would overlap
+#
+				next if (($sfh+1) > ($px - $prevx));
+				$prevx = $px;
+
+				$img->stringUp(gdSmallFont, $px-($sfh>>1), $py+2+length($txt)*$sfw, 
+					$txt, $obj->{'black'})
+			}
 		}
 	}
 	else {
@@ -947,7 +967,7 @@ __END__
 
 =head1 NAME
 
-DBD::Chart::Plot - Two dimensional plotting engine for DBD::Chart
+DBD::Chart::Plot - Graph/chart Plotting engine for DBD::Chart
 
 =head1 SYNOPSIS
 
@@ -1192,11 +1212,10 @@ using the value ranges that appropriately fit the dataset(s).
 
 =head1 AUTHOR
 
-Copyright (c) 2001 by Dean Arnold <darnold@earthlink.net>.
+Copyright (c) 2001 by Presicient Corporation. (darnold@presicient.com)
 
-You may distribute this module under the terms of either the GNU
-General Public License or the Artistic License, as specified in
-the Perl README file.
+You may distribute this module under the terms of the Artistic License, 
+as specified in the Perl README file.
 
 =head1 SEE ALSO
 
