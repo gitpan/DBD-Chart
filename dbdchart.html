@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.72 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.73 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD, Quadtree, Gantt">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -71,7 +71,7 @@
 <a href="#refs">References</a><br>
 <a href="#copy">Copyright</a></b>
 </font><p>
-<i>Last updated August 15, 2002</i>
+<i>Last updated September 11, 2002</i>
 </td>
 <td>&nbsp;&nbsp;</td>
 <td align=left valign=top>
@@ -109,10 +109,10 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>Current Version</h2><p>
 
-Release 0.72<p>
+Release 0.73<p>
 
-<a href="http://www.presicient.com/dbdchart/dbdchart072.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.72.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart073.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.73.tar.gz">.tar.gz version</a>
 <p>
 <a name="conform"></a>
 <h2>Prerequisites and Conformance</h2><p>
@@ -1708,6 +1708,17 @@ an imagemap.</i><p>
 <a name="history"></a>
 <h2>Change History</h2><p>
 
+Release 0.73:
+<ul>
+<li>fixed scaling of 3-D barchart with small datasets
+<li>fixed missing axis labels for 3-D barcharts/histograms
+<li>improved scaling for sine-point line/point graphs, barchart
+<li>fix to propagate icon-related error msgs up to DBI
+<li>fixed runaway recursion for quadtrees
+<li>fixed divide-by-zero error on quadtrees with single intensity
+<li>corrected pod SYNOPSIS section
+</ul>
+<p>
 Release 0.72:
 <ul>
 <li>fixed SHOWVALUES for bars/histos when clipped origin
@@ -1968,12 +1979,56 @@ Release 0.10:<p>
 	<td align=left>SHOWVALUES property not working on barcharts</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.72</td>
+</tr><tr bgcolor=white>
+	<td align=center>17</td>
+	<td align=center>2002-Sep-04</td>
+	<td align=center>0.72</td>
+	<td align=left>Quadtrees with single intensity cause divide by zero</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.73</td>
+</tr><tr bgcolor=white>
+	<td align=center>18</td>
+	<td align=center>2002-Sep-04</td>
+	<td align=center>0.72</td>
+	<td align=left>Some odd segment hierarchies cause runaway recursion in quadtrees</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.73</td>
+</tr><tr bgcolor=white>
+	<td align=center>19</td>
+	<td align=center>2002-Sep-04</td>
+	<td align=center>0.72</td>
+	<td align=left>Scaling of single point lines/points produces undesirable results</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.73</td>
+</tr><tr bgcolor=white>
+	<td align=center>20</td>
+	<td align=center>2002-Sep-08</td>
+	<td align=center>0.72</td>
+	<td align=left>Scaling of 3-D barcharts not valid for small datasets</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.73</td>
+</tr><tr bgcolor=white>
+	<td align=center>21</td>
+	<td align=center>2002-Sep-08</td>
+	<td align=center>0.72</td>
+	<td align=left>3-D barcharts missing axis labels</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.73</td>
+</tr><tr bgcolor=white>
+	<td align=center>22</td>
+	<td align=center>2002-Sep-08</td>
+	<td align=center>0.72</td>
+	<td align=left>Icon-related error msgs not being propagated to DBI</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.73</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
 
 <ul>
 <li>SVG
+<li>variable font faces/sizes
+<li>"ghost" grid lines
 <li>surfacemaps ?
 <li>statistical distribution curves (Poisson, Gaussian, etc.)
 <li>XML template support
@@ -2001,11 +2056,12 @@ Special thanks to
 <h2>References</h2><p>
 
 <ul>
-<li><a href="http://www.symbolstone.org/technology/perl/DBI/">Official DBI Site</a>
+<li><a href="http://dbi.perl.org">Official DBI Site</a>
 <li><a href="http://www.cpan.org">CPAN</a>
+<li><a href="http://www.perl.org">Perl.org</a>
 <li><a href="http://www.perl.com">Perl.com</a>
-<li><a href="http://www.w3c.org/svg">SVG Reference</a>
-<li><a href="http://www.adobe.com">Adobe Corp</a> (for SVG viewer)
+<!-- <li><a href="http://www.w3c.org/svg">SVG Reference</a>
+<li><a href="http://www.adobe.com">Adobe Corp</a> (for SVG viewer) -->
 <li><a href="http://www.activestate.com">ActiveState</a> (for Perl software for Windows)
 </ul>
 
@@ -2016,13 +2072,7 @@ Special thanks to
 <a name="copy"></a>
 <h2>Copyright</h2><p>
 
-Copyright (c) 2001,2002, Dean Arnold, Presicient Corp., USA<br>
-Affiliations:<br>
-<ul>
-<li><a href="http://www.presicient.com">Presicient Corp.</a>,<br>
-<li><a href="http://www.mylines.com">MyLines.com</a>,<br>
-<li><a href="http://home.earthlink.net/~darnold">Homepage</a>
-</ul><p>
+Copyright (c) 2001,2002, Dean Arnold, Presicient Corp., USA<p>
 Permission is granted to use this software according to the terms of the
 Artistic License.
 

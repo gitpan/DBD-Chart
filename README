@@ -2,7 +2,7 @@ NAME
     DBD::Chart - DBI driver abstraction for Rendering Charts and Graphs
 
 SYNOPSIS
-            $dbh = DBI->connect('dbi:Chart')
+            $dbh = DBI->connect('dbi:Chart:')
                 or die "Cannot connect: " . $DBI::errstr;
             #
             #       create file if it deosn't exist, otherwise, just open
@@ -14,7 +14,7 @@ SYNOPSIS
             $sth = $dbh->prepare('INSERT INTO mychart VALUES (?, ?, ?)');
             $sth->bind_param(1, 'Values');
             $sth->bind_param(2, 45);
-            $sth->bind_param(2, 12345.23);
+            $sth->bind_param(3, 12345.23);
             $sth->execute or die 'Cannot execute: ' . $sth->errstr;
 
             #       and render it
@@ -47,7 +47,7 @@ DESCRIPTION
 
     Perl 5.6.0 minimum
     DBI 1.14 minimum
-    DBD::Chart::Plot 0.72 (included with this package)
+    DBD::Chart::Plot 0.73 (included with this package)
     GD X.XX minimum
     GD::Text X.XX minimum
     libpng
@@ -66,11 +66,11 @@ DESCRIPTION
 
     For Unix, extract it with
 
-        gzip -cd DBD-Chart-0.72.tar.gz | tar xf -
+        gzip -cd DBD-Chart-0.73.tar.gz | tar xf -
 
     and then enter the following:
 
-        cd DBD-Chart-0.72
+        cd DBD-Chart-0.73
         perl Makefile.PL
         make
 

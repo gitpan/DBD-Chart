@@ -9,6 +9,14 @@
 #
 #	Change History:
 #
+#	0.73	2002-Sep-11		D. Arnold
+#		fix scaling for 3-D bars w/ < 4 bars
+#		fix all plots with single data point
+#		add axis labels for 3-D bars
+#		improve error reporting for iconic too wide,
+#			icon format unsupported
+#		fix for odd segmented quadtrees
+#
 #	0.72	2002-Aug-17		D. Arnold
 #		fix showvalues for nonstacked bars/histos/candles
 #		fix legend placement
@@ -87,7 +95,7 @@ use GD;
 use Time::Local;
 use GD qw(gdBrushed gdSmallFont gdTinyFont gdMediumBoldFont);
 
-$DBD::Chart::Plot::VERSION = '0.72';
+$DBD::Chart::Plot::VERSION = '0.73';
 
 #
 #	list of valid colors
@@ -1414,10 +1422,14 @@ sub computeScales {
 #	width x depth ratio
 #	actual width is adjust width - the 30 deg. rotation effect
 #
+		$xh = 0.5 + int($xh), $xl = 0.5,
+		$obj->{xh} = $xh, $obj->{xl} = $xl
+			if ($xh - $xl < int($xh));
 		$obj->{plotWidth} = int($twd / ($xzratio*sin(3.1415926/6) + 1)),
 		$obj->{plotDepth} = int(($twd - $obj->{plotWidth})/sin(3.1415926/6)),
 		$obj->{plotHeight} = int($tht - ($obj->{plotDepth}*cos(3.1415926/3))),
-		$obj->{xscale} = $obj->{plotWidth}/($xh - $xl),
+#		$obj->{xscale} = $obj->{plotWidth}/($xh - $xl),
+		$obj->{xscale} = $obj->{plotWidth}/int($xh),
 		$obj->{yscale} = $obj->{plotHeight}/($yh - $yl),
 		$obj->{zscale} = $obj->{plotDepth}/($zh - $zl)
 			unless ($plottypes & (HISTO|GANTT));
@@ -1476,6 +1488,7 @@ sub computeRanges {
 		push @sign, (($_ < 0) ? -1 : (! $_) ? 0 : 1)
 			if defined($_);
 	}
+	$xh = 2 if (($xh == 1) && ($xl == 1));
 #
 #	tick increment/value algorithm:
 #	z = (log(max - min))/log(10);
@@ -1512,7 +1525,7 @@ sub computeRanges {
 			if ($obj->{horizStep}%$align != 0);
 	}
 	
-	$yh = $yl * 2 if ($yh == $yl);
+	($yl, $yh) = (($yl * 0.75), ($yl * 1.25)) if ($yh == $yl);
 	$yl = int($yl) - ($yl < 0 ? 1 : 0),
 	$yh = int($yh) + 1
 		if ($obj->{yLog});
@@ -1554,7 +1567,7 @@ sub computeRanges {
 		($obj->{horizStep}, $obj->{vertStep}, $obj->{depthStep});
 
 	($zl, $zh) = (0.5, 1.5) if ($obj->{symDomain} && defined($zl) && ($zl == $zh));
-	($xl, $xh) = (0.5, 1.5) if ($obj->{symDomain} && ($xl == $xh));
+	($xl, $xh) = (0.5, 1) if ($obj->{symDomain} && ($xl == $xh));
 # fudge a little in case limit equals min or max
 	$obj->{zl} = ((! $zm) ? 0 : $zm * (int(($zl-0.00001*$sign[4])/$zm) + $sign[4] - 1)),
 	$obj->{zh} = ((! $zm) ? 0 : $zm * (int(($zh-0.00001*$sign[5])/$zm) + $sign[5] + 1))
@@ -1731,6 +1744,7 @@ sub plot2DBars {
 			$markers[$_] = ($valid_shapes{$markers[$_]} && ($markers[$_] ne 'null')) ? 
 				$obj->make_marker($markers[$_], $barcolors[$_]) : 
 				$obj->getIcon($markers[$_], 1);
+			return undef unless $markers[$_];
 		}
 #
 #	render legend if requested
@@ -3151,6 +3165,37 @@ sub plot3DAxes {
 			$img->line($gx, $gy, $hx, $hy, $obj->{gridColor});
 		}
 	}
+#
+#	we forgot the axis labels!!!
+#	draw Y-axis at rear-left-top corner
+#	draw X-axis at front-right-bottom corner
+#	draw Z-axis vertical from front-right-bottom along image edge
+#
+	my ($xal, $yal, $zal) = ($obj->{plotTypes} & HISTO) ? 
+		($obj->{yAxisLabel}, $obj->{xAxisLabel}, $obj->{zAxisLabel}) :
+		($obj->{xAxisLabel}, $obj->{yAxisLabel}, $obj->{zAxisLabel});
+	if ($xal) {
+		($gx, $gy) = ($yc == $yl) ? $obj->pt2pxl($v[12], $v[13], $v[14]) :
+			$obj->pt2pxl($v[15], $v[16], $v[17]);
+		$gx -= ($sfw * length($xal)),
+		$gy += 10,
+		$img->string(gdSmallFont, $gx, $gy, $xal, $obj->{textColor})
+	}
+
+	($gx, $gy) = $obj->pt2pxl($v[9], $v[10], $v[11]),
+	$gx -= ($sfw * length($yal)/2),
+	$gy -= ($sfh + 5),
+	$img->string(gdSmallFont, $gx, $gy, $yal, 
+		$obj->{textColor})
+		if $yal;
+
+	($gx, $gy) = $obj->pt2pxl($v[15], $v[16], $v[17]),
+	$gx += $sfh + 10,
+	$gy += ($sfw * length($zal)),
+	$img->stringUp(gdSmallFont, $gx, $gy, $zal, 
+		$obj->{textColor})
+		if $zal;
+
 # need these later to redraw floor and tick labels
 	$obj->{xlatVerts} = \@xlatverts;
 	1;
@@ -4047,6 +4092,32 @@ sub clusterQuadPts {
 	return $result;
 }
 
+sub dumpQuadData {
+	my ($group, $tabcnt) = @_;
+	
+	print ' ' x (4*$tabcnt), $group , "\n" and return 1
+		unless (ref $group);
+	
+	foreach (@$group) {
+		if (ref $_ eq 'HASH') {
+			foreach my $cat (keys(%{$_})) {
+				dumpQuadData($cat, $tabcnt+1), next if (ref $cat);
+				print ' ' x (4*$tabcnt), $cat , ' => {', "\n";
+				dumpQuadData($_->{$cat}, $tabcnt+1);
+			}
+		}
+		elsif (ref $_ eq 'ARRAY') {
+			foreach my $cat (0..$#$_) {
+				print ' ' x (4*$tabcnt), $cat , ' => [', "\n";
+				dumpQuadData($_->[$cat], $tabcnt+1);
+			}
+		}
+		else {
+			print ' ' x (4*$tabcnt), $_ , "\n";
+		}
+	}
+}
+
 sub plotQuadtree {
 	my ($obj) = @_;
 #
@@ -4066,6 +4137,8 @@ sub plotQuadtree {
 #
 sub renderQuadTree {
 	my ($obj, $group, $xorig, $yorig, $w, $h, $splitdir) = @_;
+	
+#	dumpQuadData($group, 0);
 	
 	my @cluster1 = ();
 	my @cluster2 = ();
@@ -4119,7 +4192,7 @@ sub renderQuadTree {
 			$half -= $_->[1],
 			push(@cluster1, $_),
 			next
-				if ($half > 0);
+				if ($half >= $_->[1]);
 			push(@cluster2, $_);
 		}
 #
@@ -4226,6 +4299,8 @@ sub computeGradient {
 #	NOTE that the last color in list is used as upper bound
 #	of gradient shading
 #
+	$obj->{yh} *= 2, $obj->{yl} = 0
+		if ($obj->{yh} == $obj->{yl});
 	my $incr = ($obj->{yh} - $obj->{yl})/24;
 	my $shadestep = ($obj->{yh} - $obj->{yl})/$#colormap;
 	my $min = $obj->{yl};
