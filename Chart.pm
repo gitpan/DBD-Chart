@@ -256,7 +256,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.73';
+$DBD::Chart::VERSION = '0.74';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;

@@ -97,7 +97,7 @@ use GD;
 use Time::Local;
 use GD qw(gdBrushed gdSmallFont gdTinyFont gdMediumBoldFont);
 
-$DBD::Chart::Plot::VERSION = '0.73';
+$DBD::Chart::Plot::VERSION = '0.74';
 
 #
 #	list of valid colors
