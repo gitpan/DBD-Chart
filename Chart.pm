@@ -174,7 +174,7 @@ package DBD::Chart;
 use DBI;
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.51';
+$DBD::Chart::VERSION = '0.52';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;

@@ -9,6 +9,9 @@
 #
 #	Change History:
 #
+#	0.52	2001-Dec-14		D. Arnold
+#		fix for ymax in 2d bars
+#
 #	0.51	2001-Dec-01		D. Arnold
 #		Support multicolor barcharts
 #		Support 3D piecharts
@@ -41,7 +44,7 @@
 require 5.6.0;
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.51';
+$DBD::Chart::Plot::VERSION = '0.52';
 
 use GD;
 use strict;
@@ -565,6 +568,9 @@ sub set2DBarPoints {
 	my ($x, $y) = (0,0);
 	my @ary = ();
 	my ($i, $ymin, $ymax);
+	$ymin = $obj->{yl}, $ymax = $obj->{yh}
+		if $baseary;
+
 	for ($i = 0; $i <= $#$xary; $i++) {
 #
 #	eliminate undefined data points
