@@ -2,6 +2,14 @@
 use DBI;
 use DBD::Chart;
 
+open(OUTF, ">pietest.html");
+print OUTF "<html><body>
+<img src=simppie.png>
+<img src=updpie.png>
+<img src=delpie.png>
+</body></html>\n";
+close OUTF;
+
 $dbh = DBI->connect('dbi:Chart:');
 #
 #	simple piechart
@@ -28,6 +36,7 @@ open(OUTF, '>simppie.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "simppie.png OK\n";
 
 $updsth = $dbh->prepare('UPDATE pie SET sales = ? WHERE region = \'Northwest\' ');
 $updsth->bind_param(1, 12999.45);
@@ -40,6 +49,7 @@ open(OUTF, '>updpie.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "updpie.png OK\n";
 
 $delsth = $dbh->prepare('delete from pie where region = ? ');
 $delsth->bind_param(1, 'Northwest');
@@ -52,3 +62,4 @@ open(OUTF, '>delpie.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "delpie.png OK\n";

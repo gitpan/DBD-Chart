@@ -2,6 +2,14 @@
 use DBI;
 use DBD::Chart;
 
+open(OUTF, ">graphs.html");
+print OUTF "<html><body>
+<img src=simpline.png>
+<img src=simppts.png >
+<img src=multipt.png >
+</body></html>\n";
+close OUTF;
+
 $dbh = DBI->connect('dbi:Chart:');
 #
 # simple line graph
@@ -34,6 +42,7 @@ open(OUTF, '>simpline.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "simpline.png OK\n";
 #
 #	simple point graph
 #
@@ -48,7 +57,7 @@ open(OUTF, '>simppts.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
-
+print "simppts.png OK\n";
 
 #
 #	linepoint graph, multidataset
@@ -94,7 +103,8 @@ $rsth = $dbh->prepare(
 $rsth->execute(400, 400, 'Month', 'Sales');
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
-open(OUTF, '>multlpt.png');
+open(OUTF, '>multipt.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "multipt.png OK\n";

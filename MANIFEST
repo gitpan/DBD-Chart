@@ -2,7 +2,7 @@ Makefile.PL
 MANIFEST
 Chart.pm
 dbdchart.html
-Readme
+README
 README.plot
 Chart/Plot.pm
 

@@ -56,6 +56,7 @@ print MAP '<p><h2>Iconic Barchart with Imagemap</h2>', "\n";
 print MAP '<img src=iconbar.png usemap="#pumpkins">',
 	$$row[1], "\n";
 $dbh->do('DROP TABLE iconic');
+print "iconic barchart OK\n";
 #
 #	simple barchart with imagemap
 #
@@ -95,6 +96,7 @@ print MAP '<p><h2>Simple Barchart with Imagemap</h2>
 print MAP '<img src=samplebar.png usemap="#barsample">',
 	$$row[1], "\n";
 $dbh->do('DROP TABLE barchart');
+print "simple barchart OK\n";
 #
 #	simple boxchart with imagemap
 #
@@ -125,6 +127,7 @@ print MAP '<h2>Boxchart with Imagemap</h2>', "\n";
 print MAP '<img src=samplebox.png usemap="#boxsample">',
 	$$row[1], "\n";
 $dbh->do('DROP TABLE samplebox');
+print "boxchart OK\n";
 #
 #	3-axis barchart
 #
@@ -162,6 +165,7 @@ print MAP '<p><h2>3-Axis Barchart with Imagemap</h2>', "\n";
 print MAP '<img src=bar3axis.png usemap="#sales_by_region">',
 	$$row[1], "\n";
 $dbh->do('DROP table threeaxis');
+print "3 Axis barchart OK\n";
 #
 #	multrange 3D barchart with imagemap
 #
@@ -196,6 +200,7 @@ print MAP '<p><h2>Multirange 3-D Barchart with Imagemap</h2>', "\n";
 print MAP '<img src=samp3dbar.png usemap="#bars3dsample">',
 	$$row[1], "\n";
 $dbh->do('DROP table threedbar');
+print "3-D barchart OK\n";
 #
 #	simple piechart with imagemap
 #
@@ -224,6 +229,7 @@ print MAP '<h2>Piechart with Imagemap</h2>', "\n";
 print MAP '<img src=samplepie.png usemap="#piesample">',
 	$$row[1], "\n";
 $dbh->do('DROP table samplepie');
+print "piechart OK\n";
 #
 #	simple candlestick with imagemap
 #
@@ -252,6 +258,7 @@ close BAR;
 print MAP '<p><h2>Candlestick with Imagemap</h2>', "\n";
 print MAP '<img src=sampcandle.png usemap="#candlesample">',
 	$$row[1], "\n";
+print "candlestick OK\n";
 #
 #	multidomain linegraph with imagemap
 #
@@ -280,6 +287,7 @@ close BAR;
 print MAP '<p><h2>Multirange Linegraph with Imagemap</h2>', "\n";
 print MAP '<img src=samplines.png usemap="#linesample">',
 	$$row[1], "\n";
+print "multirange linegraph OK\n";
 #
 #	multidomain pointgraph with imagemap
 #
@@ -306,6 +314,7 @@ close BAR;
 print MAP '<p><h2>Multirange Pointgraph with Imagemap</h2>', "\n";
 print MAP '<img src=samppoints.png usemap="#pointsample">',
 	$$row[1], "\n";
+print "multirange pointgraph OK\n";
 #
 #	multirange areagraph with imagemap
 #
@@ -341,6 +350,7 @@ print MAP '<img src=samparea.png usemap="#areasample">',
 
 print MAP '</body></html>';
 close MAP;
+print "multirange areagraph OK\n";
 
 $dbh->disconnect;
 

@@ -1,6 +1,11 @@
 #!/usr/bin/perl -w
 use DBI;
 use DBD::Chart;
+open(OUTF, ">simpylog.html");
+print OUTF "<html><body>
+<img src=simpylog.png>
+</body></html>\n";
+close OUTF;
 
 $dbh = DBI->connect('dbi:Chart:');
 #
@@ -25,3 +30,4 @@ open(OUTF, '>simpylog.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "simpylog.png OK\n";

@@ -2,6 +2,13 @@
 use DBI;
 use DBD::Chart;
 
+open(OUTF, ">simparea.html");
+print OUTF "<html><body>
+<img src=simparea.png>
+<img src=multarea.png>
+</body></html>\n";
+close OUTF;
+
 $dbh = DBI->connect('dbi:Chart:');
 #
 # simple line graph
@@ -31,6 +38,7 @@ open(OUTF, '>simparea.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "simparea.png OK\n";
 
 #
 #	linepoint graph, multidataset
@@ -75,3 +83,4 @@ open(OUTF, '>multarea.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "multarea.png OK\n";

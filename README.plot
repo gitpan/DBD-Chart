@@ -19,29 +19,32 @@ SYNOPSIS
         print $img->plot;
 
 DESCRIPTION
-    DBD::Chart::Plot creates images of line and scatter graphs for two
+    DBD::Chart::Plot creates images of various types of graphs for 2 or 3
     dimensional data. Unlike GD::Graph, the input data sets do not need to
-    be uniformly distributed in the domain (X-axis).
+    be uniformly distributed in the domain (X-axis), and may be either
+    numeric, temporal, or symbolic.
 
     DBD::Chart::Plot supports the following:
 
     - multiple data set plots
     - line graphs, areagraphs, scatter graphs, linegraphs w/ points,
-    candlestick graphs, barcharts (2-D, 3-D, and 3-axis), piecharts, and box
-    & whisker charts (aka boxcharts)
+    candlestick graphs, barcharts (2-D, 3-D, and 3-axis), histograms,
+    piecharts, box & whisker charts (aka boxcharts), and Gantt charts
     - optional iconic barcharts or datapoints
     - a wide selection of colors, and point shapes
     - optional horizontal and/or vertical gridlines
     - optional legend
     - auto-sizing of axes based in input dataset ranges
-    - automatic sorting of numeric input datasets to assure proper order of
-    plotting
-    - optional symbolic (i.e., non-numeric) domain values
+    - optional symbolic and temproal (i.e., non-numeric) domain values
+    - automatic sorting of numeric and temporal input datasets to assure
+    proper order of plotting
     - optional X, Y, and Z axis labels
     - optional X and/or Y logarithmic scaling
     - optional title
     - optional adjustment of horizontal and vertical margins
     - optional HTML or Perl imagemap generation
+    - composite images from multiple graphs
+    - user programmable colors
 PREREQUISITES
     GD.pm module minimum version 1.26 (available on CPAN)
         GD.pm requires additional libraries:
@@ -56,6 +59,7 @@ USAGE
 
             my $img = DBD::Chart::Plot->new; 
             my $img = DBD::Chart::Plot->new ( $image_width, $image_height ); 
+            my $img = DBD::Chart::Plot->new ( $image_width, $image_height, \%colormap ); 
             my $anotherImg = new DBD::Chart::Plot; 
 
         Creates an empty image. If image size is not specified, the default
@@ -87,7 +91,7 @@ USAGE
         respectively.
 
     genMap, mapType, mapURL, mapScript
-        COntrol generation of imagemaps. When genMap is set to a legal HTML
+        Control generation of imagemaps. When genMap is set to a legal HTML
         anchor name, an image map of the specified type is created for the
         image. The default type is 'HTML' if no mapType is specified. Legal
         types are 'HTML' and 'PERL'.
@@ -195,13 +199,24 @@ USAGE
         discrete symbolic values which are evenly distributed over the
         X-axis. Numeric domains are plotted as scaled values in the image.
 
-    timeDomain - NOT YET SUPPORTED
+    timeDomain
         When set to a valid format string, the domain data points are
         treated as associated temporal values (e.g., date, time, timestamp,
         interval). The values supplied by setPoints will be strings of the
         specified format (e.g., 'YYYY-MM-DD'), but will be converted to
         numeric time values for purposes of plotting, so the domain is
         treated as continuous numeric data, rather than discrete symbolic.
+        Note that for barcharts, histograms, candlesticks, or piecharts,
+        temporal domains are treated as symbolic for plotting purposes, but
+        are sorted as numeric values.
+
+    timeRange
+        When set to a valid format string, the range data points are treated
+        as associated temporal values (e.g., date, time, timestamp,
+        interval). The values supplied by setPoints will be strings of the
+        specified format (e.g., 'YYYY-MM-DD'), but will be converted to
+        numeric time values for purposes of plotting, so the range is
+        treated as continuous numeric data.
 
     gridColor
         Sets the color of the axis lines and ticks. Default is black.
@@ -233,7 +248,7 @@ USAGE
 
         Copies the input array values for later plotting. May be called
         repeatedly to establish multiple plots in a single graph. Returns a
-        positive integer on success and `undef' on failure. The global graph
+        positive integer on success and "undef" on failure. The global graph
         properties should be set (via setOptions()) prior to setting the
         data points. The error() method can be used to retrieve an error
         message. X-axis values may be non-numeric, in which case the set of
@@ -249,9 +264,9 @@ USAGE
         range data array is used as the top value of each candlestick.
         Pointshapes may be specified, in which case the top and bottom of
         each stick will be capped with the specified pointshape. The range
-        axis may be logarithmically scaled. If value display is requested,
-        the range value of both the top and bottom of each stick will be
-        printed above and below the stick, respectively.
+        and/or domain axis may be logarithmically scaled. If value display
+        is requested, the range value of both the top and bottom of each
+        stick will be printed above and below the stick, respectively.
 
         Plot properties: Properties of each dataset plot can be set with an
         optional string as the third argument. Properties are separated by
@@ -267,7 +282,7 @@ USAGE
                 dgray       pie                    filldiamond
                 lblue       box                    opendiamond
                 blue       zaxis                   horizcross
-                dblue                              diagcross
+                dblue      histo                   diagcross
                 gold                               icon
                 lyellow 
                 yellow
@@ -322,8 +337,8 @@ USAGE
         The range of values on each axis is automatically computed to
         optimize the data placement in the largest possible area of the
         image. As a result, the origin (0, 0) axes may be omitted if none of
-        the datasets do not cross them at any point. Instead, the axes will
-        be drawn on the left and bottom borders using the value ranges that
+        the datasets cross them at any point. Instead, the axes will be
+        drawn on the left and bottom borders using the value ranges that
         appropriately fit the dataset(s).
 
   Fetch the imagemap: getMap()
@@ -337,7 +352,7 @@ USAGE
 
         The resulting imagemap will be applied as follows:
 
-    2 axis 2-D Barcharts
+    2 axis 2-D Barcharts and Histograms
         Each bar is mapped individually.
 
     Piecharts
@@ -348,6 +363,10 @@ USAGE
 
     3-D Barcharts (either 2 or 3 axis)
         The top face of each bar is mapped. The Z CGI parameter will be
+        empty for 2 axis barcharts.
+
+    3-D Histograms (either 2 or 3 axis)
+        The right face of each bar is mapped. The Z CGI parameter will be
         empty for 2 axis barcharts.
 
     Line, point, area graphs
@@ -361,9 +380,11 @@ USAGE
         The area of the box is mapped, and 4-pixel diameter circles are
         mapped at the end of each extreme whisker.
 
-BUGS AND TO DO
+    Gantt Charts
+        The area of each bar in the chart is mapped.
+
+TO DO
     programmable fonts
-    temporal domain and ranges
     symbolic ranges for scatter graphs
     surfacemaps
     SVG support

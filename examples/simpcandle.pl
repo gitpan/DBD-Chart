@@ -2,6 +2,13 @@
 use DBI;
 use DBD::Chart;
 
+open(OUTF, ">simpcandle.html");
+print OUTF "<html><body>
+<img src=simpcndl.png>
+<img src=simpsymb.png>
+</body></html>\n";
+close OUTF;
+
 $dbh = DBI->connect('dbi:Chart:');
 #
 # simple candle graph
@@ -40,6 +47,8 @@ open(OUTF, '>simpcndl.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "simpcndl.png OK\n";
+
 #
 #	use same data to render linegraph with symbolic domain
 #
@@ -55,3 +64,4 @@ open(OUTF, '>simpsymb.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "simpsymb.png OK\n";

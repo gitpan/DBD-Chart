@@ -2,6 +2,15 @@
 use DBI;
 use DBD::Chart;
 
+open(OUTF, ">bars.html");
+print OUTF "<html><body>
+<img src=simpbar.png>
+<img src=multibar.png>
+<img src=updbars.png>
+<img src=delbars.png>
+</body></html>\n";
+close OUTF;
+
 $dbh = DBI->connect('dbi:Chart:');
 #
 #	simple barchart
@@ -30,6 +39,7 @@ binmode OUTF;
 print OUTF $buf;
 close(OUTF);
 $dbh->do('DROP CHART bars');
+print "simpbar.png OK\n";
 #
 #	barchart, multidataset
 #
@@ -52,6 +62,7 @@ open(OUTF, '>multibar.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "multibar.png OK\n";
 
 $usth = $dbh->prepare('update bars set East=?, Southeast=?, ' .
 'Midwest = 8675.0, Southwest = ?, Northwest = ? ' .
@@ -70,6 +81,7 @@ open(OUTF, '>updbars.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
+print "updbars.png OK\n";
 
 $dsth = $dbh->prepare('delete from bars where quarter = ?');
 $dsth->bind_param(1, 3);
@@ -83,6 +95,4 @@ open(OUTF, '>delbars.png');
 binmode OUTF;
 print OUTF $buf;
 close(OUTF);
-
-
-
+print "delbars.png OK\n";

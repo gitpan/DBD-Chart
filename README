@@ -35,7 +35,8 @@ WARNING
 
 DESCRIPTION
     The DBD::Chart provides a DBI abstraction for rendering pie charts, bar
-    charts, and line and point graphs.
+    charts, box&whisker charts (aka boxcharts), histograms, Gantt charts,
+    and line, point, and area graphs.
 
     For detailed usage information, see the included the dbdchart.html
     manpage webpage. See the DBI(3) manpage for details on DBI. See the
@@ -46,7 +47,7 @@ DESCRIPTION
 
     Perl 5.6.0 minimum
     DBI 1.14 minimum
-    DBD::Chart::Plot 0.50 (included with this package)
+    DBD::Chart::Plot 0.60 (included with this package)
     GD X.XX minimum
     GD::Text X.XX minimum
     libpng
@@ -65,11 +66,11 @@ DESCRIPTION
 
     For Unix, extract it with
 
-        gzip -cd DBD-Chart-0.50.tar.gz | tar xf -
+        gzip -cd DBD-Chart-0.60.tar.gz | tar xf -
 
     and then enter the following:
 
-        cd DBD-Chart-0.50
+        cd DBD-Chart-0.60
         perl Makefile.PL
         make
 
@@ -87,7 +88,7 @@ FOR MORE INFO
     It includes all the usage information.
 
 AUTHOR AND COPYRIGHT
-    This module is Copyright (C) 2001 by Presicient Corporation
+    This module is Copyright (C) 2001, 2002 by Presicient Corporation
 
         Email: darnold@presicient.com
 

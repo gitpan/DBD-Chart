@@ -6,12 +6,13 @@ $dbh = DBI->connect('dbi:Chart:');
 #
 # simple candle graph direct from database
 #
-$tddbh = DBI->connect('dbi:Teradata:dbc', 'dbitst', 'dbitst',
+$tddbh = DBI->connect('dbi:Teradata:wdevcop1', $ARGV[0], $ARGV[1],
 	{ PrintError => 1, RaiseError => 0, AutoCommit => 1 });
+$tddbh->do('DATABASE darnold1');
 $tddbh->do('DROP TABLE candle');
 $tddbh->do(
 "CREATE TABLE candle (
-	TradeDay DATE FORMAT \'YYYY-MM-DD\', 
+	TradeDay DATE FORMAT 'YYYY-MM-DD', 
 	lowprice FLOAT, 
 	highprice FLOAT)"
 );
@@ -41,10 +42,10 @@ $tdsth = $tddbh->prepare(
 FROM candle ORDER BY TradeDay");
 $tdsth->execute;
 
-$rsth = $dbh->prepare('SELECT CANDLESTICK FROM ? ' .
-'WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND ' .
-'TITLE = \'Daily Price Range\' AND COLOR=red AND SHOWGRID=1 AND ' .
-'SHAPE=filldiamond AND SHOWPOINTS=1 AND SHOWVALUES=0');
+$rsth = $dbh->prepare("SELECT CANDLESTICK FROM ?
+WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND
+TITLE = 'Daily Price Range' AND COLOR=red AND SHOWGRID=1 AND
+SHAPE=filldiamond AND SHOWPOINTS=1 AND SHOWVALUES=0");
 $rsth->execute($tdsth, 300,400, 'Date', 'Price');
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
@@ -56,10 +57,10 @@ close(OUTF);
 #	use same data to render linegraph with symbolic domain
 #
 $tdsth->execute;
-$rsth = $dbh->prepare('SELECT LINEGRAPH FROM ? ' .
-'WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND Y-AXIS=\'Price\' AND ' .
-'TITLE = \'Daily Price Range\' AND COLOR=(red, blue) AND SHOWGRID=1 AND ' .
-'SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1');
+$rsth = $dbh->prepare("SELECT LINEGRAPH FROM ?
+WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS='Date' AND Y-AXIS='Price' AND
+TITLE = 'Daily Price Range' AND COLOR=(red, blue) AND SHOWGRID=1 AND
+SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1");
 $rsth->execute($tdsth);
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
