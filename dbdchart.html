@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.74 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.80 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD, Quadtree, Gantt">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -71,7 +71,7 @@
 <a href="#refs">References</a><br>
 <a href="#copy">Copyright</a></b>
 </font><p>
-<i>Last updated September 12, 2002</i>
+<i>Last updated September 15, 2002</i>
 </td>
 <td>&nbsp;&nbsp;</td>
 <td align=left valign=top>
@@ -109,10 +109,10 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>Current Version</h2><p>
 
-Release 0.74<p>
+Release 0.80<p>
 
-<a href="http://www.presicient.com/dbdchart/dbdchart074.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.74.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart080.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.80.tar.gz">.tar.gz version</a>
 <p>
 <a name="conform"></a>
 <h2>Prerequisites and Conformance</h2><p>
@@ -138,6 +138,10 @@ Be advised that these modules require the following (non-Perl) libraries:<p>
 <li> <a href="http://www.info-zip.org/pub/infozip/zlib/">zlib</a>
 <li> <a href="http://www.ijg.org/">jpeg-6b</a> (for JPEG support)
 </ul><p>
+
+In addition, you may find <a href="http://www.presicient.com/dbixchart">DBIx::Chart</a>
+a simpler interface. It uses DBD::Chart, but handles everything in SQL,
+and makes your favorite DBMS look like it supports chart rendering!<p>
 
 The following DBI functions are not supported:
 <pre>
@@ -974,15 +978,20 @@ Populates the chart with the specified data. A value must be provided for each c
 in the chart (i.e., no defaults are used.).</li><p>
 
 <a name="select"></a>
-<li><code><b>SELECT <i>&lt;chart-type&gt;</i> [, IMAGEMAP ]<br>
+<li><code><b>SELECT <i>&lt;chart-type&gt;</i> [ <i>( &lt;column-list&gt; | * )</i> ] [, IMAGEMAP ]<br>
 FROM <i>? | &lt;chartname&gt; <!-- | &lt;template-uri&gt; -->|
 ( &lt;subquery&gt; ) [ &lt;queryname&gt; ] [, ( &lt;subquery&gt; )...]</i><br>
 WHERE <i>&lt;qualifier&gt; &lt;</i> = | IN <i>&gt; &lt; ? | literal | literallist&gt;</i> [AND ...]</b></code><p>
 Renders the image(s) from the specified chart or DBI statement handle, <!-- or XML template document, -->
 using the <i>&lt;qualifer&gt;</i>s to control how the image
-is rendered.
+is rendered.<p>
 <!-- When <i>TEMPLATE</i> is included in the column list, an XML template file
 containing the graph properties and data points is generated. -->
+The optional <i>( &lt;column-list&gt; )</i> is a comma separated
+list of data source column names used to specify a subset of the columns
+to be used for the chart. An asterisk indicates that all the returned columns
+should be used.<p>
+
 When <i>IMAGEMAP</i> is included in the column list, text
 is generated for either
 <ul>
@@ -1025,7 +1034,8 @@ with the plot color).
 <li><b>GANTT</b> - generates a Gantt chart
 <li><b>QUADTREE</b> - generates a Quadtree chart
 <li><b>IMAGE</b> - used only when derived tables are specified; creates a composite image
-from one or more different graph types.
+from one or more different graph types. Note that this chart-type does <b>not</b>
+support a column-list argument.
 </ul><p>
 The following qualifiers are allowed:<p>
 <table border=1><tr bgcolor=orange><th>Qualifier</th><th>Description</th><th>Default<br>Value</th><th>Global</th><th>Restrictions</th></tr>
@@ -1105,14 +1115,17 @@ fillcircle, opencircle, icon, dot</code>. Default none.</td>
 	<td valign=top align=center><b>SHOWVALUES</b></td>
 	<td valign=top>for all chart types except pie and Gantt,
 	determines whether the datapoint values are displayed.
-	When set to 1, the (X,Y) values are displayed just above the plotted datapoint
-	for line, area, and point graphs; for candlesticks, the minimum and maximum Y values
-	are plotted just above and below each candlestick. For barcharts, the Y axis value
-	of each bar is displayed. For box & whisker charts, the median and lower and upper quartile
-	values are displayed.</td>
+	When set to 1, the (X,Y) values are displayed  using a 6pt font either just above
+	the plotted datapoint for line, area, and point graphs;
+	for candlesticks, the minimum and maximum Y values
+	are plotted just above and below each candlestick. For barcharts and histograms,
+	the Y axis value of each bar is displayed. For box & whisker charts,
+	the median and lower and upper quartile	values are displayed. If set to a positive
+	value greater than 1, the value is used to determine the size of the font.</td>
 	<td valign=top>0</td>
 	<td valign=top>No</td>
-	<td valign=top>single value only, valid values are 0 and 1, ignored for pie charts.</td></tr>
+	<td valign=top>single value only, valid values are positive integers,
+	ignored for pie charts and quadtrees.</td></tr>
 <tr bgcolor=white>
 	<td valign=top align=center><b>X_LOG</b><br>(<i>aka</i> <b>X-LOG</b>)</td>
 	<td valign=top>for line, area, point, and candlestick graphs, causes values along the X axis to be plotted in log<sub>10</sub> form;</td>
@@ -1215,13 +1228,14 @@ to 1 to force the origin axis to be included. </td>
 	<td valign=top>None.</td>
 	<td>Single string value of a URI: e.g., 'http://www.presicient.com/simplebars.xml' or
 	'file://topdir/childdir/sample.xml'</td></tr> -->
-<!--
 <tr bgcolor=white>
 	<td valign=top align=center><b>FONT</b></td>
-	<td valign=top>sets the font face for text in the image.</td>
-	<td valign=top>Default GD::Text font for PNG, JPEG<br>Courier for SVG</td>
+	<td valign=top>sets the font face for text in the image; may be multivalued,
+	in which case the list of fonts is scanned left to right to find the first
+	instance supported on the current platform.</td>
+	<td valign=top>Default GD::Text font for PNG, JPEG, and GIF</td>
 	<td valign=top>No</td>
-	<td>Single string value</td></tr> -->
+	<td>Single string value, or a parenthsized, comma-separated list of strings</td></tr>
 <tr bgcolor=white>
 	<td align=center valign=top><b>LINEWIDTH</b></td>
 	<td valign=top>sets the width in pixels of the plot line in linegraphs, or of the candlestick
@@ -1688,7 +1702,15 @@ The application can replace the URL, Script, or AltText items with their
 own values. The callback is called after the initial ALT text is generated,
 but prior to any special variable replacement in either the URL or script text.
 The URL and Script will be subject to special variable replacement after
-the callback returns.
+the callback returns.<p>
+<li>chart_type_map - prepare() attribute; used to provide NAME, TYPE, etc.
+attributes for DBI statement handle datasources which do not provide
+native support for those attributes (e.g., DBD::CSV). Specifies an
+arrayref of hashrefs containing the NAME, TYPE, PRECISION, and SCALE
+values for each column to be fetched from the statement handle to be
+used as the datasource during rendering. If multiple statement handle
+datasources are used (e.g., for composite images), then an array ref of
+arrayrefs of hashrefs must be provided (one arrayref per statement handle).
 </ul><p>
 
 <a name="funcs"></a>
@@ -1708,6 +1730,17 @@ an imagemap.</i><p>
 <a name="history"></a>
 <h2>Change History</h2><p>
 
+Release 0.80:
+<ul>
+<li>support for programmable fonts (untested)
+<li>enhanced SQL syntax for DBIx::Chart support
+<li>added chart_type_map to permit external type specs for parameterized datasources
+<li>add BORDER property to make image border programmable
+<li>fix origin alignment for areagraphs w/ linegraphs
+<li>fix 3-D piecharts where width >> height
+<li>improved 3-D piechart label positioning
+</ul>
+<p>
 Release 0.74:
 <ul>
 <li>fixed scaling of 3-D barchart with KEEPORIGIN=1
@@ -2047,7 +2080,6 @@ Release 0.10:<p>
 
 <ul>
 <li>SVG
-<li>variable font faces/sizes
 <li>"ghost" grid lines
 <li>surfacemaps ?
 <li>statistical distribution curves (Poisson, Gaussian, etc.)
@@ -2080,6 +2112,7 @@ Special thanks to
 <li><a href="http://www.cpan.org">CPAN</a>
 <li><a href="http://www.perl.org">Perl.org</a>
 <li><a href="http://www.perl.com">Perl.com</a>
+<li><a href="http://www.presicient.com/dbixchart">DBIx::Chart</a>
 <!-- <li><a href="http://www.w3c.org/svg">SVG Reference</a>
 <li><a href="http://www.adobe.com">Adobe Corp</a> (for SVG viewer) -->
 <li><a href="http://www.activestate.com">ActiveState</a> (for Perl software for Windows)

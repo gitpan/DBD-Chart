@@ -7,6 +7,13 @@
 #
 #	History:
 #
+#		0.80	2002-Sep-13	D. Arnold
+#			enhanced syntax in support of DBIx::Chart
+#			programmable fonts
+#			added chart_type_map to permit external
+#				type specs for parameterized datasources
+#			add BORDER property
+#
 #		0.73	2002-Sep-11	D. Arnold
 #			fix error reporting from ::Plot
 #			fix the SYNOPSIS
@@ -111,13 +118,17 @@ our %binary_props = (
 'Y_LOG', 1, 
 'THREE_D', 1, 
 'SHOWPOINTS', 1, 
-'SHOWVALUES', 1, 
 'KEEPORIGIN', 1,
 'CUMULATIVE', 1,
 'STACK', 1,
-'ANCHORED', 1
+'ANCHORED', 1,
+'BORDER', 1
 );
 	
+our %num_props = (
+'SHOWVALUES', 1
+);
+
 our %string_props = (
 'X_AXIS', 1, 
 'Y_AXIS', 1, 
@@ -127,7 +138,6 @@ our %string_props = (
 'LOGO', 1, 
 'X_ORIENT', 1, 
 'FORMAT', 1,
-'FONT', 1,
 'TEMPLATE', 1,
 'MAPURL', 1,
 'MAPSCRIPT', 1,
@@ -198,7 +208,8 @@ our %valid_props	= (
 'CUMULATIVE', 1,
 'STACK', 1,
 'LINEWIDTH', 1,
-'ANCHORED', 1
+'ANCHORED', 1,
+'BORDER', 1
 );
 
 our %valid_colors = (
@@ -256,7 +267,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.74';
+$DBD::Chart::VERSION = '0.80';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
@@ -475,7 +486,8 @@ my %dfltprops = (
 'MAPTYPE', undef,
 'STACK', undef,
 'ANCHORED', 1,
-'LINEWIDTH', undef
+'LINEWIDTH', undef,
+'BORDER', 1
 );
 #
 #	default globals for composite queries
@@ -502,7 +514,8 @@ my %dfltglobals = (
 'MAPURL', undef,
 'MAPSCRIPT', undef,
 'MAPNAME', undef,
-'MAPTYPE', undef
+'MAPTYPE', undef,
+'BORDER', 1
 );
 #
 #	default subquery props for composite queries
@@ -607,7 +620,8 @@ my %global_props	= (
 'MAPURL', 1,
 'MAPSCRIPT', 1,
 'MAPNAME', 1,
-'MAPTYPE', 1
+'MAPTYPE', 1,
+'BORDER', 1
 );
 
 sub check_color {
@@ -767,7 +781,7 @@ sub parse_props {
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = "Property $prop not valid with valuelist.",
 		return (undef, $t)
-			if (($op eq 'IN') && ($prop!~/^COLOR|SHAPE|ICON$/));
+			if (($op eq 'IN') && ($prop!~/^COLOR|SHAPE|ICON|FONT$/));
 
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = "Property $prop not valid in subquery.",
@@ -788,6 +802,15 @@ sub parse_props {
 			$props{ $prop } = $t,
 			next
 				if (($t == 1) || ($t == 0));
+
+			$DBD::Chart::err = -1;
+			$DBD::Chart::errstr = "Invalid value for $prop property.";
+			return (undef, $t);
+		}
+		if ($prop eq 'SHOWVALUES') {
+			$props{ $prop } = $t,
+			next
+				if (($t=~/^\d+$/) && ($t >= 0) && ($t <= 100));
 
 			$DBD::Chart::err = -1;
 			$DBD::Chart::errstr = "Invalid value for $prop property.";
@@ -844,7 +867,7 @@ sub parse_props {
 			return (undef, $t);
 		}
 
- 		if (($prop eq 'COLOR') || ($prop eq 'SHAPE')) {
+ 		if (($prop eq 'COLOR') || ($prop eq 'SHAPE') || ($prop eq 'FONT')) {
  			my @colors = ();
 			$props{ $prop } = \@colors;
 
@@ -1173,9 +1196,9 @@ sub prepare {
 			'Only CREATE { TABLE | CHART }, DROP { TABLE | CHART }, ' .
 			'SELECT, INSERT, UPDATE, or DELETE statements supported.',
 		return undef
-			if ($remnant!~/^(TABLE|CHART)\s+(\w+)\s*(.*)$/i);
+			if ($remnant!~/^(TABLE|CHART)\s+(CHART\.)?(\w+)\s*(.*)$/i);
 
-		($filenm, $remnant) = ($2, $3);
+		($filenm, $remnant) = ($3, $4);
 		$filenm = uc $filenm;
 
 		$DBD::Chart::err = -1,
@@ -1194,18 +1217,18 @@ sub prepare {
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = 'Invalid UPDATE statement.',
 		return undef
-			unless ($remnant=~/^(\w+)\s+SET\s+(.+)$/i);
+			unless ($remnant=~/^(CHART\.)?(\w+)\s+SET\s+(.+)$/i);
 
-		($filenm, $remnant) = ($1, $2);
+		($filenm, $remnant) = ($2, $3);
 		$filenm = uc $filenm;
 	}
 	elsif ($cmd eq 'DELETE') {
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = 'Invalid DELETE statement.',
 		return undef
-			unless ($remnant=~/^FROM\s+(\w+)\s*(.*)$/i);
+			unless ($remnant=~/^FROM\s+(CHART\.)?(\w+)\s*(.*)$/i);
 
-		($filenm, $remnant) = ($1, $2);
+		($filenm, $remnant) = ($2, $3);
 		$filenm = uc $filenm;
 		if ($remnant ne '') {
 			$DBD::Chart::err = -1,
@@ -1220,8 +1243,8 @@ sub prepare {
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = 'Invalid INSERT statement.',
 		return undef
-			if ($remnant!~/^INTO\s+(\w+)\s+VALUES\s*\(\s*(.+)\s*\)$/i);
-		($filenm, $remnant) = ($1, $2);
+			if ($remnant!~/^INTO\s+(CHART\.)?(\w+)\s+VALUES\s*\(\s*(.+)\s*\)$/i);
+		($filenm, $remnant) = ($2, $3);
 		$filenm = uc $filenm;
 	}
 
@@ -1247,11 +1270,12 @@ sub prepare {
 	my @typescale = ();
 
 	my $numphs = 0;
-	my @dtypes = ();
-	my @dcharts = ();
-	my @dnames = ();
-	my @dprops = ();
-	my %dversions = ();
+	my @dtypes = ();	# list of chart types
+	my @dcharts = ();	# list of per-chart datasources
+	my @dnames = ();	# list of per-chart names
+	my @dprops = ();	# list of per-chart properties
+	my @dcols = ();		# list of per-chart datasource column names
+	my %dversions = (); # list of per-chart datasource versions
 	my %setcols = ();
 	my @parmcols = ();
 	my ($tname, $props, $cnum, $predicate, $ctype);
@@ -1370,13 +1394,13 @@ sub prepare {
 				\$numphs, $ccols, $ctypes);
 	}
 	else {	# must be SELECT
-		if ($remnant=~/^\*\s+FROM\s+COLORMAP\s+(WHERE\s+NAME\s*=\s*(.+))?$/i) {
+		if ($remnant=~/^\*\s+FROM\s+(CHART\.)?COLORMAP\s+(WHERE\s+NAME\s*=\s*(.+))?$/i) {
 #
 #	its a COLORMAP query, handle special
 #
 			my $charttype = 'COLORMAP';
-			my $flds = uc $1;
-			my $pred = uc $3;
+			my $flds = '*';
+			my $pred = 'NAME = ' . uc $3;
 			my($outer, $sth) = DBI::_new_sth($dbh, {
 				'Statement'     => $statement,
 			});
@@ -1445,9 +1469,10 @@ sub prepare {
 #
 #	get global properties
 #
-			$imagemap = 1 if ($queries[0]=~/^IMAGE\s*,\s*IMAGEMAP$/i);
-			push(@dtypes, 'IMAGE');
-			push(@dcharts, undef);
+			$imagemap = 1 if ($queries[0]=~/^IMAGE(\s*\(\s*\*\s*\))?\s*,\s*IMAGEMAP$/i);
+			push @dtypes, 'IMAGE';
+			push @dcharts, undef;
+			push @dcols, undef;
 			shift @queries;
 			$remnant = ($queries[$#queries]=~/^WHERE/i) ? pop(@queries) : undef;
 			$dprops[0] = \%dfltglobals;
@@ -1464,23 +1489,33 @@ sub prepare {
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = 'Unrecognized SELECT statement.',
 			return undef
-				unless ($remnant=~/^(CANDLESTICK|SURFACEMAP|POINTGRAPH|HISTOGRAM|LINEGRAPH|AREAGRAPH|PIECHART|BARCHART|BOXCHART|QUADTREE|GANTT)(\s*,\s*IMAGEMAP)?\s+FROM\s+(\?|\w+)\s*(.*)$/i);
+				unless ($remnant=~/^(CANDLESTICK|SURFACEMAP|POINTGRAPH|HISTOGRAM|LINEGRAPH|AREAGRAPH|PIECHART|BARCHART|BOXCHART|QUADTREE|GANTT)(\s*\(\s*([^\)]+)\))?(\s*,\s*IMAGEMAP)?\s+FROM\s+(\?|\w+)\s*(.*)$/i);
 
 			$ctype = uc $1;
-			$imagemap = uc $2 unless $imagemap;
-			$filenm = uc $3;
-			$remnant = $4;
+			my $colnames = uc $3;
+			$imagemap = uc $4 unless ($imagemap || (! $4));
+			$filenm = uc $5;
+			$remnant = $6;
 
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = 'IMAGEMAP not valid in subquery.',
 			return undef
-				if ($is_composite && defined($2) && ($2 ne ''));
+				if ($is_composite && $4);
 
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = 'Incompatible chart types in composite image.',
 			return undef
 				if (($is_composite) && ($#dtypes > 0) && 
 					(! $compatibility{$dtypes[1]}->{$ctype}));
+#
+#	collect any column-list values
+#
+			my $cols = [ '*' ];
+			$colnames=$1 
+				if ($colnames && ($colnames=~/^\s*(.+)\s*$/));
+			@$cols = split(',', $colnames)
+				if ($colnames && ($colnames ne '*'));
+			$$cols[$_]=~s/^\s*(.+)\s*$/$1/ foreach (0..$#$cols);
 				
 			if ($filenm ne '?') {
 				$chart = $DBD::Chart::charts{$filenm};
@@ -1490,6 +1525,15 @@ sub prepare {
 					unless $chart;
 
 				$ctypes = $$chart{types};
+				$DBD::Chart::err = -1,
+				$DBD::Chart::errstr = $ctype . 
+					' chart requires at least ' .
+					$mincols{$ctype} . ' columns.',
+				return undef
+					if (scalar(@$ctypes) < $mincols{$ctype});
+#
+#	validate any column list
+#
 				$DBD::Chart::err = -1,
 				$DBD::Chart::errstr = $ctype . 
 					' chart requires at least ' .
@@ -1507,6 +1551,7 @@ sub prepare {
 				if ($imagemap);
 			push(@dtypes, $ctype);
 			push(@dcharts, $filenm);
+			push(@dcols, $cols);
 			if ($remnant=~/^WHERE\s+(.+)$/i) {
 #
 #	process format properties
@@ -1550,13 +1595,26 @@ sub prepare {
 	if ($cmd eq 'SELECT') {
 		$sth->{chart_charttypes} = \@dtypes;
 		$sth->{chart_sources} = \@dcharts;
+		$sth->{chart_columns} = \@dcols;
 		$sth->{chart_properties} = \@dprops;
 		$sth->{chart_version} = \%dversions;
 		$sth->{chart_imagemap} = $imagemap;
 		$sth->{chart_qnames} = \@dnames;
 		$sth->{chart_map_modifier} = $attrs->{chart_map_modifier}
 			if ($attrs && $attrs->{chart_map_modifier} &&
+				ref $attrs->{chart_map_modifier} &&
 				(ref $attrs->{chart_map_modifier} eq 'CODE'));
+#
+#	added external name/type/precision/scale mapping
+#	app will provide [ { NAME => [ ], TYPE => [ ], PRECISION => [ ], SCALE => [ ] }, ... ]
+# 	(one hashref per param'd datasource)
+#	this is mostly to support DBD::CSV, DBD::File
+#
+		$sth->{chart_type_map} = $attrs->{chart_type_map}
+			if ($attrs && $attrs->{chart_type_map} &&
+				ref $attrs->{chart_type_map} &&
+				(ref $attrs->{chart_type_map} eq 'ARRAY'));
+
 		if ($imagemap) {
 			$sth->STORE('NUM_OF_FIELDS', 2);
 			$sth->{NAME} = [ '', '' ];
@@ -1619,7 +1677,8 @@ sub DESTROY {
 1;
 }
 
-{   package DBD::Chart::st; # ====== STATEMENT ======
+{
+package DBD::Chart::st; # ====== STATEMENT ======
 use DBI qw(:sql_types);
 use Carp;
 use Time::Local;
@@ -2244,8 +2303,10 @@ sub execute {
 	my $dcharts = $sth->{chart_sources};
 	my $dprops = $sth->{chart_properties};
 	my $dversions = $sth->{chart_version};
+	my $dcols = $sth->{chart_columns};
 	my $dnames = $sth->{chart_qnames};
 	my $srcsth;
+	my @dcolidxs = ();
 #
 #	if COLORMAP, just fetch and return
 #
@@ -2317,7 +2378,7 @@ sub execute {
 			$DBD::Chart::errstr = 
 	'Parameterized chartsource value must be a prepared and executed DBI statement handle.',
 			return undef
-				if (ref $srcsth ne 'DBI::st');
+				if ((ref $srcsth ne 'DBI::st') && (ref $srcsth ne 'DBIx::Chart::st'));
 
 			my $ctype = $$dtypes[$i];
 			$DBD::Chart::err = -1,
@@ -2330,8 +2391,34 @@ sub execute {
 			$DBD::Chart::errstr = 
 				'CANDLESTICK chart requires 2N + 1 columns.',
 			return undef
-				if (($ctype eq 'CANDLESTICK') && 
+				if (($ctype eq 'CANDLESTICK') && (! $$dprops[$i]->{STACK}) &&
 					(($srcsth->{NUM_OF_FIELDS} - 1) & 1));
+#
+#	collect and validate the column specification
+#
+			my $cols = $$dcols[$i];
+			my $colidxs = [ ];
+			$dcolidxs[$i] = $colidxs;
+			@$colidxs = (0..($srcsth->{NUM_OF_FIELDS} - 1)),
+			next 
+				if ($$cols[0] eq '*');
+			
+			my ($d, $idx);
+			$columns = get_ext_type_info($sth, $srcsth, 'NAME', ($i ? $i-1 : 0) );
+			foreach $d (0..$#$columns) {
+				$$columns[$d] = uc $$columns[$d] ;
+			}
+			foreach my $c (@$cols) {
+				foreach $d (0..$#$columns) {
+					$idx = $d,
+					last if ($c eq $$columns[$d]);
+				}
+				$DBD::Chart::err = -1,
+				$DBD::Chart::errstr = 'Column ' . $c . ' not found in datasource.',
+				return undef
+					unless ($c eq $$columns[$idx]);
+				push @$colidxs, $idx;
+			}
 		}
 	}
 #
@@ -2361,30 +2448,29 @@ sub execute {
 #	NOTE: we should eventually support array binding here!!!
 #
 				my $srcsth = $$parms[$1];
-				$columns = $srcsth->{NAME};
-				$types = $srcsth->{TYPE};
-				$precs = $srcsth->{PRECISION};
-				$scales = $srcsth->{SCALE};
+				$columns = get_ext_type_info($sth, $srcsth, 'NAME', ($i ? $i-1 : 0) );
+				$types = get_ext_type_info($sth, $srcsth, 'TYPE', ($i ? $i-1 : 0));
+#				$precs = get_ext_type_info($sth, $srcsth, 'PRECISION', $i-1);
+#				$scales = get_ext_type_info($sth, $srcsth, 'SCALE', $i-1);
+				$DBD::Chart::err = -1,
+				$DBD::Chart::errstr = 
+		'Datasource does not provide one of NAME or TYPE information.',
+				$srcsth->finish,
+				return undef
+					unless ($types || $columns);
+
 				$data = [];
 				my $rowcnt = 0;
 				my $row;
-				foreach my $col (@$columns) {
-					my @ary = ();
-					push(@$data, \@ary);
-				}
-				
-				while ($row = $srcsth->fetchrow_arrayref) {
-					$rowcnt++;
-					$DBD::Chart::err = -1,
-					$DBD::Chart::errstr = 
-		'More than 10000 plot points returned by parameterized chartsource.',
-					$srcsth->finish,
-					return undef
-						if ($rowcnt > 10000);
-	
-					for ($j = 0; $j < $srcsth->{NUM_OF_FIELDS}; $j++) {
-						push(@{$$data[$j]}, $$row[$j]);
-					}
+				my $colidxs = $dcolidxs[$i];
+
+				push(@$data, [ ])
+					foreach (@$colidxs);
+
+				$row = $srcsth->fetchall_arrayref(undef, 10000);
+				foreach my $r (@$row) {
+					push(@{$$data[$_]}, $$r[$$colidxs[$_]])
+						foreach (0..$#$colidxs);
 				}
 			}
 			else {
@@ -2418,7 +2504,7 @@ sub execute {
 #
 			$img->setOptions( bgColor => $$props{BACKGROUND},
 				textColor => $$props{TEXTCOLOR},
-				gridColor => $$props{GRIDCOLOR} ,
+				gridColor => $$props{GRIDCOLOR},
 				threed => $$props{THREE_D});
 
 			$img->setOptions( title => $$props{TITLE})
@@ -2433,7 +2519,8 @@ sub execute {
 				mapURL => $$props{MAPURL},
 				mapScript => $$props{MAPSCRIPT},
 				mapType => ($$props{MAPTYPE}) ? $$props{MAPTYPE} : 'HTML',
-				mapModifier => $sth->{chart_map_modifier}
+				mapModifier => $sth->{chart_map_modifier},
+				border => $$props{BORDER}
 			)
 				if $sth->{chart_imagemap};
 
@@ -2461,6 +2548,9 @@ sub execute {
 			
 			$img->setOptions( 'keepOrigin' => 1)
 				if $$props{KEEPORIGIN};
+
+			$img->setOptions( 'font' => $$props{FONT})
+				if $$props{FONT};
 		}
 
 		next if ($$dtypes[$i] eq 'IMAGE');	# specific chart processing from here on
@@ -2523,8 +2613,8 @@ sub execute {
 
 		$zdomain = $$types[2] if ((! $zdomain) && $$props{Z_AXIS});
 		$img->setOptions( 'symDomain' => 1)
-			if ($is_symbolic || 
-				($symboltype{$xdomain} && ($$dtypes[$i] ne 'GANTT')));
+			if (($$dtypes[$i] ne 'GANTT') && ($$dtypes[$i] ne 'QUADTREE') && 
+				($is_symbolic || $symboltype{$xdomain}));
 		$img->setOptions( 'timeDomain' => $timetype{$xdomain})
 			if (defined($xdomain) && $timetype{$xdomain});
 		$img->setOptions( 'timeRange' => $timetype{$ydomain})
@@ -2586,9 +2676,7 @@ sub execute {
 		}
 		shift @colnames unless ($$dtypes[$i] eq 'BOXCHART');
 
-#		$img->setOptions( 'showValues' => 1)
-#			if ($$props{SHOWVALUES});
-		$propstr .= ' showvalues '
+		$propstr .= ' showvalues:' . (($$props{SHOWVALUES} == 1) ? 5 : $$props{SHOWVALUES}) . ' '
 			if ($$props{SHOWVALUES});
 		$propstr .= ' stack '
 			if ($$props{STACK});
@@ -2967,6 +3055,42 @@ sub bind_param_inout {
 #
 	return bind_param($sth, $pNum, $val, $attr);
 }
+#
+#	get externally provided name/type/prec/scale info
+#
+sub get_ext_type_info {
+	my ($sth, $srcsth, $item, $entry) = @_;
+
+	my $t;
+#
+#	if srcsth provides it, use it
+#
+	return $srcsth->{$item}
+		if eval { $t = $srcsth->{$item}; };
+#
+#	if chart type map, and requested item
+#	exists in the type map, return it
+#
+	return undef
+		unless (ref $sth->{chart_type_map} &&
+			(ref $sth->{chart_type_map} eq 'ARRAY') &&
+			$sth->{chart_type_map}->[$entry] &&
+			ref $sth->{chart_type_map}->[$entry] &&
+				(($entry == 0) && 
+				((ref $sth->{chart_type_map}->[$entry] eq 'HASH') &&
+				$sth->{chart_type_map}->[$entry]->{$item}) ||
+			((ref $sth->{chart_type_map}->[$entry] eq 'ARRAY') &&
+			$sth->{chart_type_map}->[$entry]->[0]->{$item})));
+#
+#	if its single src form, collect the items into an arrayref
+#
+	my $srcary = (($entry == 0) && (ref $sth->{chart_type_map}->[$entry] eq 'HASH')) ?
+		$sth->{chart_type_map} : $sth->{chart_type_map}->[$entry];
+	my @outary = ();
+	push @outary, $_->{$item}
+		foreach (@$srcary);
+	return \@outary;
+}
 
 sub STORE {
 	my ($sth, $attr, $val) = @_;
@@ -3034,7 +3158,6 @@ Gantt charts, and line, point, and area graphs.
 For detailed usage information, see the included L<dbdchart.html>
 webpage.
 See L<DBI(3)> for details on DBI.
-See L<GD(3)>, L<GD::Graph(3)> for details about the graphing engines.
 
 =head2 Prerequisites
 
@@ -3044,11 +3167,13 @@ See L<GD(3)>, L<GD::Graph(3)> for details about the graphing engines.
 
 =item DBI 1.14 minimum
 
-=item DBD::Chart::Plot 0.73 (included with this package)
+=item DBD::Chart::Plot 0.80 (included with this package)
 
 =item GD X.XX minimum
 
 =item GD::Text X.XX minimum
+
+=item Time::HiRes
 
 =item libpng
 
@@ -3074,11 +3199,11 @@ whip up a PPM in the future.
 
 For Unix, extract it with
 
-    gzip -cd DBD-Chart-0.73.tar.gz | tar xf -
+    gzip -cd DBD-Chart-0.80.tar.gz | tar xf -
 
 and then enter the following:
 
-    cd DBD-Chart-0.73
+    cd DBD-Chart-0.80
     perl Makefile.PL
     make
 
@@ -3123,6 +3248,6 @@ For help on the use of DBD::Chart, see the DBI users mailing list:
 
 For general information on DBI see
 
-  http://www.symbolstone.org/technology/perl/DBI
+  http://dbi.perl.org
 
 =cut

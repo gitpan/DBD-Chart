@@ -9,6 +9,13 @@
 #
 #	Change History:
 #
+#	0.80	2002-Sep-13		D. Arnold
+#		programmable fonts
+#		fix origin alignment for areagraphs w/ linegraphs
+#		make image border programmable
+#		fix 3-D piecharts where width >> height
+#		improved 3-D piechart label positioning
+#
 #	0.73	2002-Sep-11		D. Arnold
 #		fix scaling for 3-D bars w/ < 4 bars
 #		fix all plots with single data point
@@ -94,10 +101,12 @@ use strict 'vars';
 package DBD::Chart::Plot;
 
 use GD;
+use GD::Text;
+use GD::Text::Align;
 use Time::Local;
 use GD qw(gdBrushed gdSmallFont gdTinyFont gdMediumBoldFont);
 
-$DBD::Chart::Plot::VERSION = '0.74';
+$DBD::Chart::Plot::VERSION = '0.80';
 
 #
 #	list of valid colors
@@ -233,7 +242,6 @@ our %valid_attr = qw(
 	title 1
 	signature 1
 	legend 1
-	showValues 1
 	horizGrid 1
 	vertGrid 1
 	xAxisVert 1
@@ -249,12 +257,23 @@ our %valid_attr = qw(
 	logo 1
 	timeRange 1
 	mapModifier 1
+	border 1
 );
 our @lines = ( 
 [ 0*2, 4*2,	5*2, 1*2 ],	# top face
 [ 0*2, 1*2, 3*2, 2*2 ],	# front face
 [ 1*2, 5*2, 7*2, 3*2 ]	# side face
 );
+
+our %gdfontmap = (
+5, gdTinyFont,
+6, gdSmallFont,
+7, gdMediumBoldFont,
+8, gdLargeFont,
+9, gdGiantFont
+);
+
+our %fontMap = ();
 
 our %month = ( 'JAN', 0, 'FEB', 1, 'MAR', 2, 'APR', 3, 'MAY', 4, 'JUN', 5, 
 'JUL', 6, 'AUG', 7, 'SEP', 8, 'OCT', 9, 'NOV', 10, 'DEC', 11);
@@ -401,7 +420,6 @@ sub init {
 	$obj->{title} = '';
 	$obj->{signature} = '';
 	$obj->{legend} = 0; 	# 1 => render legend
-	$obj->{showValues} = 0; # 1 => print datapoint values
 	$obj->{horizGrid} = 0;	# 1 => print y-axis gridlines
 	$obj->{vertGrid} = 0;	# 1 => print x-axis gridlines
 	$obj->{xAxisVert} = 0;	# 1 => print x-axis label vertically
@@ -424,6 +442,7 @@ sub init {
 	$obj->{bgColor} = $white; # background color
 	$obj->{gridColor} = $black;
 	$obj->{textColor} = $black;
+	$obj->{border} = 1;
 
 	$obj->{mapModifier} = undef;
 	
@@ -435,7 +454,7 @@ sub init {
 # set image basic properties
 	$img->transparent($obj->{transparent});
 	$img->interlaced('true');
-	$img->rectangle( 0, 0, $w-1, $h-1, $obj->{black});
+#	$img->rectangle( 0, 0, $w-1, $h-1, $obj->{black});
 }
 
 #
@@ -1169,7 +1188,7 @@ sub setOptions {
 		return undef
 			unless ($valid_attr{$_});
 		
-		if ($_=~/^(bg|grid|text)Color$/) {
+		if (/^(bg|grid|text)Color$/) {
 			$obj->{errmsg} = "Unrecognized color $hash{$_} for $_.",
 			return undef
 				unless $colors{$hash{$_}};
@@ -1184,6 +1203,21 @@ sub setOptions {
 			next;
 		}
 		
+		if ($_ eq 'font') {
+#
+#	locate first available font and use it
+#
+			delete $obj->{font};
+			foreach my $f (@{$hash{font}}) {
+				$obj->{font} = $f, last
+					if $obj->loadFont($f);
+			}
+			$obj->{errmsg} = "No specified font available.",
+			return undef
+				unless $obj->{font};
+			next;
+		}
+
 		$obj->{$_} = $hash{$_};
 	}
 	return 1;
@@ -1199,6 +1233,8 @@ sub plot {
 #
 	my $color;
 	$obj->{img}->fill(1, 1, $obj->{bgColor} );
+	$obj->{img}->rectangle( 0, 0, $obj->{width}-1, $obj->{height}-1,
+	 ($obj->{border} ? $obj->{black} : $obj->{bgColor}));
 #
 #	then add any defined logo
 	$obj->addLogo if $obj->{logo};
@@ -1350,6 +1386,18 @@ sub computeScales {
 # set axis ranges for widest/tallest/deepest dataset
 	$obj->computeRanges($xl, $xh, $yl, $yh, $zl, $zh);
 	$obj->{yl} = 0 if (($plottypes & (BAR|HISTO)) && ($yl == 0));
+	if ($obj->{keepOrigin}) {
+		unless ($obj->{xLog} || $obj->{symDomain} ||
+			$obj->{zAxisLabel} || $obj->{threed}) {
+			$obj->{xl} = 0 if ($xl >= 0);
+			$obj->{xh} = 0 if ($xh <= 0);
+		}
+		unless ($obj->{yLog}) {
+			$obj->{yl} = 0 if ($yl >= 0);
+			$obj->{yh} = 0 if ($yh <= 0);
+		}
+	}
+
 	($xl, $xh, $yl, $yh, $zl, $zh) = 
 		($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh}, 
 			$obj->{zl}, $obj->{zh});
@@ -1680,7 +1728,7 @@ sub plot2DBars {
 		$t=~s/\s+/ /g;
 #		$t = lc $t;
 		@props = split (' ', $t);
-		my $showvals = $obj->{showValues};
+		my $showvals;
 		my $stacked = 0;
 		foreach (@props) {
 #
@@ -1692,8 +1740,8 @@ sub plot2DBars {
 				if /^icon:(\S+)$/i;
 
 			$_ = lc $_;
-			$showvals = 1, next
-				if ($_ eq 'showvalues');
+			$showvals = $1, next
+				if /^showvalues:(\d+)/;
 
 			$stacked = 1, next
 				if ($_ eq 'stack');
@@ -1859,12 +1907,10 @@ sub plot2DBars {
 #	we need a better way to position the values for stacked candles
 #
 					$iconh >>= 1;
-					$img->string(gdTinyFont,$pxl-(length($prtYL) * ($tfw>>1)),
-						$pyb+4+$iconh, 
-						$prtYL, $obj->{textColor});
-					$img->string(gdTinyFont,$pxl-(length($prtYH) * ($tfw>>1)),
-						$pyt-$tfh-$iconh, 
-						$prtYH, $obj->{textColor});
+					$obj->string($showvals, 0, $pxl-(length($prtYL) * ($tfw>>1)),
+						$pyb+4+$iconh, $prtYL, $tfw);
+					$obj->string($showvals, 0, $pxl-(length($prtYH) * ($tfw>>1)),
+						$pyt-$tfh-$iconh, $prtYH, $tfw);
 					next;
 				}
 #
@@ -1928,12 +1974,12 @@ sub plot2DBars {
 			$py = shift @val_palette;
 			$prtYH = shift @val_palette;
 
-			$img->stringUp(gdTinyFont, $px, $py, $prtYH, $obj->{textColor}), 
+			$obj->string($showvals, 90, $px, $py, $prtYH, $tfw), 
 			next
 				if (($plottypes & BAR) &&
 					($obj->{yLog} || ($yorient >= $obj->{brushWidth})));
 
-			$img->string(gdTinyFont, $px, $py, $prtYH, $obj->{textColor});
+			$obj->string($showvals, 0, $px, $py, $prtYH, $tfw);
 		}
 	} # end for each plot
 	return 1;
@@ -1999,9 +2045,9 @@ sub plotBox {
 		my @props = split(' ', $t);
 		my $color = 'black';
 		my ($val, $xoff);
-		my $showvals = $obj->{showValues};
+		my $showvals;
 		foreach (@props) {
-			$showvals = 1, next if ($_ eq 'showvalues');
+			$showvals = $1, next if /^showvalues:(\d+)/i;
 
 			$color = $_
 				if ($colors{$_});
@@ -2043,9 +2089,9 @@ sub plotBox {
 			if ($obj->{timeDomain} && ($obj->{genMap} || $showvals));
 
 		$xoff = int(length($lq) * $tfw/2),
-		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $lq, $obj->{textColor}),
+		$obj->string($showvals,0,$p1x-$xoff,$p1y-$tfh, $lq, $tfw),
 		$xoff = int(length($uq) * $tfw/2),
-		$img->string(gdTinyFont,$p2x-$xoff,$p1y-$tfh, $uq, $obj->{textColor})
+		$obj->string($showvals,0,$p2x-$xoff,$p1y-$tfh, $uq, $tfw)
 			if ($showvals);
 	
 		$obj->updateImagemap('RECT', "$tmed\[$lq..$uq\]", 0, $tmed, 
@@ -2059,9 +2105,8 @@ sub plotBox {
 		$img->line($p1x, $p1y, $p1x, $p2y, $obj->{$color});
 
 		$xoff = int(length($median) * $tfw/2),
-		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $tmed, 
-			$obj->{textColor})
-			if ($showvals);
+		$obj->string($showvals,0,$p1x-$xoff,$p1y-$tfh, $tmed , $tfw)
+			if $showvals;
 #
 #	draw whiskers
 		($p1x, $p1y) = $obj->pt2pxl($lex, $dumy);
@@ -2075,9 +2120,8 @@ sub plotBox {
 			if ($obj->{timeDomain} && ($obj->{genMap} || $showvals));
 
 		$xoff = int(length($lex) * $tfw/2),
-		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $tlex,
-			$obj->{textColor})
-			if ($showvals);
+		$obj->string($showvals,0,$p1x-$xoff,$p1y-$tfh, $tlex, $tfw)
+			if $showvals;
 		$obj->updateImagemap('CIRCLE', $tlex, 0, $tlex, undef, undef, 
 			$p1x, $p1y, 4)
 			if ($obj->{genMap});
@@ -2089,9 +2133,8 @@ sub plotBox {
 
 		$xoff = int(length($uex) * $tfw/2),
 
-		$img->string(gdTinyFont,$p2x-$xoff,$p1y-$tfh, $tuex, 
-			$obj->{textColor})
-			if ($showvals);
+		$obj->string($showvals,0,$p2x-$xoff,$p1y-$tfh, $tuex, $tfw)
+			if $showvals;
 		$obj->updateImagemap('CIRCLE', $tuex, 0, $tuex, undef, undef, 
 			$p2x, $p1y, 4)
 			if ($obj->{genMap});
@@ -2136,8 +2179,7 @@ sub plotBoxAxes {
 	$len = $sfw * length($obj->{xAxisLabel}),
 	$xStart = ($p2x+$len/2 > $obj->{width}-10)
 		? ($obj->{width}-10-$len) : ($p2x-$len/2),
-	$img->string(gdSmallFont, $xStart, $p2y+ int(4*$sfh/3), 
-		$obj->{xAxisLabel}, $obj->{textColor})
+	$obj->string(6, 0, $xStart, $p2y+ int(4*$sfh/3), $obj->{xAxisLabel}, $sfw)
 		if ($obj->{xAxisLabel});
 #
 # draw ticks and labels
@@ -2162,8 +2204,7 @@ sub plotBoxAxes {
 
 			$powk = ($obj->{timeDomain}) ? 
 				restore_temporal(10**$k, $obj->{timeDomain}) : 10**$k,
-			$img->stringUp(gdSmallFont, $px-$sfh/2, 
-				$py+length($powk)*$sfw, $powk, $obj->{textColor})
+			$obj->string(6, 90, $px-$sfh/2, $py+length($powk)*$sfw, $powk, $sfw)
 				if (($n == 1) && ($px+$sfh < $xStart));
 
 			($n, $i)  = (0, $k)
@@ -2184,12 +2225,10 @@ sub plotBoxAxes {
 
 		next if ($obj->{xAxisVert} && ($px+$sfh >= $xStart));
 		$prtX = $obj->{timeDomain} ? restore_temporal($i, $obj->{timeDomain}) : $i;
-		$img->stringUp(gdSmallFont, $px-($sfh>>1), 
-			$py+2+length($prtX)*$sfw, $prtX, $obj->{textColor}), next
+		$obj->string(6, 90, $px-($sfh>>1), $py+2+length($prtX)*$sfw, $prtX, $sfw), next
 			if ($obj->{xAxisVert});
 
-		$img->string(gdSmallFont, $px-length($prtX)*($sfw>>1), 
-			$py+($sfh>>1), $prtX, $obj->{textColor});
+		$obj->string(6, 0, $px-length($prtX)*($sfw>>1), $py+($sfh>>1), $prtX, $sfw);
 	}
 	return 1;
 }
@@ -2235,8 +2274,8 @@ sub plotAll {
 			$stacked = 1, next
 				if ($_ eq 'stack');
 
-			$showvals = 1, next
-				if ($_ eq 'showvalues');
+			$showvals = $1, next
+				if /^showvalues:(\d+)/i;
 
 			$marker = $_,
 			next
@@ -2297,7 +2336,11 @@ sub plotAll {
 #
 			my @newary = ();
 			$i = 0;
-			push(@newary, $$ary[$i], 0, $$ary[$i+1]), $i += 2
+			my $yl = $obj->{yl};
+			my $yh = $obj->{yh};
+			my $yaxpt = ((! $obj->{yLog}) && ($yl < 0) && ($yh > 0)) ? 0 : $yl;
+
+			push(@newary, $$ary[$i], $yaxpt, $$ary[$i+1]), $i += 2
 				while ($i <= $#$ary);
 
 			return undef unless $obj->plotData($n, \@newary, 
@@ -2326,6 +2369,7 @@ sub plotData {
 	my ($markw, $markh, $yoff, $wdelta, $hdelta);
 	$img = $obj->{img};	
 
+	$color = 'black' unless $color;
 	$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
 		unless $obj->{$color};
 		
@@ -2407,8 +2451,8 @@ sub plotData {
 			if ($obj->{genMap});
 
 		$voff = (length($s) * $tfw)>>1,
-		$img->string(gdTinyFont,$px-$voff,$py-$yoff, $s, $obj->{textColor})
-			if ($showvals);
+		$obj->string($showvals,0,$px-$voff,$py-$yoff, $s, $tfw)
+			if $showvals;
 	}
 	return 1;
 }
@@ -2460,8 +2504,7 @@ sub drawLegend {
 		$img->line($xoff, $yoff+4, $xoff+20, $yoff+4, $obj->{$color})
 			if $line;
 
-		$img->string(gdTinyFont, $xoff + ($line ? 25 : ($w + 5)),
-			$yoff, $text, $obj->{$color});
+		$obj->string(5, 0,$xoff + ($line ? 25 : ($w + 5)),$yoff, $text, $tfw);
 
 		$img->copy($shape, $xoff+5, $yoff, 0, 0, $w-1, $w-1)
 			if $shape;
@@ -2560,8 +2603,7 @@ sub plotAxes {
 	$len = $sfw * length($obj->{xAxisLabel}),
 	$xStart = ($p2x+$len/2 > $obj->{width}-10)
 		? ($obj->{width}-10-$len) : ($p2x-$len/2),
-	$img->string(gdSmallFont, $xStart, $p2y+ int(4*$sfh/3), 
-		$obj->{xAxisLabel}, $obj->{textColor})
+	$obj->string(6,0, $xStart, $p2y+ int(4*$sfh/3), $obj->{xAxisLabel}, $sfw)
 		if ($obj->{xAxisLabel});
 
 # Y axis
@@ -2572,8 +2614,8 @@ sub plotAxes {
 		if ((! $obj->{'vertGrid'}) && (! $obj->{horizGrid}));
 
 	$xStart2 = $p2x - length($obj->{yAxisLabel}) * ($sfw >> 1),
-	$img->string(gdSmallFont, ($xStart2 > 10 ? $xStart2 : 10), 
-		$p2y - 3*($sfh>>1), $obj->{yAxisLabel},  $obj->{textColor})
+	$obj->string(6,0, ($xStart2 > 10 ? $xStart2 : 10), 
+		$p2y - 3*($sfh>>1), $obj->{yAxisLabel}, $sfw)
 		if ($obj->{yAxisLabel});
 #
 # draw ticks and labels
@@ -2603,8 +2645,8 @@ sub plotAxes {
 #
 			$powk = ($obj->{timeDomain}) ? 
 				restore_temporal(10**$k, $obj->{timeDomain}) : 10**$k,
-			$img->stringUp(gdSmallFont, $px-$sfh/2, 
-				$py+length($powk)*$sfw, $powk, $obj->{textColor})
+			$obj->string(6, 90, $px-$sfh/2, 
+				$py+length($powk)*$sfw, $powk)
 				if (($n == 1) && ($px+$sfh < $xStart));
 
 			($n, $i)  = (0 , $k)
@@ -2638,16 +2680,16 @@ sub plotAxes {
 			if ($obj->{xAxisVert}) {
 				$prevx = $px;
 				next if ($px+$sfh >= $xStart);
-				$img->stringUp(gdSmallFont, $px-($sfh>>1), 
-					$py+2+length($txt)*$sfw, $txt, $obj->{textColor});
+				$obj->string(6, 90, $px-($sfh>>1), 
+					$py+2+length($txt)*$sfw, $txt, $sfw);
 				next;
 			}
 
 			next if (((length($txt)+1) * $sfw) > ($px - $prevx));
 			$prevx = $px;
 
-			$img->string(gdSmallFont, $px-length($txt)*($sfw>>1), 
-				$py+($sfh>>1), $txt, $obj->{textColor});
+			$obj->string(6,0, $px-length($txt)*($sfw>>1), 
+				$py+($sfh>>1), $txt, $sfw);
 		}
 	}
 	else {
@@ -2670,13 +2712,13 @@ sub plotAxes {
 			$prevx = $px;
 			next if ($obj->{xAxisVert} &&  ($px+$sfh >= $xStart));
 			
-			$img->stringUp(gdSmallFont, $px-($sfh>>1), 
-				$py+2+length($txt)*$sfw, $txt, $obj->{textColor}),
+			$obj->string(6, 90, $px-($sfh>>1), 
+				$py+2+length($txt)*$sfw, $txt, $sfw),
 			next
 				if ($obj->{xAxisVert});
 
-			$img->string(gdSmallFont, $px-length($txt)*($sfw>>1), 
-				$py+($sfh>>1), $txt, $obj->{textColor});
+			$obj->string(6, 0,$px-length($txt)*($sfw>>1), 
+				$py+($sfh>>1), $txt, $sfw);
 		}
 	}
 #
@@ -2699,8 +2741,8 @@ sub plotAxes {
 
 			$powk = ($obj->{timeRange}) ? 
 				restore_temporal(10**$k, $obj->{timeRange}) : 10**$k,
-			$img->string(gdSmallFont, $px-5-length($powk)*$sfw, 
-				$py-($sfh>>1), $powk, $obj->{textColor})
+			$obj->string(6, 0, $px-5-length($powk)*$sfw, 
+				$py-($sfh>>1), $powk, $sfw)
 				if ($n == 0);
 			
 			$k = $i + $logsteps[$n++];
@@ -2730,8 +2772,7 @@ sub plotAxes {
 
 		next if (($skip) && ($j&1));
 		$txt = $obj->{timeRange} ? restore_temporal($tickv, $obj->{timeRange}) : $tickv,
-		$img->string(gdSmallFont, $px-5-length($txt)*$sfw, $py-($sfh>>1), 
-			$txt, $obj->{textColor});
+		$obj->string(6,0, $px-5-length($txt)*$sfw, $py-($sfh>>1), $txt, $sfw);
 	}
 	return 1;
 }
@@ -2785,15 +2826,14 @@ sub plotHistoAxes {
 	$len = $sfw * length($obj->{yAxisLabel}),
 	$xStart = ($p2x+$len/2 > $obj->{width}-10) ? 
 		($obj->{width}-10-$len) : ($p2x-$len/2),
-	$img->string(gdSmallFont, $xStart, $p2y+ int(4*$sfh/3), 
-		$obj->{yAxisLabel}, $obj->{textColor})
+	$obj->string(6,0, $xStart, $p2y+ int(4*$sfh/3), $obj->{yAxisLabel}, $sfw)
 		if ($obj->{yAxisLabel});
 
 # vertical axis label
 	($p2x, $p2y) = $obj->pt2pxl($xh, $yl),
 	$xStart2 = $p2x - ((length($obj->{xAxisLabel}) * $sfw) >> 1),
-	$img->string(gdSmallFont, ($xStart2 > 10 ? $xStart2 : 10), 
-		$p2y - 3*($sfh>>1), $obj->{xAxisLabel},  $obj->{textColor})
+	$obj->string(6, 0,($xStart2 > 10 ? $xStart2 : 10), 
+		$p2y - 3*($sfh>>1), $obj->{xAxisLabel}, $sfw)
 		if $obj->{xAxisLabel};
 #
 # draw ticks and labels
@@ -2824,8 +2864,8 @@ sub plotHistoAxes {
 		$txt = substr($txt, 0, 22) . '...' 
 			if (length($txt) > 25);
 
-		$img->string(gdSmallFont, ($px-(length($txt)*$sfw)-5), 
-			$py-($sfh>>1), $txt, $obj->{textColor});
+		$obj->string(6, 0, ($px-(length($txt)*$sfw)-5), 
+			$py-($sfh>>1), $txt, $sfw);
 	}
 #
 # horizontal
@@ -2862,13 +2902,13 @@ sub plotHistoAxes {
 			$prevx = $px;
 
 			next if ($obj->{xAxisVert} && ($px+$sfh >= $xStart));
-			$img->stringUp(gdSmallFont, $px-($sfh>>1), 
-				$py+2+length($powk)*$sfw, $powk, $obj->{textColor}),
+			$obj->string(6, 90, $px-($sfh>>1), 
+				$py+2+length($powk)*$sfw, $powk, $sfw),
 			next
 				if $obj->{xAxisVert};
 
-			$img->string(gdSmallFont, $px-(length($powk) * ($sfw>>1)),
-				$py+4, $powk, $obj->{textColor});
+			$obj->string(6, 0, $px-(length($powk) * ($sfw>>1)),
+				$py+4, $powk, $sfw);
 		}
 		return 1;
 	}
@@ -2886,13 +2926,13 @@ sub plotHistoAxes {
 		$prevx = $px;
 
 		next if ($obj->{xAxisVert} && ($px+$sfh >= $xStart));
-		$img->stringUp(gdSmallFont, $px-($sfh>>1), 
-			$py+2+length($txt)*$sfw, $txt, $obj->{textColor}),
+		$obj->string(6, 90, $px-($sfh>>1), 
+			$py+2+length($txt)*$sfw, $txt, $sfw),
 		next
 			if $obj->{xAxisVert};
 
-		$img->string(gdSmallFont, $px-(length($txt) * ($sfw>>1)),
-			$py+4, $txt, $obj->{textColor});
+		$obj->string(6,0, $px-(length($txt) * ($sfw>>1)),
+			$py+4, $txt, $sfw);
 	}
 	return 1;
 }
@@ -2905,8 +2945,7 @@ sub drawTitle {
 	my ($px,$py) = ($obj->{width}/2, $obj->{height} - 40 + $h);
 
 	($px,$py) = ($px - length ($obj->{title}) * $w/2, $py-$h/2);
-	$obj->{img}->string (gdMediumBoldFont, $px, $py, 
-		$obj->{title}, $obj->{textColor}); 
+	$obj->string(7, 0, $px, $py, $obj->{title}, $w); 
 }
 
 sub drawSignature {
@@ -2915,8 +2954,7 @@ sub drawSignature {
 # in lower right corner
 	my ($px,$py) = ($obj->{width} - $fw, $obj->{height} - ($tfh * 2));
 
-	$obj->{img}->string (gdTinyFont, $px, $py, 
-		$obj->{signature}, $obj->{textColor}); 
+	$obj->string(5, 0, $px, $py, $obj->{signature}, $tfw); 
 }
 
 sub fill_region {
@@ -3182,21 +3220,19 @@ sub plot3DAxes {
 			$obj->pt2pxl($v[15], $v[16], $v[17]);
 		$gx -= ($sfw * length($xal)),
 		$gy += 10,
-		$img->string(gdSmallFont, $gx, $gy, $xal, $obj->{textColor})
+		$obj->string(6, 0, $gx, $gy, $xal, $sfw);
 	}
 
 	($gx, $gy) = $obj->pt2pxl($v[9], $v[10], $v[11]),
 	$gx -= ($sfw * length($yal)/2),
 	$gy -= ($sfh + 5),
-	$img->string(gdSmallFont, $gx, $gy, $yal, 
-		$obj->{textColor})
+	$obj->string(6, 0, $gx, $gy, $yal, $sfw)
 		if $yal;
 
 	($gx, $gy) = $obj->pt2pxl($v[15], $v[16], $v[17]),
 	$gx += $sfh + 10,
 	$gy += ($sfw * length($zal)),
-	$img->stringUp(gdSmallFont, $gx, $gy, $zal, 
-		$obj->{textColor})
+	$obj->string(6, 90, $gx, $gy, $zal, $sfw)
 		if $zal;
 
 # need these later to redraw floor and tick labels
@@ -3235,7 +3271,7 @@ sub plot3DTicks {
 			($gx, $gy) = $obj->pt2pxl($xv, $yv, $_+1+0.8);
 			$text = $$zs[$_];
 			$text = substr($text, 0, 22) . '...' if (length($text) > 25);
-			$img->string(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
+			$obj->string(6, 0, $gx, $gy, $text, $sfw);
 		}
 	}
 	my $xs = $obj->{xValues};
@@ -3247,12 +3283,12 @@ sub plot3DTicks {
 		$text = substr($text, 0, 22) . '...' if (length($text) > 25);
 
 		$gy += (length($text) * $sfw) + 5,
-		$img->stringUp(gdSmallFont, $gx-($sfh>>1), $gy, $text, $obj->{textColor}),
+		$obj->string(6, 90, $gx-($sfh>>1), $gy, $text, $sfw),
 		next
 			unless $ishisto;
 
 		$gx -= (length($text) * $sfw) + 5;
-		$img->string(gdSmallFont, $gx, $gy-($sfw>>1), $text, $obj->{textColor}),
+		$obj->string(6, 0, $gx, $gy-($sfw>>1), $text, $sfw);
 	}
 	my $ystep = $ishisto ? $obj->{horizStep} : $obj->{vertStep};
 	for ($i = $yl; $i < $yh; $i += $ystep) {
@@ -3261,12 +3297,12 @@ sub plot3DTicks {
 		$text = substr($text, 0, 22) . '...' if (length($text) > 25);
 
 		$gx -= ((length($text) * $sfw) + 5),
-		$img->string(gdSmallFont, $gx, $gy-($sfw>>1), $text, $obj->{textColor}),
+		$obj->string(6, 0, $gx, $gy-($sfw>>1), $text, $sfw),
 		next
 			unless $ishisto;
 
 		$gy += ((length($text) * $sfw) + 5),
-		$img->stringUp(gdSmallFont, $gx-($sfh>>1), $gy, $text, $obj->{textColor});
+		$obj->string(6, 90, $gx-($sfh>>1), $gy, $text, $sfw);
 	}
 	return 1 if $ishisto;
 #
@@ -3305,6 +3341,7 @@ sub plot3DBars {
 	my @props;
 	my $stacked = undef;
 	my @barcolors = ();
+	my $svfont = 5;
 #
 #	extract properties
 #
@@ -3316,10 +3353,9 @@ sub plot3DBars {
 		$t=~s/\s+/ /g;
 		$t = lc $t;
 		@props = split (' ', $t);
-		$showvals = $obj->{showValues};
 		$stacked = 0;
 		foreach (@props) {
-			$showvals = [ ], next if ($_ eq 'showvalues');
+			$showvals = [ ], $svfont = $1, next if /^showvalues:(\d+)/i;
 			$stacked = 1, next if ($_ eq 'stack');
 #
 #	generate light, medium, and dark version for front,
@@ -3360,7 +3396,7 @@ sub plot3DBars {
 				0, $fronts[0]->[$j], $tops[0]->[$j], $sides[0]->[$j], 
 				$xoff, $xbarw, $zbarw, $$xvals[$$ary[$i]-1], 
 				$$zvals[$$ary[$i+2]-1], $showvals);
-			$obj->renderCubeValues($showvals) if $showvals;
+			$obj->renderCubeValues($showvals, $svfont) if $showvals;
 			$j++;
 			$j = 0 if ($j > $#{$fronts[0]});
 		}
@@ -3379,7 +3415,7 @@ sub plot3DBars {
 				$xoff, $xbarw, $zbarw, $$xvals[$$ary[$i]-1], 
 				$$zvals[$$ary[$i+2]-1], $showvals, $stacked),
 				foreach (1..$#$ys);
-			$obj->renderCubeValues($showvals) if $showvals;
+			$obj->renderCubeValues($showvals, $svfont) if $showvals;
 		}
 	}
 	return 1;
@@ -3494,7 +3530,7 @@ sub drawCube {
 }
 
 sub renderCubeValues {
-	my ($obj, $val_stack) = @_;
+	my ($obj, $val_stack, $svfont) = @_;
 #
 #	render the top text label
 #
@@ -3508,9 +3544,9 @@ sub renderCubeValues {
 		$y = shift @$val_stack;
 		$xwidth = shift @$val_stack;
 
-		$img->stringUp(gdTinyFont, $px, $py, $y, $obj->{textColor}), next
+		$obj->string($svfont, 90, $px, $py, $y, $tfw), next
 			unless ($ishisto || $xwidth);
-		$img->string(gdTinyFont, $px, $py, $y, $obj->{textColor});
+		$obj->string($svfont,0, $px, $py, $y, $tfw);
 	}
 	return 1;
 }
@@ -3529,9 +3565,9 @@ sub plotPie {
 	$t = lc $t;
 	my @props = split (' ', $t);
 	my $img = $obj->{img};
-	my $showvals = $obj->{showValues};
+	my $showvals = 6;
 	foreach (@props) {
-		$showvals = 1, next if ($_ eq 'showvalues');
+		$showvals = $1, next if /^showvalues:(\d+)/;
 		push(@colormap, $img->colorAllocate(@{$colors{$_}}) )
 			if $colors{$_};
 	}
@@ -3549,7 +3585,7 @@ sub plotPie {
 	my $len = 0;
 	for ($i = 0; $i <= $#$ary; $i+=2) { 
 		$total += $$ary[$i+1]; 
-		$len = length($$ary[$i]) + 6;
+		$len = length($$ary[$i]);
 		$len = 25 if ($len > 25);
 		$maxlen = $len if ($len > $maxlen);
 	}
@@ -3567,10 +3603,10 @@ sub plotPie {
 	my $vr = $obj->{threed} ? int($hr * tan(30 * (3.1415926/180))) : $hr;
 	my $piefactor = $obj->{threed} ? cotan(30 * (3.1415926/180)) : 1;
 
-	$vr = $yc - 10, $hr = $vr
-		unless ($obj->{threed} || ($yc - 10 > $vr));
-	$vr = $yc - 10, $hr = int($vr/tan(30))
-		if ($obj->{threed} && ($vr > $yc - 10));
+	$vr = $yc - 20, $hr = $vr
+		unless ($obj->{threed} || ($yc - 20 > $vr));
+	$vr = $yc - 20, $hr = int($vr/tan(30 * (3.1415926/180)))
+		if ($obj->{threed} && ($vr > $yc - 20));
 
 	$img->arc($xc, $yc, $hr*2, $vr*2, 0, 360, $obj->{black});
 	$img->arc($xc, $yc+20, $hr*2, $vr*2, 0, 180, $obj->{black}),
@@ -3588,13 +3624,13 @@ sub plotPie {
 		$w = $$ary[$i+1];
 		my $color = $colormap[$j%(scalar @colormap)];
 		$arc = $obj->drawWedge($arc, $color, $xc, 
-			$yc, $vr, $hr, $w/$total, $$ary[$i], $w, $piefactor);
+			$yc, $vr, $hr, $w/$total, $$ary[$i], $w, $piefactor, $showvals);
 	}
 	return 1;
 }
 
 sub drawWedge {
-	my ($obj, $arc, $color, $xc, $yc, $vr, $hr, $pct, $text, $val, $piefactor) = @_;
+	my ($obj, $arc, $color, $xc, $yc, $vr, $hr, $pct, $text, $val, $piefactor, $showvals) = @_;
 	my $img = $obj->{img};
 #
 #	locate coords at 80% of radius that bisects the wedge;
@@ -3655,17 +3691,19 @@ sub drawWedge {
 #
 	if ($text) {
 		my ($gx, $gy) = computeCoords($xc, $yc, $vr, $hr, $bisect, $piefactor);
-		$gy -= $sfh if (($bisect > 3.1415926/2) && ($bisect <= 3.1415926));
+		$gy -= $sfh if (($bisect > 3.1415926/2) && ($bisect <= (1.5 * 3.1415926)));
 
 		$gy += 20 if ($obj->{threed} && 
 			(($bisect < 3.1415926/2) || ($bisect >= (1.5 * 3.1415926))));
 		$gx -= ((length($text)+1) * $sfw) 
 			if (($gx < $xc) && ($bisect > 3.1415926/4));
+		$gx -= (length($text) * $sfw/2) 
+			if (($gx > $xc) && ($bisect > (1.75 * 3.1415926)));
 		$gx += $sfw if ($gx > $xc);
 		$gx -= (length($text) * $sfw/2) 
 			if (($gx == $xc) || ($bisect <= 3.1415926/4));
 
-		$img->string(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
+		$obj->string($showvals, 0,$gx, $gy, $text, $tfw);
 	}
 	return $arc;
 }
@@ -3921,9 +3959,9 @@ sub plotGantt {
 	my ($offset, $span, $pct, $compend, $prtT, $starts, $ends);
 	my $img = $obj->{img};
 
-	my $showvals = $obj->{showValues};
+	my $showvals = 6;
 	foreach (split(' ', $props)) {
-		$showvals = 1, next if ($_ eq 'showvalues');
+		$showvals = $1, next if /^showvalues:(\d+)/;
 		$color = $_ if $colors{$_};
 	}
 	$obj->{$color} = $img->colorAllocate(@{$colors{$color}})
@@ -3979,8 +4017,8 @@ sub plotGantt {
 		$prtT = $$data[$i];
 		$prtT .= '(' . $$data[$i+3]. ')' if $$data[$i+3];
 		$prtT .= ' : ' . $$data[$i+4] . '%';
-		$img->string(gdSmallFont, $pts[$s], $pts[$s+1] - $offset - $sfh,
-				$prtT, $obj->{textColor});
+		$obj->string($showvals, 0, $pts[$s], $pts[$s+1] - $offset - $sfh,
+				$prtT, $tfw);
 
 		$starts = restore_temporal($$data[$i+1], $obj->{timeRange}),
 		$ends = restore_temporal($$data[$i+2], $obj->{timeRange}),
@@ -4347,6 +4385,79 @@ sub computeGradient {
 	$obj->{colormap} = \@newmap;
 	return 1;
 }
+#
+#	validate that font exists, and if so,
+#	map our std. pt sizes to the closest available size
+#
+sub loadFont {
+	my ($obj, $font) = @_;
+	
+	my $gd_text;
+	my $ptsz;
+	my $rc;
+	foreach (5,6,7) {
+		$gd_text = GD::Text::Align->new($obj->{img},
+			valign => 'top', halign => 'center') or return undef;
+		$ptsz = $_;
+		while ($ptsz < 12) {
+			$rc = $gd_text->set_font($font, $ptsz);
+			last if $rc;
+			$ptsz++;
+		}
+		return undef unless ($ptsz < 13);
+		$fontMap{$_} = $gd_text;
+	}
+	return 1;
+}
+#
+#	render a string using either the
+#	provided font, or default font
+#
+sub string {
+	my ($obj, $size, $angle, $x, $y, $val, $fontsz) = @_;
+
+	my $img = $obj->{img};
+	$angle = 0 unless $angle;
+	$angle = 3.1415926 * ($angle/360);
+	
+	my $rc;
+	my $font = $obj->{font};
+	unless ($font eq 'gd') {
+		unless ($fontMap{$size}) {
+			my $gd_text = GD::Text::Align->new($img,
+				valign => 'top', halign => 'right') or return undef;
+			my $ptsz = $size;
+			while ($ptsz < $size + 4) {
+				last if $gd_text->set_font($font, $ptsz);
+				$ptsz++;
+			}
+			return undef unless ($ptsz < $size+4);
+			$fontMap{$size} = $gd_text;
+		}
+#
+#	need to adjust our X based on length
+#
+		$fontsz = $sfw unless $fontsz;
+		$x += (length($val) * ($fontsz>>1));
+		$rc = $fontMap{$size}->set( color => $obj->{textColor} );
+		$rc = $fontMap{$size}->set_text( $val );
+		$rc = $fontMap{$size}->draw(int($x), int($y), $angle);
+		return 1 if $rc;
+	}
+#
+#	it was std font, or didn't work
+#
+	$font = $gdfontmap{$size};
+#
+#	if none of the fonts provided exists, then use defaults
+#
+	$img->string($font,$x,$y, $val, $obj->{textColor}),
+	return 1
+		unless $angle;
+	
+	$img->stringUp($font,$x,$y, $val, $obj->{textColor});
+	return 1
+}	
 
 1;
 }

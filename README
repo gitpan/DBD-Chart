@@ -39,17 +39,16 @@ DESCRIPTION
     and line, point, and area graphs.
 
     For detailed usage information, see the included the dbdchart.html
-    manpage webpage. See the DBI(3) manpage for details on DBI. See the
-    GD(3) manpage, the GD::Graph(3) manpage for details about the graphing
-    engines.
+    manpage webpage. See the DBI(3) manpage for details on DBI.
 
   Prerequisites
 
     Perl 5.6.0 minimum
     DBI 1.14 minimum
-    DBD::Chart::Plot 0.73 (included with this package)
+    DBD::Chart::Plot 0.80 (included with this package)
     GD X.XX minimum
     GD::Text X.XX minimum
+    Time::HiRes
     libpng
     zlib
     libgd
@@ -66,11 +65,11 @@ DESCRIPTION
 
     For Unix, extract it with
 
-        gzip -cd DBD-Chart-0.73.tar.gz | tar xf -
+        gzip -cd DBD-Chart-0.80.tar.gz | tar xf -
 
     and then enter the following:
 
-        cd DBD-Chart-0.73
+        cd DBD-Chart-0.80
         perl Makefile.PL
         make
 
@@ -111,5 +110,5 @@ SEE ALSO
 
     For general information on DBI see
 
-      http://www.symbolstone.org/technology/perl/DBI
+      http://dbi.perl.org
 

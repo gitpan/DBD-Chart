@@ -43,51 +43,51 @@ my @y3d = (
 
 open(HTMLF, ">t/plottest.html");
 print HTMLF "<html><body>
-<img src=simpline.png alt='simpline' usemap=#simpline><p>
-<img src=simpscat.png alt='simpscat' usemap=#simpscat><p>
-<img src=simparea.png alt='simparea' usemap=#simparea><p>
-<img src=symline.png alt='symline' usemap=#symline><p>
-<img src=simpbar.png alt='simpbar' usemap=#simpbar><p>
-<img src=iconbars.png alt='iconbars' usemap=#iconbars><p>
-<img src=iconhisto.png alt='iconhisto' usemap=#iconhisto><p>
-<img src=simpbox.png alt='simpbox' usemap=#simpbox><p>
-<img src=simpcandle.png alt='simpcandle' usemap=#simpcandle><p>
-<img src=simppie.png alt='simppie' usemap=#simppie><p>
-<img src=pie3d.png alt='pie3d' usemap=#pie3d><p>
-<img src=bar3d.png alt='bar3d' usemap=#bar3d><p>
-<img src=bar3axis.png alt='bar3axis' usemap=#bar3axis><p>
-<img src=simphisto.png alt='simphisto' usemap=#simphisto><p>
-<img src=histo3d.png alt='histo3d' usemap=#histo3d><p>
-<img src=histo3axis.png alt='histo3axis' usemap=#histo3axis><p>
-<img src=templine.png alt='templine' usemap=#templine><p>
-<img src=templine2.png alt='templine2' usemap=#templine2><p>
-<img src=logtempline.png alt='logtempline' usemap=#logtempline><p>
-<img src=tempbar.png alt='tempbar' usemap=#tempbar><p>
-<img src=temphisto.png alt='temphisto' usemap=#temphisto><p>
-<img src=complinept.png alt='complinept' usemap=#complinept><p>
-<img src=complpa.png alt='complpa' usemap=#complpa><p>
-<img src=compblpa.png alt='compblpa' usemap=#compblpa><p>
-<img src=complnbox.png alt='complnbox' usemap=#complnbox><p>
-<img src=compllbb.png alt='compllbb' usemap=#compllbb><p>
-<img src=comphisto.png alt='comphisto' usemap=#comphisto><p>
-<img src=compbars.png alt='compbars' usemap=#compbars><p>
-<img src=denseline.png alt='denseline'><p>
-<img src=densearea.png alt='densearea'><p>
-<img src=simpgantt.png alt='simpgantt' usemap=#simpgantt><p>
-<img src=stackbar.png alt='stackbar' usemap=#stackbar><p>
-<img src=stackicon.png alt='stackicon' usemap=#stackicon><p>
-<img src=stackarea.png alt='stackarea' usemap=#stackarea><p>
-<img src=stackhisto.png alt='stackhisto' usemap=#stackhisto><p>
-<img src=stackcandle.png alt='stackcandle' usemap=#stackcandle><p>
-<img src=multilinemm.png alt='multilinemm' usemap=#multilinemm><p>
-<img src=quadtree.png alt='quadtree' usemap=#quadtree><p>
-<img src=stack3Dbar.png alt='stack3Dbar' usemap=#stack3Dbar><p>
-<img src=stack3Dhisto.png alt='stack3Dhisto' usemap=#stack3Dhisto><p>
-<img src=tmstamp.png alt='tmstamp' usemap=#tmstamp><p>
-<img src=floatarea.png alt='floatarea' usemap=#floatarea><p>
-<img src=floathisto.png alt='floathisto' usemap=#floathisto><p>
-<img src=floatbar.png alt='floatbar' usemap=#floatbar><p>
-<img src=multwidth.png alt='multwidth' usemap=#multwidth><p>
+<img border=0 src=simpline.png alt='simpline' usemap=#simpline><p>
+<img border=0 src=simpscat.png alt='simpscat' usemap=#simpscat><p>
+<img border=0 src=simparea.png alt='simparea' usemap=#simparea><p>
+<img border=0 src=symline.png alt='symline' usemap=#symline><p>
+<img border=0 src=simpbar.png alt='simpbar' usemap=#simpbar><p>
+<img border=0 src=iconbars.png alt='iconbars' usemap=#iconbars><p>
+<img border=0 src=iconhisto.png alt='iconhisto' usemap=#iconhisto><p>
+<img border=0 src=simpbox.png alt='simpbox' usemap=#simpbox><p>
+<img border=0 src=simpcandle.png alt='simpcandle' usemap=#simpcandle><p>
+<img border=0 src=simppie.png alt='simppie' usemap=#simppie><p>
+<img border=0 src=pie3d.png alt='pie3d' usemap=#pie3d><p>
+<img border=0 src=bar3d.png alt='bar3d' usemap=#bar3d><p>
+<img border=0 src=bar3axis.png alt='bar3axis' usemap=#bar3axis><p>
+<img border=0 src=simphisto.png alt='simphisto' usemap=#simphisto><p>
+<img border=0 src=histo3d.png alt='histo3d' usemap=#histo3d><p>
+<img border=0 src=histo3axis.png alt='histo3axis' usemap=#histo3axis><p>
+<img border=0 src=templine.png alt='templine' usemap=#templine><p>
+<img border=0 src=templine2.png alt='templine2' usemap=#templine2><p>
+<img border=0 src=logtempline.png alt='logtempline' usemap=#logtempline><p>
+<img border=0 src=tempbar.png alt='tempbar' usemap=#tempbar><p>
+<img border=0 src=temphisto.png alt='temphisto' usemap=#temphisto><p>
+<img border=0 src=complinept.png alt='complinept' usemap=#complinept><p>
+<img border=0 src=complpa.png alt='complpa' usemap=#complpa><p>
+<img border=0 src=compblpa.png alt='compblpa' usemap=#compblpa><p>
+<img border=0 src=complnbox.png alt='complnbox' usemap=#complnbox><p>
+<img border=0 src=compllbb.png alt='compllbb' usemap=#compllbb><p>
+<img border=0 src=comphisto.png alt='comphisto' usemap=#comphisto><p>
+<img border=0 src=compbars.png alt='compbars' usemap=#compbars><p>
+<img border=0 src=denseline.png alt='denseline'><p>
+<img border=0 src=densearea.png alt='densearea'><p>
+<img border=0 src=simpgantt.png alt='simpgantt' usemap=#simpgantt><p>
+<img border=0 src=stackbar.png alt='stackbar' usemap=#stackbar><p>
+<img border=0 src=stackicon.png alt='stackicon' usemap=#stackicon><p>
+<img border=0 src=stackarea.png alt='stackarea' usemap=#stackarea><p>
+<img border=0 src=stackhisto.png alt='stackhisto' usemap=#stackhisto><p>
+<img border=0 src=stackcandle.png alt='stackcandle' usemap=#stackcandle><p>
+<img border=0 src=multilinemm.png alt='multilinemm' usemap=#multilinemm><p>
+<img border=0 src=quadtree.png alt='quadtree' usemap=#quadtree><p>
+<img border=0 src=stack3Dbar.png alt='stack3Dbar' usemap=#stack3Dbar><p>
+<img border=0 src=stack3Dhisto.png alt='stack3Dhisto' usemap=#stack3Dhisto><p>
+<img border=0 src=tmstamp.png alt='tmstamp' usemap=#tmstamp><p>
+<img border=0 src=floatarea.png alt='floatarea' usemap=#floatarea><p>
+<img border=0 src=floathisto.png alt='floathisto' usemap=#floathisto><p>
+<img border=0 src=floatbar.png alt='floatbar' usemap=#floatbar><p>
+<img border=0 src=multwidth.png alt='multwidth' usemap=#multwidth><p>
 ";
 
 foreach (1..100) {
@@ -117,36 +117,10 @@ push (@yfreq2, $xbhash2{$_} ? $xbhash2{$_} : 0)
 	foreach (10..70);
 my $testnum = 0;
 goto $ARGV[0] if ($ARGV[0]);
-#
-#	simple line chart
-#
-simpline:
 	$dbh->do('create table simpline (x integer, y integer)');
 	$sth = $dbh->prepare('insert into simpline values(?, ?)');
 	$sth->execute($x[$_], $y1[$_])
 		foreach (0..$#x);
-	$sth = $dbh->prepare("select linegraph, imagemap from simpline
-	where WIDTH=500 
-	AND HEIGHT=500 
-	AND X_AXIS='Some Domain' 
-	AND Y_AXIS='Some Range' 
-	AND	TITLE='Linegraph Test' 
-	AND SIGNATURE='(C)2002, GOWI Systems' 
-	AND	LOGO='t/gowilogo.png' 
-	AND FORMAT='PNG' 
-	AND SHOWGRID=1 
-	AND	LINEWIDTH=4 
-	AND	MAPNAME='simpline' 
-	AND MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
-	AND MAPTYPE='HTML' 
-	AND COLOR='newcolor'
-	AND SHAPE='fillcircle'
-	AND SHOWVALUES=1");
-	$sth->execute;
-	$row = $sth->fetchrow_arrayref;
-	dump_img($row, 'png', 'simpline');
-	$testnum++;
-	print "ok $testnum simpline OK\n";
 #
 #	simple scatter chart
 #
@@ -164,6 +138,35 @@ simpscat:
 	$testnum++;
 	print "ok $testnum simpscat OK\n";
 #
+#	simple line chart
+#
+simpline:
+	$sth = $dbh->prepare("select linegraph, imagemap from simpline
+	where WIDTH=500 
+	AND HEIGHT=500 
+	AND X_AXIS='Some Domain' 
+	AND Y_AXIS='Some Range' 
+	AND	TITLE='Linegraph Test' 
+	AND SIGNATURE='(C)2002, GOWI Systems' 
+	AND	LOGO='t/gowilogo.png' 
+	AND FORMAT='PNG' 
+	AND SHOWGRID=1 
+	AND	LINEWIDTH=4 
+	AND FONT='D:\\WINNT\\Fonts\\antquab.ttf'
+	AND SHOWVALUES=8
+	AND	MAPNAME='simpline' 
+	AND MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
+	AND MAPTYPE='HTML' 
+	AND COLOR='newcolor'
+	AND SHAPE='fillcircle'
+	AND BORDER=0
+	AND SHOWVALUES=1");
+	$sth->execute;
+	$row = $sth->fetchrow_arrayref;
+	dump_img($row, 'png', 'simpline');
+	$testnum++;
+	print "ok $testnum simpline OK\n";
+#
 #	simple area chart
 #
 simparea:
@@ -173,6 +176,7 @@ simparea:
 	LOGO='t/gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
 	MAPNAME='simparea' AND COLOR='newcolor' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
+	AND BORDER=0
 	AND MAPTYPE='HTML' AND SHOWVALUES=0");
 	$sth->execute;
 	$row = $sth->fetchrow_arrayref;
@@ -913,6 +917,7 @@ bar3d:
 	THREE_D=1 AND SHOWGRID=1 AND
 	MAPNAME='bar3d' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
+	AND BORDER=0
 	AND MAPTYPE='HTML'");
 	$sth->execute;
 	$row = $sth->fetchrow_arrayref;
