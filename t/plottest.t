@@ -4,7 +4,7 @@ use DBD::Chart;
 $|=1;
 $^W=1;
 
-BEGIN { $tests = 41 }
+BEGIN { $tests = 45 }
 
 print "1..$tests\n";
 
@@ -84,6 +84,10 @@ print HTMLF "<html><body>
 <img src=stack3Dbar.png alt='stack3Dbar' usemap=#stack3Dbar><p>
 <img src=stack3Dhisto.png alt='stack3Dhisto' usemap=#stack3Dhisto><p>
 <img src=tmstamp.png alt='tmstamp' usemap=#tmstamp><p>
+<img src=floatarea.png alt='floatarea' usemap=#floatarea><p>
+<img src=floathisto.png alt='floathisto' usemap=#floathisto><p>
+<img src=floatbar.png alt='floatbar' usemap=#floatbar><p>
+<img src=multwidth.png alt='multwidth' usemap=#multwidth><p>
 ";
 
 foreach (1..100) {
@@ -122,13 +126,22 @@ simpline:
 	$sth->execute($x[$_], $y1[$_])
 		foreach (0..$#x);
 	$sth = $dbh->prepare("select linegraph, imagemap from simpline
-	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
-	TITLE='Linegraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
-	LINEWIDTH=4 AND
-	MAPNAME='simpline' AND 
-	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
-	AND MAPTYPE='HTML' AND COLOR=newcolor AND SHAPE=fillcircle");
+	where WIDTH=500 
+	AND HEIGHT=500 
+	AND X_AXIS='Some Domain' 
+	AND Y_AXIS='Some Range' 
+	AND	TITLE='Linegraph Test' 
+	AND SIGNATURE='(C)2002, GOWI Systems' 
+	AND	LOGO='t/gowilogo.png' 
+	AND FORMAT='PNG' 
+	AND SHOWGRID=1 
+	AND	LINEWIDTH=4 
+	AND	MAPNAME='simpline' 
+	AND MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
+	AND MAPTYPE='HTML' 
+	AND COLOR='newcolor'
+	AND SHAPE='fillcircle'
+	AND SHOWVALUES=1");
 	$sth->execute;
 	$row = $sth->fetchrow_arrayref;
 	dump_img($row, 'png', 'simpline');
@@ -141,7 +154,7 @@ simpscat:
 	$sth = $dbh->prepare("select pointgraph, imagemap from simpline
 	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Scattergraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=0 AND
+	LOGO='t/gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=0 AND
 	MAPNAME='simpscat' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' AND SHOWVALUES=1");
@@ -157,7 +170,7 @@ simparea:
 	$sth = $dbh->prepare("select areagraph, imagemap from simpline
 	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Areagraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
+	LOGO='t/gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
 	MAPNAME='simparea' AND COLOR='newcolor' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' AND SHOWVALUES=0");
@@ -178,7 +191,7 @@ symline:
 	$sth = $dbh->prepare("select linegraph, imagemap from symline
 	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Symbolic Domain Linegraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
+	LOGO='t/gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
 	MAPNAME='symline' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' AND COLOR=newcolor AND SHAPE=fillcircle");
@@ -354,7 +367,7 @@ templine:
 	TITLE='Temporal Domain Linegraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
 	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
-	X_ORIENT='VERTICAL' AND LOGO='gowilogo.png' AND
+	X_ORIENT='VERTICAL' AND LOGO='t/gowilogo.png' AND
 	FORMAT='PNG' AND COLORS=newcolor AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND
 	MAPNAME='templine' AND 
@@ -379,7 +392,7 @@ templine2:
 	TITLE='Temporal Range Linegraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
 	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
-	X_ORIENT='VERTICAL' AND LOGO='gowilogo.png' AND
+	X_ORIENT='VERTICAL' AND LOGO='t/gowilogo.png' AND
 	FORMAT='PNG' AND COLORS=newcolor AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND SHAPE=fillcircle AND
 	MAPNAME='templine2' AND 
@@ -689,7 +702,7 @@ my @depends = ( '3rd task',  'Final task', undef,    '2nd task',  undef);
 	TITLE='Simple Gantt Chart Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
 	X_AXIS='Tasks' AND Y_AXIS='Schedule' AND
-	COLOR=red AND LOGO='gowilogo.png' AND
+	COLOR=red AND LOGO='t/gowilogo.png' AND
 	MAPNAME='simpgantt' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' AND
@@ -1067,6 +1080,128 @@ tmstamp:
 	dump_img($row, 'png', 'tmstamp');
 	$testnum++;
 	print "ok $testnum tmstamp OK\n";
+#
+#	floated stacked bar chart
+#
+floatbar:
+	$dbh->do('create table floatbar (
+		x integer, ylo integer, ymid integer, yhi integer)');
+	$sth = $dbh->prepare('insert into floatbar values(?, ?, ?, ?)');
+	$sth->execute($x[$_], $y1[$_], $y2[$_], $y3[$_])
+		foreach (0..$#x);
+
+	$sth = $dbh->prepare("select barchart, imagemap from floatbar
+	where WIDTH=500 
+	AND HEIGHT=500 
+	AND X_AXIS='Some Domain' 
+	AND Y_AXIS='Some Range' 
+	AND	TITLE='Floating Stacked Barchart Test' 
+	AND SIGNATURE='(C)2002, GOWI Systems' 
+	AND FORMAT='PNG' 
+	AND SHOWVALUES=1 
+	AND STACK=1 
+	AND ANCHORED=0
+	AND	MAPNAME='floatbar' 
+	AND MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X\&y=:Y\&z=:Z\&plotno=:PLOTNUM'
+	AND MAPTYPE='HTML' 
+	AND COLORS IN ('yellow', 'blue', 'red')");
+	$sth->execute;
+	$row = $sth->fetchrow_arrayref;
+	dump_img($row, 'png', 'floatbar');
+	$testnum++;
+	print "ok $testnum floatbar OK\n";
+#
+#	floating stacked histogram chart
+#
+floathisto:
+	$sth = $dbh->prepare("select histogram, imagemap from floatbar
+	where WIDTH=500 
+	AND HEIGHT=500 
+	AND X_AXIS='Some Domain' 
+	and Y_AXIS='Some Range' 
+	AND TITLE='Floating Stacked Histogram Test' 
+	AND SIGNATURE='(C)2002, GOWI Systems' 
+	AND	FORMAT='PNG' 
+	AND SHOWVALUES=1 
+	AND STACK=1 
+	AND ANCHORED=0
+	AND	MAPNAME='floathisto' 
+	AND	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X\&y=:Y\&z=:Z\&plotno=:PLOTNUM'
+	AND MAPTYPE='HTML' 
+	AND COLORS IN ('red', 'green', 'orange')");
+	$sth->execute;
+	$row = $sth->fetchrow_arrayref;
+	dump_img($row, 'png', 'floathisto');
+	$testnum++;
+	print "ok $testnum floathisto OK\n";
+#
+#	floating stacked area chart
+#
+floatarea:
+	$sth = $dbh->prepare("select areagraph, imagemap from floatbar
+	where WIDTH=500 
+	AND HEIGHT=500 
+	AND X_AXIS='Some Domain' 
+	AND Y_AXIS='Some Range' 
+	AND TITLE='Floating Stacked Areagraph Test' 
+	AND SIGNATURE='(C)2002, GOWI Systems' 
+	AND	FORMAT='PNG' 
+	AND SHOWVALUES=1 
+	AND STACK=1 
+	AND ANCHORED=0
+	AND MAPNAME='floatarea' 
+	AND	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X\&y=:Y\&z=:Z\&plotno=:PLOTNUM'
+	AND MAPTYPE='HTML' 
+	AND COLORS IN ('green', 'yellow', 'red')");
+	$sth->execute;
+	$row = $sth->fetchrow_arrayref;
+	dump_img($row, 'png', 'floatarea');
+	$testnum++;
+	print "ok $testnum floatarea OK\n";
+#
+#	multline multiwidth chart
+#
+multwidth:
+	$dbh->do('drop table floatbar');
+	$dbh->do('create table floatbar (
+		x integer, baseline integer, cold integer, warm integer, hot integer)');
+	$sth = $dbh->prepare('insert into floatbar values(?, ?, ?, ?, ?)');
+	$sth->execute(10, -50, -10, 50, 140);
+	$sth->execute(50, -50, -10, 50, 140);
+
+	$dbh->do('create table regline (x integer, ylo integer)');
+	$dbh->do('create table fatline (x integer, ymid integer)');
+	$dbh->do('create table midline (x integer, yhi integer)');
+	$sth1 = $dbh->prepare('insert into regline values(?, ?)');
+	$sth2 = $dbh->prepare('insert into fatline values(?, ?)');
+	$sth3 = $dbh->prepare('insert into midline values(?, ?)');
+	$sth1->execute($x[$_], $y1[$_]),
+	$sth2->execute($x[$_], $y2[$_]),
+	$sth3->execute($x[$_], $y3[$_])
+		foreach (0..$#x);
+
+	$sth = $dbh->prepare("select image, imagemap from
+	(select areagraph from floatbar where anchored=0
+		and stack=1 and colors in ('blue', 'yellow', 'red')),
+	(select linegraph from regline
+		where color='newcolor' and showvalues=1 ) regline,
+	(select linegraph from fatline
+		where color='lgray' and linewidth=10) fatline,
+	(select linegraph from midline
+		where color='green' and linewidth=4) midline
+	where WIDTH=500 AND HEIGHT=500 AND 
+	TITLE='Variable Width Linegraph Test' AND 
+	SIGNATURE='(C)2002, GOWI Systems' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+	FORMAT='PNG' AND 
+	MAPNAME='multwidth' AND 
+	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
+	AND MAPTYPE='HTML'");
+	$sth->execute;
+	$row = $sth->fetchrow_arrayref;
+	dump_img($row, 'png', 'multwidth');
+	$testnum++;
+	print "ok $testnum multwidth OK\n";
 
 print HTMLF "</hmtl></body>\n";
 close HTMLF;

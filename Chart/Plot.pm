@@ -9,6 +9,11 @@
 #
 #	Change History:
 #
+#	0.71	2002-Aug-12		D. Arnold
+#		add float property for bars/histos/areas
+#		fix linewidth to be local property
+#		fix bug in stacked areagraphs
+#
 #	0.70	2002-Jun-10		D. Arnold
 #		add stacked bar, histo, area, and candlestick graphs
 #		add quadtree graph
@@ -78,7 +83,7 @@ use GD;
 use Time::Local;
 use GD qw(gdBrushed gdSmallFont gdTinyFont gdMediumBoldFont);
 
-$DBD::Chart::Plot::VERSION = '0.70';
+$DBD::Chart::Plot::VERSION = '0.71';
 
 #
 #	list of valid colors
@@ -230,7 +235,6 @@ our %valid_attr = qw(
 	logo 1
 	timeRange 1
 	mapModifier 1
-	lineWidth 1
 );
 our @lines = ( 
 [ 0*2, 4*2,	5*2, 1*2 ],	# top face
@@ -300,7 +304,6 @@ sub new {
 #	icon - name of icon image file for iconic barcharts/points
 #	logo - name of background logo image file
 #	mapModifier - ref to callback to modify imagemap entries
-#	lineWidth - width of linegraph/candlestick in pixels
 #
 sub init {
 	my ($obj, $w, $h, $colormap) = @_;
@@ -409,7 +412,6 @@ sub init {
 	$obj->{textColor} = $black;
 
 	$obj->{mapModifier} = undef;
-	$obj->{lineWidth} = undef;
 	
 #	for now these aren't used, but someday we'll let them be configured
 	$obj->{font} = 'gd';
@@ -689,6 +691,9 @@ sub set2DBarPoints {
 
 	my $type = pop @ranges;
 	my $props = pop @ranges;
+	my $lwidth = 2;
+	$lwidth = $1 if ($props=~/\bwidth:(\d+)/i);
+	my $unanchored = ($props=~/\bfloat\b/i);
 	
 	foreach (@ranges) {
 		$obj->{errmsg} = 'Unbalanced dataset.',
@@ -701,6 +706,10 @@ sub set2DBarPoints {
 	$obj->{errmsg} = 'Candlesticks require a minimum and maximum range value.', 
 	return undef
 		unless (($type != CANDLE) || ($#ranges > 0));
+
+	$obj->{errmsg} = 'Unanchored charts require a minimum and maximum range value.', 
+	return undef
+		if ($unanchored && ($#ranges <= 0));
 
 	$obj->{errmsg} = 'Incompatible plot types.', return undef
 		if ((($type == HISTO) && $obj->{plotTypes} && ($obj->{plotTypes}^HISTO)) ||
@@ -751,7 +760,7 @@ sub set2DBarPoints {
 #
 #	reserve the first element for our 'base' value
 #	to be determined after we compute the first 2 range elements
-		push(@$yary, undef) unless ($type == CANDLE);
+		push(@$yary, undef) unless (($type == CANDLE) || $unanchored);
 		my $first_valid = 0;
 		foreach (@ranges) {
 			$y = $_->[$i];
@@ -774,10 +783,10 @@ sub set2DBarPoints {
 #
 #	compute cumulative range value
 			push(@$yary, 0), $lasty = 0
-				if (($lasty < 0) && ($y >= 0));
+				if (($lasty < 0) && ($y >= 0) && (! $unanchored));
 			$y += $lasty;
 			push(@$yary, ($obj->{yLog} ? log($y)/log(10) : $y));
-			$lasty = $y unless (($type == CANDLE) && ($first_valid == 1));
+			$lasty = $y unless (($unanchored || ($type == CANDLE)) && ($first_valid == 1));
 			$ymin = $y unless (defined($ymin) && ($y >= $ymin));
 			$ymax = $y unless (defined($ymax) && ($y <= $ymax));
 		}
@@ -786,7 +795,7 @@ sub set2DBarPoints {
 #	if we start negative, but go positive, then just use first
 #	range value as base
 #
-		if ($type != CANDLE) {
+		unless ($unanchored || ($type == CANDLE)) {
 			if (($$yary[1] < 0) && (($#$yary == 1) || ($$yary[2] > $$yary[1]))) {
 				push @$yary, 0
 					if ($#$yary == 1);
@@ -809,7 +818,7 @@ sub set2DBarPoints {
 	
 	$obj->{haveScale} = 0;	# invalidate any prior min-max calculations
 	$obj->{barCount}++;
-	$obj->{brushWidth} = ($obj->{lineWidth} ? $obj->{lineWidth} : 2)
+	$obj->{brushWidth} = $lwidth
 		if ($type == CANDLE);
 
 	return 1;
@@ -968,6 +977,7 @@ sub setPoints {
 			$$yary[$i] = [ ];
 			my $ys = $$yary[$i];
 			my $lasty = 0;
+			my $first_valid = 0;
 			foreach (@ranges) {
 
 				$y = $$_[$i];
@@ -985,12 +995,14 @@ sub setPoints {
 				return undef
 					if ($obj->{yLog} && ($y <= 0));
 
+				$first_valid++;
+				
 				$y += $lasty;
 				$y = log($y)/log(10) if $obj->{yLog};
 				$ymin = $y if ($y < $ymin);
 				$ymax = $y if ($y > $ymax);
 				push @$ys, $y;
-				$lasty += $y;
+				$lasty = $y unless (($props=~/\bfloat\b/i) && ($first_valid == 1));
 			}
 		}
 	}
@@ -2174,6 +2186,9 @@ sub plotAll {
 		my $stacked = 0;
 		my $coloridx = 0;
 		my $legend;
+		my $lwidth = 1;
+		my $anchor = 1;
+		my $showvals = 0;
 		foreach (@props) {
 #
 #	if its iconic, load the icon image
@@ -2189,6 +2204,9 @@ sub plotAll {
 			$stacked = 1, next
 				if ($_ eq 'stack');
 
+			$showvals = 1, next
+				if ($_ eq 'showvalues');
+
 			$marker = $_,
 			next
 				if ($valid_shapes{$_} && ($_ ne 'null'));
@@ -2200,8 +2218,12 @@ sub plotAll {
 			$marker = undef, next 
 				if ($_ eq 'nopoints');
 
-			$line = $_
+			$line = $_, next
 				if /^(line|noline|fill)$/;
+
+			$lwidth = $1, next if /width:(\d+)/;
+			
+			$anchor = undef if ($_ eq 'float');
 		}
 
 		if (($line eq 'fill') && $stacked) {
@@ -2219,23 +2241,43 @@ sub plotAll {
 				$k++;
 				$k = 0 if ($k == $colorcnt);
 			}
-			for (; $j >= 0; $j--) {
+			my $looplim = ($anchor ? 0 : 1);
+			my $ylo = $obj->{yl};
+			$ylo = 0 if ($ylo < 0);
+			for (; $j >= $looplim; $j--) {
 				@newary = ();
-				$color = $areacolors[$j];
+				$color = $areacolors[$j-$looplim];
 				$i = 0;
-				push(@newary, $$ary[$i], $ary->[$i+1]->[$j]),
+				push(@newary, $$ary[$i], ($anchor ? $ylo : $ary->[$i+1]->[0]), $ary->[$i+1]->[$j]),
 				$i += 2
 					while ($i <= $#$ary);
 				$legend = $obj->{legend} ? $obj->{legend}->[$n]->[$j] : undef;
 				return undef unless $obj->plotData($n, \@newary, $color, 'fill', $marker,
-					$legend);
+					$legend, $lwidth, $anchor, $showvals);
 				$obj->{legendPos}++ if $obj->{legend};
 			}
 			next;
 		}
+
 		$legend = $obj->{legend} ? $obj->{legend}->[$n] : undef;
-		return undef unless $obj->plotData($n, $ary, $areacolors[$coloridx], $line, $marker,
-			$obj->{legend}->[$n]);
+
+		if (($line eq 'fill') && $anchor) {
+#
+#	if its anchored, then add the origin points
+#
+			my @newary = ();
+			$i = 0;
+			push(@newary, $$ary[$i], 0, $$ary[$i+1]), $i += 2
+				while ($i <= $#$ary);
+
+			return undef unless $obj->plotData($n, \@newary, 
+				$areacolors[$coloridx], $line, $marker,
+				$obj->{legend}->[$n], $lwidth, $anchor, $showvals);
+		}
+		else {
+			return undef unless $obj->plotData($n, $ary, $areacolors[$coloridx], $line, $marker,
+				$obj->{legend}->[$n], $lwidth, $anchor, $showvals);
+		}
 		$coloridx++;
 		$coloridx = 0 if ($coloridx = $#areacolors);
 	}
@@ -2244,7 +2286,7 @@ sub plotAll {
 
 # draws the specified dataset in $obj->{data}
 sub plotData {
-	my ($obj, $k, $ary, $color, $line, $marker, $legend) = @_;
+	my ($obj, $k, $ary, $color, $line, $marker, $legend, $lw, $anchor, $showvals) = @_;
 	my ($i, $n, $px, $py, $prevpx, $prevpy, $pyt, $pyb);
 	my ($img, $prop, $s, $voff);
 	my @props = ();
@@ -2278,7 +2320,7 @@ sub plotData {
 #	overlapping areagraphs...for now the user will need to be smart 
 #	about the order of registering the datasets
 #
-	$obj->fill_region($obj->{$color}, $ary)
+	$obj->fill_region($obj->{$color}, $ary, $anchor)
 		if ($line eq 'fill');
 
 	($prevpx, $prevpy) = (0,0);
@@ -2289,13 +2331,13 @@ sub plotData {
 	my $xhash = $obj->{symDomain} ? $obj->{domainValues} : undef;
 	my $domsize = $obj->{symDomain} ? $#$domain : $#$ary;
 	my $x;
-	my $incr = $obj->{symDomain} ? 1 : 2;
+	my $incr = $obj->{symDomain} ? 1 : ($line eq 'fill') ? 3 : 2;
+	my $offset = ($line eq 'fill') ? 2 : 1;
 	my $xd;
 #
 #	create a brush to draw linegraphs
 	my $lbrush;
 	if ($line eq 'line') {
-		my $lw = $obj->{lineWidth} ? $obj->{lineWidth} : 1;
 		$lbrush = new GD::Image($lw,$lw);
 		my $ci = $lbrush->colorAllocate(@{$colors{$color}});
 		$lbrush->filledRectangle(0,0,$lw, $lw,$ci);
@@ -2309,7 +2351,7 @@ sub plotData {
 
 # get next point
 		($px, $py) = $obj->pt2pxl(($obj->{symDomain} ? $xd+1 : $$ary[$i]),
-			$$ary[$i+1] );
+			$$ary[$i+$offset] );
 
 # draw line from previous point, maybe
 		$img->line($prevpx, $prevpy, $px, $py, gdBrushed)
@@ -2321,8 +2363,8 @@ sub plotData {
 			$markh)
 			if ($marker);
 
-		if ($obj->{genMap} || $obj->{showValues}) {
-			($prtX, $prtY) = ($$ary[$i], $$ary[$i+1]);
+		if ($obj->{genMap} || $showvals) {
+			($prtX, $prtY) = ($$ary[$i], $$ary[$i+$offset]);
 			$prtY = 10**$prtY if $obj->{yLog};
 			$prtX = 10**$prtX if $obj->{xLog};
 			$prtY = restore_temporal($prtY, $obj->{timeRange}) if $obj->{timeRange};
@@ -2336,7 +2378,7 @@ sub plotData {
 
 		$voff = (length($s) * $tfw)>>1,
 		$img->string(gdTinyFont,$px-$voff,$py-$yoff, $s, $obj->{textColor})
-			if ($obj->{showValues});
+			if ($showvals);
 	}
 	return 1;
 }
@@ -2820,31 +2862,22 @@ sub drawSignature {
 		$obj->{signature}, $obj->{textColor}); 
 }
 
-sub fill_region
-{
-	my ($obj, $ci, $ary) = @_;
+sub fill_region {
+	my ($obj, $ci, $ary, $anchor) = @_;
 	my $img = $obj->{img};
-
-	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, 
-		$obj->{yl}, $obj->{yh});
-	my($x, $y);
-	
-	# Create a new polygon
-	my $poly = GD::Polygon->new();
-
+	my($x, $y, $xbot, $ybot, $xval);
 	my @bottom;
-
-	$xl = 1 if $obj->{symDomain};
-	my ($xbot, $ybot) = $obj->pt2pxl($xl, (($yl >= 0) ? $yl : 0));
-	
-	# Add the data points
-	for (my $i = 0; $i < @$ary; $i += 2)
+#	
+# Create a new polygon
+	my $poly = GD::Polygon->new();
+#
+# Add the data points; data is organized as (x, ybot, ytop)
+	for (my $i = 0; $i < @$ary; $i += 3)
 	{
 		next unless defined($$ary[$i]);
-
-		($x, $y) = $obj->pt2pxl(
-			$obj->{symDomain} ? ($i>>1)+1 : $$ary[$i], 
-			$$ary[$i+1]);
+		$xval = $obj->{symDomain} ? ($i/3)+1 : $$ary[$i];
+		($x, $y) = $obj->pt2pxl($xval, $$ary[$i+2]);
+		($xbot, $ybot) = $obj->pt2pxl($xval, $$ary[$i+1]);
 		$poly->addPt($x, $y);
 		push @bottom, [$x, $ybot];
 	}

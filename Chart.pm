@@ -7,6 +7,11 @@
 #
 #	History:
 #
+#		0.71	2002-Aug-12	D. Arnold
+#			fix LINEWIDTH property to be local
+#			add ANCHORED property
+#			fixed VERSION value
+#
 #		0.70	2002-Jun-01	D. Arnold
 #			added quadtree plots
 #			added cumulative (aka stacked) barcharts
@@ -102,7 +107,8 @@ our %binary_props = (
 'SHOWVALUES', 1, 
 'KEEPORIGIN', 1,
 'CUMULATIVE', 1,
-'STACK', 1
+'STACK', 1,
+'ANCHORED', 1
 );
 	
 our %string_props = (
@@ -184,7 +190,8 @@ our %valid_props	= (
 'MAPTYPE', 1,
 'CUMULATIVE', 1,
 'STACK', 1,
-'LINEWIDTH', 1
+'LINEWIDTH', 1,
+'ANCHORED', 1
 );
 
 our %valid_colors = (
@@ -242,7 +249,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.64';
+$DBD::Chart::VERSION = '0.71';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
@@ -376,7 +383,8 @@ my %inv_pieprop = (
 'ICONS', 1,
 'CUMULATIVE', 1,
 'STACK', 1,
-'LINEWIDTH', 1
+'LINEWIDTH', 1,
+'ANCHORED', 1
 );
 
 my %inv_quadtree = (
@@ -403,6 +411,7 @@ my %inv_quadtree = (
 'ICONS', 1,
 'CUMULATIVE', 1,
 'STACK', 1,
+'ANCHORED', 1,
 'LINEWIDTH', 1
 );
 
@@ -419,6 +428,7 @@ my %inv_candle = (
 'X_LOG', 1,
 'THREE_D', 1,
 'X-LOG', 1,
+'ANCHORED', 1,
 '3-D', 1
 );
 
@@ -457,6 +467,7 @@ my %dfltprops = (
 'MAPNAME', undef,
 'MAPTYPE', undef,
 'STACK', undef,
+'ANCHORED', 1,
 'LINEWIDTH', undef
 );
 #
@@ -495,6 +506,7 @@ my %dfltcomposites = (
 'COLORS', \@dfltcolors, 
 'ICONS', undef,
 'STACK', undef,
+'ANCHORED', 1,
 'LINEWIDTH', undef
 );
 #
@@ -1392,9 +1404,11 @@ sub prepare {
 		$num++
 			while ($remnant=~/'(.*?)'/);
 
-		$remnant=~s/\)(\s+(\w+))?\s*WHERE\s+/$1\rWHERE /i;	# isolate last predicate
+		$remnant=~s/\)\s+WHERE\s+/\rWHERE /i;
+		$remnant=~s/\)(\s+(\w+))\s+WHERE\s+/$1\rWHERE /i;
 		$remnant=~s/\s+FROM\s+\(\s*SELECT\s*/\r/i;	# isolate first subquery
-		$remnant=~s/\s*\)(\s+(\w+))?\s*,\s*\(\s*SELECT\s*/$1\r/ig;	# isolate individual queries
+		$remnant=~s/\s*\)\s*,\s*\(\s*SELECT\s*/\r/ig;	# isolate individual queries
+		$remnant=~s/\s*\)(\s+(\w+))\s*,\s*\(\s*SELECT\s*/$1\r/ig;	# isolate individual queries
 		my @queries = split("\r", $remnant);
 
 		if ($#queries > 0) {
@@ -2567,9 +2581,9 @@ sub execute {
 
 #		$img->setOptions( 'showValues' => 1)
 #			if ($$props{'SHOWVALUES'});
-		$propstr .= 'showvalues '
+		$propstr .= ' showvalues '
 			if ($$props{'SHOWVALUES'});
-		$propstr .= 'stack '
+		$propstr .= ' stack '
 			if ($$props{'STACK'});
 #
 #	default x-axis label orientation is vertical for candlesticks
@@ -2645,19 +2659,20 @@ sub execute {
 #
 #	if single domain and multiple colors, then push all colors into
 #	the property string
+			$propstr.= ' float' unless $$props{ANCHORED};
 			if (($#$data == 1) && (! $$props{ICON})) {
 				$DBD::Chart::err = -1,
 				$DBD::Chart::errstr = $img->{errmsg},
 				return undef
 					unless $img->setPoints($$data[0], $$data[1],
-						$propstr . join(' ', @colors)),
+						$propstr . ' ' . join(' ', @colors)),
 				next;
 			}
 #
 #	if stacked, send all the data at the same time
 #
 			if ($$props{'STACK'}) {
-				$propstr .= $$props{ICON} ? 'icon:' . join(' icon:', @icons) : join(' ', @colors);
+				$propstr .= ' ' . ($$props{ICON} ? 'icon:' . join(' icon:', @icons) : join(' ', @colors));
 				$DBD::Chart::err = -1,
 				$DBD::Chart::errstr = $img->{errmsg},
 				return undef
@@ -2694,11 +2709,11 @@ sub execute {
 #	datasets, consisting of 2-tuples (y-min, y-max).
 #	If more than 1 dataset is supplied, then sticks are grouped
 #
-			$img->setOptions( lineWidth => ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 2));
 			if ($$props{'STACK'}) {
-				$propstr .= 'candle ' . join(' ', @colors);
+				$propstr .= ' candle ' . join(' ', @colors);
 				$propstr .= ' ' . $shapes[0]
 					if ($$props{'SHOWPOINTS'});
+				$propstr .= ' width:' . ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 2);
 				$DBD::Chart::err = -1,
 				$DBD::Chart::errstr = $img->{errmsg},
 				return undef
@@ -2706,7 +2721,7 @@ sub execute {
 				next;
 			}
 			for (my $n = 0, $k = 1; $k <= $#$data; $k += 2, $n++) {
-				$propstr .= 'candle ' . $colors[$n];
+				$propstr .= ' candle ' . $colors[$n];
 				$propstr .= ' ' . $shapes[$n]
 					if ($$props{'SHOWPOINTS'});
 				$DBD::Chart::err = -1,
@@ -2722,7 +2737,7 @@ sub execute {
 #	each data array is a distinct domain to be plotted
 #
 			for (my $n = 0, $k = 0; $k <= $#$data; $k++, $n++) {
-				$propstr .= 'box ' . $colors[$n];
+				$propstr .= ' box ' . $colors[$n];
 				$propstr .= ' ' . $shapes[$n]
 					if ($$props{'SHOWPOINTS'});
 				$DBD::Chart::err = -1,
@@ -2737,9 +2752,10 @@ sub execute {
 #
 		$img->setOptions( lineWidth => ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 1));
 		if (($$dtypes[$i] eq 'AREAGRAPH') && ($$props{'STACK'})) {
-			$propstr .= 'fill ' . join(' ', @colors) ;
+			$propstr .= ' fill ' . join(' ', @colors) ;
 			$propstr .= ' ' . join(' ', @shapes) 
 				if ($$props{'SHOWPOINTS'} || $$props{'SHAPE'});
+			$propstr .= ' float' unless $$props{ANCHORED};
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = $img->{errmsg},
 			return undef
@@ -2747,7 +2763,7 @@ sub execute {
 			next;
 		}
 		for ($k = 1; $k <= $#$data; $k++) {
-			my $tprops = $propstr;
+			my $tprops = $propstr . ' ';
 			$tprops .= ($$dtypes[$i] eq 'POINTGRAPH') ?
 				'noline ' . $colors[$k-1] . ' ' . $shapes[$k-1] :
 				($$dtypes[$i] eq 'LINEGRAPH') ? 
@@ -2755,6 +2771,8 @@ sub execute {
 					'fill ' . $colors[$k-1] ;
 			$tprops .= ' ' . $shapes[$k-1] 
 				if ($$props{'SHOWPOINTS'} || $$props{'SHAPE'});
+			$tprops .= ' width:' . ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 1);
+			$tprops .= ' float' unless $$props{ANCHORED};
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = $img->{errmsg},
 			return undef
@@ -3003,7 +3021,7 @@ See L<GD(3)>, L<GD::Graph(3)> for details about the graphing engines.
 
 =item DBI 1.14 minimum
 
-=item DBD::Chart::Plot 0.70 (included with this package)
+=item DBD::Chart::Plot 0.71 (included with this package)
 
 =item GD X.XX minimum
 
@@ -3033,11 +3051,11 @@ whip up a PPM in the future.
 
 For Unix, extract it with
 
-    gzip -cd DBD-Chart-0.61.tar.gz | tar xf -
+    gzip -cd DBD-Chart-0.71.tar.gz | tar xf -
 
 and then enter the following:
 
-    cd DBD-Chart-0.61
+    cd DBD-Chart-0.71
     perl Makefile.PL
     make
 

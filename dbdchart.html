@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.70 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.71 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD, Quadtree, Gantt">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -71,7 +71,7 @@
 <a href="#refs">References</a><br>
 <a href="#copy">Copyright</a></b>
 </font><p>
-<i>Last updated August 2, 2002</i>
+<i>Last updated August 15, 2002</i>
 </td>
 <td>&nbsp;&nbsp;</td>
 <td align=left valign=top>
@@ -90,7 +90,7 @@ DBI driver abstraction for rendering
 <li>areagraphs
 <li>candlestick graphs
 <li>Gantt charts
-<li> quadtree graphs
+<li>quadtree graphs
 </ul><p>
 The default output format is PNG; JPEG or GIF format can be generated
 by setting the FORMAT property (see below), assuming the appropriate supporting
@@ -109,10 +109,10 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>Current Version</h2><p>
 
-Release 0.70<p>
+Release 0.71<p>
 
-<a href="http://www.presicient.com/dbdchart/dbdchart070.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.70.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart071.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.71.tar.gz">.tar.gz version</a>
 <p>
 <a name="conform"></a>
 <h2>Prerequisites and Conformance</h2><p>
@@ -1240,6 +1240,16 @@ to 1 to force the origin axis to be included. </td>
 	<td valign=top>either 1 or 0
 	</td></tr>
 <tr bgcolor=white>
+	<td valign=top align=center><b>ANCHORED</td>
+	<td valign=top>when set to 1 (the default), causes barchart, histograms, and areagraphs
+	to be 'anchored' to the X-axis (which may or may not be the origin, depending on
+	whether the origin has been clipped away). When set to zero, the baseline of these
+	graphs is determined by the first set of range data.</td>
+	<td valign=top>1</td>
+	<td valign=top>no</td>
+	<td valign=top>either 1 or 0
+	</td></tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>MAPTYPE</b></td>
 	<td valign=top>set the type of imagemap</td>
 	<td valign=top>HTML</td>
@@ -1698,6 +1708,13 @@ an imagemap.</i><p>
 <a name="history"></a>
 <h2>Change History</h2><p>
 
+Release 0.71:
+<ul>
+<li>added ANCHORED property
+<li>fixed SHOWVALUES for line/point/areagraphs
+<li>fixed LINEWIDTH to be a local, rather than global, property
+</ul>
+<p>
 Release 0.70:
 <ul>
 <li>added quadtrees
@@ -1924,6 +1941,20 @@ Release 0.10:<p>
 	<td align=left>SHOWVALUES property was applied globally, even when specified on individual graph</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.70</td>
+</tr><tr bgcolor=white>
+	<td align=center>14</td>
+	<td align=center>2002-Aug-10</td>
+	<td align=center>0.70</td>
+	<td align=left>SHOWVALUES property not working on line, point, area graphs</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.71</td>
+</tr><tr bgcolor=white>
+	<td align=center>15</td>
+	<td align=center>2002-Aug-10</td>
+	<td align=center>0.70</td>
+	<td align=left>LINEWIDTH property was specified in subquery of composite image, but applied globally</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.71</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
