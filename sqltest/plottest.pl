@@ -105,7 +105,7 @@ simpline:
 		$sth->execute($x[$i], $y1[$i]);
 	}
 	$sth = $dbh->prepare("select linegraph, imagemap from simpline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Linegraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
 	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
 	MAPNAME='simpline' AND 
@@ -120,7 +120,7 @@ simpline:
 #
 simpscat:
 	$sth = $dbh->prepare("select pointgraph, imagemap from simpline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Scattergraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
 	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=0 AND
 	MAPNAME='simpscat' AND 
@@ -135,10 +135,10 @@ simpscat:
 #
 simparea:
 	$sth = $dbh->prepare("select areagraph, imagemap from simpline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Areagraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
 	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
-	MAPNAME='simparea' AND COLOR=newcolor AND
+	MAPNAME='simparea' AND COLOR='newcolor' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' AND SHOWVALUES=0");
 	$sth->execute;
@@ -155,7 +155,7 @@ symline:
 		$sth->execute($xdate[$i], $y1[$i]);
 	}
 	$sth = $dbh->prepare("select linegraph, imagemap from symline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Symbolic Domain Linegraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
 	LOGO='gowilogo.png' AND FORMAT='PNG' AND SHOWGRID=1 AND
 	MAPNAME='symline' AND
@@ -170,7 +170,7 @@ symline:
 #
 simpbar:
 	$sth = $dbh->prepare("select barchart, imagemap from symline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Barchart Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
 	FORMAT='PNG' AND SHOWVALUES=1 AND
 	MAPNAME='simpbar' AND
@@ -185,11 +185,11 @@ simpbar:
 #
 iconbars:
 	$sth = $dbh->prepare("select barchart, imagemap from symline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
 	TITLE='Iconic Barchart Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
 	FORMAT='PNG' AND SHOWVALUES=1 AND ICON='pumpkin.png' AND
-	MAPNAME='iconbars' AND SHOWGRID=1 AND GRIDCOLOR=blue AND
-	TEXTCOLOR=dbrown AND
+	MAPNAME='iconbars' AND SHOWGRID=1 AND GRIDCOLOR='blue' AND
+	TEXTCOLOR='dbrown' AND
 	MAPSCRIPT='ONCLICK=\"alert(''Got X=:X, Y=:Y'')\"' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML'");
@@ -202,12 +202,12 @@ iconbars:
 #
 iconhisto:
 	$sth = $dbh->prepare("select histogram, imagemap from symline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and 
-	Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and 
+	Y_AXIS='Some Range' AND
 	TITLE='Iconic Histogram Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
 	FORMAT='PNG' AND ICON='pumpkin.png' AND
-	MAPNAME='iconhisto' AND SHOWGRID=1 AND GRIDCOLOR=red AND
-	TEXTCOLOR=newcolor AND
+	MAPNAME='iconhisto' AND SHOWGRID=1 AND GRIDCOLOR='red' AND
+	TEXTCOLOR='newcolor' AND
 	MAPSCRIPT='ONCLICK=\"alert(''Got X=:X, Y=:Y'')\"' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML'");
@@ -225,9 +225,9 @@ simpbox:
 		$sth->execute($xbox[$i], $xbox2[$i]);
 	}
 	$sth = $dbh->prepare("select boxchart, imagemap from simpbox
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' AND
 	TITLE='Boxchart Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	FORMAT='PNG' AND COLORS=(newcolor, red) AND SHOWVALUES=1 AND
+	FORMAT='PNG' AND COLORS IN ('newcolor', 'red') AND SHOWVALUES=1 AND
 	MAPNAME='simpbox' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML'");
@@ -245,10 +245,10 @@ simpcandle:
 		$sth->execute($x[$i], $y1[$i], $y2[$i]);
 	}
 	$sth = $dbh->prepare("select candlestick, imagemap from simpcandle
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' AND
-	Y-AXIS = 'Price' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' AND
+	Y_AXIS = 'Price' AND
 	TITLE='Candlestick Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	FORMAT='PNG' AND COLORS=(newcolor) AND SHAPE=fillsquare AND
+	FORMAT='PNG' AND COLORS IN ('newcolor') AND SHAPE='fillsquare' AND
 	SHOWVALUES=1 AND SHOWGRID=1 AND
 	MAPNAME='simpcandle' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -267,9 +267,9 @@ simppie:
 		$sth->execute($x[$i], $y2[$i]);
 	}
 	$sth = $dbh->prepare("select piechart, imagemap from simppie
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' AND
 	TITLE='Piechart Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	FORMAT='PNG' AND COLORS=(red, blue, newcolor, green, yellow) AND
+	FORMAT='PNG' AND COLORS IN ('red', 'blue', 'newcolor', 'green', 'yellow') AND
 	MAPNAME='simppie' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML'");
@@ -282,10 +282,10 @@ simppie:
 #
 pie3d:
 	$sth = $dbh->prepare("select piechart, imagemap from simppie
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' AND
 	TITLE='3-D Piechart Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	FORMAT='PNG' AND COLORS=(red, blue, newcolor, green, yellow) AND
-	3-D=1 AND
+	FORMAT='PNG' AND COLORS IN ('red', 'blue', 'newcolor', 'green', 'yellow') AND
+	THREE_D=1 AND
 	MAPNAME='pie3d' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML'");
@@ -298,11 +298,11 @@ pie3d:
 #
 bar3d:
 	$sth = $dbh->prepare("select barchart, imagemap from simpline
-	where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' AND
-	Y-AXIS='Some Range' AND
+	where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' AND
+	Y_AXIS='Some Range' AND
 	TITLE='3-D Barchart Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	FORMAT='PNG' AND COLORS=(orange) AND
-	3-D=1 AND SHOWGRID=1 AND
+	FORMAT='PNG' AND COLORS IN ('orange') AND
+	THREE_D=1 AND SHOWGRID=1 AND
 	MAPNAME='bar3d' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML'");
@@ -322,8 +322,8 @@ bar3axis:
 	$sth = $dbh->prepare("select barchart, imagemap from bar3axis
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='3 Axis Barchart Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Region' AND Y-AXIS='Sales' AND Z-AXIS='Quarter' AND
-	FORMAT='PNG' AND COLORS=(red) AND
+	X_AXIS='Region' AND Y_AXIS='Sales' AND Z-AXIS='Quarter' AND
+	FORMAT='PNG' AND COLORS IN ('red') AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND
 	MAPNAME='bar3axis' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -339,8 +339,8 @@ simphisto:
 	$sth = $dbh->prepare("select histogram, imagemap from simppie
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Histogram Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
-	FORMAT='PNG' AND COLOR=newcolor AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+	FORMAT='PNG' AND COLOR IN ('red', 'green', 'orange', 'blue', 'newcolor') AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND
 	MAPNAME='simphisto' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -356,8 +356,8 @@ histo3d:
 	$sth = $dbh->prepare("select histogram, imagemap from simppie
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Histogram Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
-	FORMAT='PNG' AND COLOR=orange AND 3-D=1 AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+	FORMAT='PNG' AND COLOR='orange' AND THREE_D=1 AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND
 	MAPNAME='histo3d' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -373,8 +373,8 @@ histo3axis:
 	$sth = $dbh->prepare("select histogram, imagemap from bar3axis
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='3 Axis Histogram Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Region' AND Y-AXIS='Sales' AND Z-AXIS='Quarter' AND
-	FORMAT='PNG' AND COLORS=(red) AND
+	X_AXIS='Region' AND Y_AXIS='Sales' AND Z_AXIS='Quarter' AND
+	FORMAT='PNG' AND COLORS='red' AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND
 	MAPNAME='histo3axis' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -396,8 +396,8 @@ templine:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Temporal Domain Linegraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
-	X-ORIENT='VERTICAL' AND LOGO='gowilogo.png' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+	X_ORIENT='VERTICAL' AND LOGO='gowilogo.png' AND
 	FORMAT='PNG' AND COLORS=newcolor AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND
 	MAPNAME='templine' AND 
@@ -420,8 +420,8 @@ templine2:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Temporal Range Linegraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
-	X-ORIENT='VERTICAL' AND LOGO='gowilogo.png' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+	X_ORIENT='VERTICAL' AND LOGO='gowilogo.png' AND
 	FORMAT='PNG' AND COLORS=newcolor AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND SHAPE=fillcircle AND
 	MAPNAME='templine2' AND 
@@ -445,8 +445,8 @@ logtempline:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Logarithmic Temporal Range Linegraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
-	X-ORIENT='VERTICAL' AND Y-LOG=1 AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+	X_ORIENT='VERTICAL' AND Y-LOG=1 AND
 	FORMAT='PNG' AND COLORS=newcolor AND
 	SHOWGRID=1 AND SHOWVALUES=1 AND SHAPE=fillcircle AND
 	MAPNAME='logtempline' AND 
@@ -464,7 +464,7 @@ tempbar:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Temporal Barchart Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND COLORS=red AND
 	SHOWVALUES=1 AND 
 	MAPNAME='tempbar' AND 
@@ -482,7 +482,7 @@ temphisto:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Temporal Histogram Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND COLORS=blue AND
 	SHOWVALUES=1 AND 
 	MAPNAME='temphisto' AND 
@@ -498,13 +498,13 @@ temphisto:
 complinept:
 	$sth = $dbh->prepare("select image, imagemap from
 	(select linegraph from simpline
-		where color=newcolor and shape=fillcircle) simpline,
+		where color=newcolor and shape='fillcircle') simpline,
 	(select pointgraph from simppie
-		where color=blue and shape=opensquare) simppt
+		where color=blue and shape='opensquare') simppt
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Line/Pointgraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND 
 	MAPNAME='complinept' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -532,7 +532,7 @@ complpa:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Line/Point/Areagraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND 
 	MAPNAME='complpa' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -557,7 +557,7 @@ compblpa:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Bar/Line/Point/Areagraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND 
 	MAPNAME='compblpa' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -589,7 +589,7 @@ complnbox:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Box and Line Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND 
 	MAPNAME='complnbox' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -624,7 +624,7 @@ compllbb:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Multiple Box and Line Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND 
 	MAPNAME='compllbb' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -645,8 +645,8 @@ comphisto:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Histogram Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
-	FORMAT='PNG' AND 3-D=1 AND SHOWVALUES = 1 AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+	FORMAT='PNG' AND THREE_D=1 AND SHOWVALUES = 1 AND
 	MAPNAME='comphisto' AND 
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML'");
@@ -666,7 +666,7 @@ compbars:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Barchart Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+	X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
 	FORMAT='PNG' AND SHOWVALUES = 1 AND SHOWGRID=1 AND
 	MAPNAME='compbars' AND ICONS=('pumpkin.png', 'turkey.png' ) AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
@@ -694,7 +694,7 @@ denseline:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Dense Linegraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Angle (Radians)' AND Y-AXIS='Sin/Cos' AND
+	X_AXIS='Angle (Radians)' AND Y_AXIS='Sin/Cos' AND
 	FORMAT='PNG'");
 	$sth->execute;
 	$row = $sth->fetchrow_arrayref;
@@ -710,7 +710,7 @@ densearea:
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Composite Dense Areagraph Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Angle (Radians)' AND Y-AXIS='Sin/Cos' AND
+	X_AXIS='Angle (Radians)' AND Y_AXIS='Sin/Cos' AND
 	FORMAT='PNG'");
 	$sth->execute;
 	$row = $sth->fetchrow_arrayref;
@@ -738,12 +738,12 @@ my @depends = ( '3rd task',  'Final task', undef,    '2nd task',  undef);
 	where WIDTH=500 AND HEIGHT=500 AND 
 	TITLE='Simple Gantt Chart Test' AND 
 	SIGNATURE='(C)2002, GOWI Systems' AND
-	X-AXIS='Tasks' AND Y-AXIS='Schedule' AND
+	X_AXIS='Tasks' AND Y_AXIS='Schedule' AND
 	COLOR=red AND LOGO='gowilogo.png' AND
 	MAPNAME='simpgantt' AND
 	MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
 	AND MAPTYPE='HTML' AND
-	X-ORIENT='VERTICAL' AND
+	X_ORIENT='VERTICAL' AND
 	FORMAT='PNG'");
 	$sth->execute;
 	$row = $sth->fetchrow_arrayref;

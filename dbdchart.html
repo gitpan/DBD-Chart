@@ -1,65 +1,145 @@
 <html>
 <head>
-<title>DBD::Chart 0.60 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.61 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
-<body>
-<h2>DBD::Chart - Perl DBI Driver interface For Rendering Charts and Graphs</h3><p>
+<body background='imgs/grey.jpg' link='blue' vlink='darkred'>
+<center><img src='imgs/dbdchart.gif' alt="DBD::Chart">
+<h1>Perl DBI Driver For Rendering Charts and Graphs</h1><p>
+</center>
+<table align=center border=0>
+<tr><td valign=top nowrap><b>
+<font size="+1">
+<a href="#description">Description</a><br>
+<a href="#version">Version</a><br>
+<a href="#conform">Prerequisites and</a><br>
+&nbsp;&nbsp;<a href="#conform">Conformance</a><br>
+<a href="#examples">Examples</a><br>
+</font>
+<font size="-1">
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#piechart">Pie Chart</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#barchart">3-D Bar Chart</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#pointgraph">Point Graph</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#linegraph">Multirange Linegraph</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#areagraph">Multirange Areagraph</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#loggraph">Log-Log Linegraph</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#candlestick">Candlestick Chart</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#symgraph">Multirange Symbolic Linegraph</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#boxchart">Box & Whisker Chart w/ Imagemap</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#iconbars">Iconic Barchart w/ Imagemap</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#iconhisto">Iconic Histogram w/ Imagemap</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#logtempline">Log. Temporal Range Linegraph</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#composite">Composite Image</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#gantt">Gantt Chart</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.presicient.com/dbdchart/plottest/plottest.html">Lots more examples...</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.presicient.com/dbdchart/testres.html">Still more examples...</a><br>
+</font>
+<font size="+1">
+<a href="#behavior">Driver Specific</a><br>
+&nbsp;&nbsp;<a href="#behavior">Behavior</a><br>
+</font>
+<font size="-1">
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#dsn">Data Source Name</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#types">Data Types</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#parmsql">SQL Dialect</a><br>
 
-<ul>
-<li><a href="#synopsis">SYNOPSIS</a>
-<ul>
-<li><a href="#piechart">Pie Chart</a>
-<li><a href="#barchart">3-D Bar Chart</a>
-<li><a href="#pointgraph">Point Graph</a>
-<li><a href="#linegraph">Multirange Linegraph with Logo and Signature</a>
-<li><a href="#areagraph">Multirange Areagraph</a>
-<li><a href="#loggraph">Log-Log Linegraph</a>
-<li><a href="#candlestick">Candlestick Chart</a>
-<li><a href="#symgraph">Multirange Symbolic Linegraph</a>
-<li><a href="#boxchart">Box & Whisker Chart with Imagemap</a>
-<li><a href="#iconbars">Iconic Barchart with Imagemap</a>
-<li><a href="#iconhisto">Iconic Histogram with Imagemap</a>
-<li><a href="#logtempline">Logarithmic Temporal Range Linegraph</a>
-<li><a href="#composite">Composite Image</a>
-<li><a href="#gantt">Gantt Chart</a>
-<li><a href="http://www.presicient.com/dbdchart/plottest/plottest.html">Lots more examples...</a>
-<li><a href="http://www.presicient.com/dbdchart/testres.html">Still more examples!!!</a>
-</ul>
-<li><a href="#description">DESCRIPTION</a>
-<li><a href="#version">VERSION</a>
-<li><a href="#history">CHANGE HISTORY</a>
-<li><a href="#behavior">DRIVER-SPECIFIC BEHAVIOR</a>
-<ul>
-<li><a href="#dsn">DATA-SOURCE NAME</a>
-<li><a href="#types">DATA TYPES</a>
-<li><a href="#parmsql">SQL DIALECT</a>
-<ul>
-<li><a href="#create">CREATE</a>
-<li><a href="#drop">DROP</a>
-<li><a href="#insert">INSERT</a>
-<li><a href="#select">SELECT</a>
-<li><a href="#update">UPDATE</a>
-<li><a href="#delete">DELETE</a>
-</ul>
-<li><a href="#colormap">USER DEFINED COLORS</a>
-<li><a href="#imagemaps">IMAGEMAPS</a>
-<li><a href="#errors">ERROR HANDLING</a>
-<li><a href="#diags">DIAGNOSTICS</a>
-<li><a href="#specattr">DRIVER-SPECIFIC ATTRIBUTES</a>
-<li><a href="#funcs">DRIVER-SPECIFIC FUNCTIONS</a>
-</ul>
-<li><a href="#conform">PREREQUISITES AND CONFORMANCE</a>
-<li><a href="#bugs">KNOWN BUGS</a>
-<li><a href="#todo">TO DO List</a>
-<li><a href="#acks">ACKNOWLEDGEMENTS</a>
-<li><a href="#refs">REFERENCES</a>
-<li><a href="#copy">COPYRIGHT</a>
-</ul>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#create">CREATE</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#drop">DROP</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#insert">INSERT</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#select">SELECT</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#update">UPDATE</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#delete">DELETE</a><br>
+
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#colormap">User Defined Colors</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#imagemaps">Imagemaps</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#errors">Error Handling</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#diags">Diagnostics</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#specattr">Driver Specific</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#specattr">Attributes</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#funcs">Driver Specific</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#funcs">Functions</a><br>
+</font>
+<font size="+1">
+<a href="#history">Change History</a><br>
+<a href="#bugs">Known Bugs</a><br>
+<a href="#todo">To Do List</a><br>
+<a href="#acks">Acknowledgements</a><br>
+<a href="#refs">References</a><br>
+<a href="#copy">Copyright</a></b>
+</font>
+</td>
+<td>&nbsp;&nbsp;</td>
+<td align=left valign=top>
 <p>
-<a name="synopsis"></a>
-<h2>SYNOPSIS</h2><p>
+<a name="description"></a>
+<h2>Description</h2><p>
+
+DBI driver abstraction for rendering pie charts, bar charts, histograms, box & whisker charts,
+line, point, area, and candlestick graphs. The default output format is PNG;
+JPEG or GIF format can be generated
+by setting the FORMAT property (see below), assuming the appropriate supporting
+libraries and modules are installed.<br>
+<b>BE ADVISED:</b> This is <b>BETA</B> software, and subject to change at the
+whim of the author(s). <p>
+
+Why DBD::Chart ? Basically, the idea is to make chart rendering easy for us database
+geeks...and maybe for other folks, as well. Being able to render a chart from a
+rowset by simply binding output column buffers as input parameter buffers for a
+simple INSERT, then just SELECT'ing to get the image, seemed like a nice
+abstraction.<p>
+
+BTW: This driver is 100% pure Perl.<p>
+<p>
+<a name="version"></a>
+<h2>Current Version</h2><p>
+
+Release 0.61<p>
+
+<a href="http://www.presicient.com/dbdchart/dbdchart061.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.61.tar.gz">.tar.gz version</a>
+<p>
+<a name="conform"></a>
+<h2>Prerequisites and Conformance</h2><p>
+
+DBD::Chart requires the following (versions are recommended
+only, cuz they're the version I built with...if you're feeling
+frisky, you can try older or newer versions.): <p>
+<ul>
+<li>Perl version 5.6.0
+<li>DBI module 1.14.
+<li>GD module 1.32
+<li>GD::Text (<i>aka GDTextUtil</i>) module 0.80
+<li>Time::Local
+<!-- <li>SVG 2.0 -->
+<!-- <li>XML::Simple
+<li>XML::Writer -->
+</ul>
+
+Be advised that these modules require the following (non-Perl) libraries:<p>
+<ul>
+<li> <a href="http://www.boutell.com/gd/">libgd</a>
+<li> <a href="http://www.libpng.org/pub/png">libpng</a>
+<li> <a href="http://www.info-zip.org/pub/infozip/zlib/">zlib</a>
+<li> <a href="http://www.ijg.org/">jpeg-6b</a> (for JPEG support)
+</ul><p>
+
+The following DBI functions are not supported:
+<pre>
+DBI->data_sources()
+$dbh->prepare_cached()
+$sth->table_info()
+$dbh->tables()
+$dbh->type_info_all()
+$dbh->type_info()
+</pre>
+</td></tr></table>
+<hr color=silver>
+<table border=0>
+<tr><td width="10%">&nbsp;</td>
+<td valign=top>
+<a name="examples"></a>
+<h2>EXAMPLES</h2><p>
 <a name="piechart"></a>
 <h3>Pie Chart</h3>
 <pre>
@@ -80,15 +160,15 @@ $sth->execute('Northwest', 33456.78);
 $rsth = $dbh->prepare(
 "SELECT PIECHART FROM pie
  WHERE WIDTH=400 AND HEIGHT=400 AND
- TITLE = \'Sales By Region\' AND
- COLOR=(red, green, blue, lyellow, lpurple) AND
- BACKGROUND=lgray AND
- SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'");
+ TITLE = 'Sales By Region' AND
+ COLOR IN ('red', 'green', 'blue', 'lyellow', 'lpurple') AND
+ BACKGROUND='lgray' AND
+ SIGNATURE='Copyright(C) 2001, GOWI Systems, Inc.'");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="simppie.png" alt="Simple Pie Chart">
+<img src="imgs/simppie.png" alt="Simple Pie Chart">
 <p>
 <a name="barchart"></a>
 <h3>3-D Bar Chart</h3>
@@ -106,14 +186,15 @@ $sth->execute(4, 2756.34, -3456.78, 1234.56, 4569.78, 33456.78);
 
 $rsth = $dbh->prepare(
 "SELECT BARCHART FROM bars
-WHERE WIDTH=600 AND HEIGHT=400 AND X-AXIS=\'Quarter\' AND
-Y-AXIS=\'Revenue\' AND TITLE = \'Quarterly Revenue By Region\' AND
-3-D=1 AND SHOWVALUES=1 AND COLOR=(red, green, blue, yellow, dbrown)");
+WHERE WIDTH=600 AND HEIGHT=400 AND X_AXIS='Quarter' AND
+Y_AXIS='Revenue' AND TITLE = 'Quarterly Revenue By Region' AND
+THREE_D=1 AND SHOWVALUES=1 AND
+COLORS IN ('red', 'green', 'blue', 'yellow', 'dbrown')");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="multibar.png" alt="Bar Chart">
+<img src="imgs/multibar.png" alt="Bar Chart">
 <p>
 <a name="pointgraph"></a>
 <h3>Point Graph</h3>
@@ -130,14 +211,15 @@ $sth->execute(12, 90.57);
 
 $rsth = $dbh->prepare(
 "SELECT POINTGRAPH FROM line
-WHERE WIDTH=500 AND HEIGHT=300 AND X-AXIS=\'Sales\' AND
-TITLE = \'Sales By Region\' AND COLOR=black AND SHOWGRID=0 AND
-SHAPE=filldiamond AND SHOWVALUES=1");
+WHERE WIDTH=500 AND HEIGHT=300 AND X_AXIS='Sales' AND
+TITLE = 'Sales By Region' AND COLOR='black' AND SHOWGRID=0 AND
+SHAPE='filldiamond' AND SHOWVALUES=1
+AND BACKGROUND='transparent'");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="simppts.png" alt="Scatter Graph">
+<img src="imgs/simppts.png" alt="Scatter Graph">
 <p>
 <a name="linegraph"></a>
 <h3>Multi-range Linegraph, with Logo and Signature</h3>
@@ -156,19 +238,20 @@ $sth->execute(12, 90.57,3456.90, 1234.99, undef, 2876.34);
 
 $rsth = $dbh->prepare(
 "SELECT LINEGRAPH FROM line
-WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND
-TITLE = \'Monthly Sales By Region\' AND
-COLOR=(red, green, blue, yellow, lbrown) AND
+WHERE WIDTH=? AND HEIGHT=? AND X_AXIS=? AND Y_AXIS=? AND
+TITLE = 'Monthly Sales By Region' AND
+COLOR IN ('red', 'green', 'blue', 'yellow', 'lbrown') AND
 SHOWPOINTS=1 AND SHOWGRID=1 AND
-SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross) AND
-LOGO=\'gowilogo.png\' AND BACKGROUND=lgray AND
-X-ORIENT=\'VERTICAL\' AND
-SIGNATURE=\'Copyright(C) 2001, GOWI Systems, Inc.\'");
+SHAPE IN ('fillcircle', 'fillsquare', 'filldiamond', 'horizcross',
+    'diagcross') AND
+LOGO='gowilogo.png' AND BACKGROUND='lgray' AND
+X_ORIENT='VERTICAL' AND
+SIGNATURE='Copyright(C) 2001, GOWI Systems, Inc.'");
 $rsth->execute(400, 400, 'Month', 'Sales');
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="multipt.png" alt="Multiline Graph">
+<img src="imgs/multipt.png" alt="Multiline Graph">
 <p>
 <a name="areagraph"></a>
 <h3>Multi-range Area Graph</h3>
@@ -203,16 +286,17 @@ $sth->execute;
 
 $rsth = $dbh->prepare(
 "SELECT AREAGRAPH FROM line
-WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Month\' AND
-Y-AXIS=\'Sales\' AND TITLE = \'Monthly Sales By Region\' AND
-COLOR=(red, green, blue, yellow, lbrown) AND
+WHERE WIDTH=400 AND HEIGHT=400 AND X_AXIS='Month' AND
+Y_AXIS='Sales' AND TITLE = 'Monthly Sales By Region' AND
+COLOR IN ('red', 'green', 'blue', 'yellow', 'lbrown') AND
 SHOWPOINTS=1 AND SHOWGRID=1 AND
-SHAPE=(fillcircle, fillsquare, filldiamond, horizcross, diagcross)");
+SHAPE IN ('fillcircle', 'fillsquare', 'filldiamond', 'horizcross',
+	'diagcross')");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="multarea.png" alt="Area Graph">
+<img src="imgs/multarea.png" alt="Area Graph">
 <p>
 <a name="loggraph"></a>
 <h3>Log-Log Linegraph</h3>
@@ -228,15 +312,15 @@ for ($i = -3; $i &lt; 13; $i++) {
 
 $rsth = $dbh->prepare(
 "SELECT LINEGRAPH FROM line
-WHERE WIDTH=450 AND HEIGHT=450 AND X-AXIS=\'5**X\' AND
-Y-AXIS=\'e**X\' AND Y-LOG=1 AND X-LOG=1 AND
-SHOWVALUES=0 AND TITLE = \'Sample Log-Log Linegraph\' AND
-COLOR=lred AND SHOWGRID=1 AND SHOWPOINTS=1");
+WHERE WIDTH=450 AND HEIGHT=450 AND X_AXIS='5**X' AND
+Y_AXIS='e**X' AND Y_LOG=1 AND X_LOG=1 AND
+SHOWVALUES=0 AND TITLE = 'Sample Log-Log Linegraph' AND
+COLOR='lred' AND SHOWGRID=1 AND SHOWPOINTS=1");
 $rsth->execute;
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="simpylog.png" alt="Log-Log Graph">
+<img src="imgs/simpylog.png" alt="Log-Log Graph">
 <p>
 <a name="candlestick"></a>
 <h3>Candlestick Chart</h3>
@@ -253,14 +337,14 @@ $tdsth->execute;
 
 $rsth = $dbh->prepare(
 "SELECT CANDLESTICK FROM ?
- WHERE WIDTH=? AND HEIGHT=? AND X-AXIS=? AND Y-AXIS=? AND
- TITLE = \'Daily Price Range\' AND COLOR=red AND SHOWGRID=1 AND
- SHAPE=filldiamond AND SHOWPOINTS=1 AND SHOWVALUES=0");
+ WHERE WIDTH=? AND HEIGHT=? AND X_AXIS=? AND Y_AXIS=? AND
+ TITLE = 'Daily Price Range' AND COLOR='red' AND SHOWGRID=1 AND
+ SHAPE='filldiamond' AND SHOWPOINTS=1 AND SHOWVALUES=0");
 $rsth->execute($tdsth, 300,400, 'Date', 'Price');
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="simpcndl.png" alt="Candlestick Graph">
+<img src="imgs/simpcndl.png" alt="Candlestick Graph">
 <p>
 <a name="symgraph"></a>
 <h3>Multirange Symbolic Linegraph</h3>
@@ -272,16 +356,16 @@ $tdsth->execute;
 
 $rsth = $dbh->prepare(
 "SELECT LINEGRAPH FROM ?
-    WHERE WIDTH=400 AND HEIGHT=400 AND X-AXIS=\'Date\' AND
-    Y-AXIS=\'Price\' AND TITLE = \'Daily Price Range\' AND
-    COLOR=(red, blue) AND SHOWGRID=1 AND
-    SHAPE=(filldiamond, fillsquare) AND SHOWPOINTS=1");
+    WHERE WIDTH=400 AND HEIGHT=400 AND X_AXIS='Date' AND
+    Y_AXIS='Price' AND TITLE = 'Daily Price Range' AND
+    COLOR IN ('red', 'blue') AND SHOWGRID=1 AND
+    SHAPE IN ('filldiamond', 'fillsquare') AND SHOWPOINTS=1");
 
 $rsth->execute($tdsth);
 $rsth->bind_col(1, \$buf);
 $rsth->fetch;
 </pre>
-<img src="simpsymb.png" alt="Non-numeric Graph">
+<img src="imgs/simpsymb.png" alt="Non-numeric Graph">
 <p>
 <a name="boxchart"></a>
 <h3>Multidomain Box & Whisker Chart with Imagemap</h3>
@@ -296,15 +380,16 @@ $sth = $dbh-&gt;prepare('INSERT INTO samplebox VALUES(?, ?)');
 foreach (1..100) {
 	$sth-&gt;execute($_, int($_/2)+20);
 }
-$sth = $dbh-&gt;prepare("SELECT BOXCHART, IMAGEMAP FROM samplebox
+$sth = $dbh-&gt;prepare(
+"SELECT BOXCHART, IMAGEMAP FROM samplebox
 WHERE WIDTH=500 and HEIGHT=300 AND
-	title = 'Sample Box & Whisker Chart' AND
-	signature = 'Copyright(C) 2001, Presicient Corp.' AND
-	MAPNAME = 'boxsample' AND
-	SHOWVALUES = 1 AND
-	COLORS=(red, blue) AND
-	mapURL = 'http://www.presicient.com/samplemap.pl?plotnum=:PLOTNUM&x=:X&y=:Y&z=:Z'"
-	);
+    title = 'Sample Box & Whisker Chart' AND
+    signature = 'Copyright(C) 2001, Presicient Corp.' AND
+    MAPNAME = 'boxsample' AND
+    SHOWVALUES = 1 AND
+    COLORS IN ('red', 'blue') AND
+    mapURL = 'http://www.presicient.com/samplemap.pl?plotnum=:PLOTNUM&x=:X&y=:Y&z=:Z'"
+);
 $sth-&gt;execute;
 $row = $sth-&gt;fetchrow_arrayref;
 
@@ -317,16 +402,16 @@ print MAP '&lt;img src=samplebox.png usemap="#boxsample"&gt;',
 	$$row[1], "\n";
 $dbh-&gt;do('DROP TABLE samplebox');
 </pre>
-<img src=samplebox.png usemap="#boxsample"><MAP NAME="boxsample">
-<AREA ALT="50.5[25.5..75.5]"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=50.5&y=25.5&z=75.5"  SHAPE=RECT COORDS="161,149,338,177">
-<AREA ALT="1"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=1&y=&z="  SHAPE=CIRCLE COORDS="75,163,4">
-<AREA ALT="100"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=100&y=&z="  SHAPE=CIRCLE COORDS="424,163,4">
-<AREA ALT="45[32.5..57.5]"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=45&y=32.5&z=57.5"  SHAPE=RECT COORDS="186,81,274,108">
-<AREA ALT="20"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=20&y=&z="  SHAPE=CIRCLE COORDS="142,94,4">
-<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=70&y=&z="  SHAPE=CIRCLE COORDS="318,94,4">
+<img src='imgs/samplebox.png' usemap="#boxsample">
+<MAP NAME="boxsample">
+<AREA ALT="50.5[25.5..75.5]"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=50.5&y=25.5&z=75.5"  SHAPE=RECT COORDS="156,113,342,161">
+<AREA ALT="1"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=1&y=&z="  SHAPE=CIRCLE COORDS="65,137,4">
+<AREA ALT="100"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=100&y=&z="  SHAPE=CIRCLE COORDS="432,137,4">
+<AREA ALT="45[32.5..57.5]"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=45&y=32.5&z=57.5"  SHAPE=RECT COORDS="182,42,275,90">
+<AREA ALT="20"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=20&y=&z="  SHAPE=CIRCLE COORDS="136,66,4">
+<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl?plotnum=0&x=70&y=&z="  SHAPE=CIRCLE COORDS="321,66,4">
 </MAP>
 <p>
-
 <a name="iconbars"></a>
 <h3>Iconic Barchart With Imagemap</h3>
 <pre>
@@ -341,13 +426,14 @@ my $sth = $dbh-&gt;prepare('INSERT INTO iconic VALUES(?, ?, ?)');
 for (my $i = 0; $i &lt;= $#months; $i++) {
 	$sth-&gt;execute($months[$i], $pumpsales[$i], $turksales[$i]);
 }
-$sth = $dbh-&gt;prepare("SELECT BARCHART, IMAGEMAP FROM iconic
+$sth = $dbh-&gt;prepare(
+"SELECT BARCHART, IMAGEMAP FROM iconic
 WHERE WIDTH=820 and HEIGHT=500 AND
 	title = 'Monthly Pumpkin vs. Turkey Sales' AND
 	signature = 'Copyright(C) 2001, Presicient Corp.' AND
-	X-AXIS = 'Month' AND
-	Y-AXIS = 'Sales' AND
-	icons = ('pumpkin.png', 'turkey.png' ) AND
+	X_AXIS = 'Month' AND
+	Y_AXIS = 'Sales' AND
+	icons IN ('pumpkin.png', 'turkey.png' ) AND
 	keepOrigin = 1 AND
 	SHOWGRID = 1 AND
 	MAPNAME = 'pumpkins' AND
@@ -365,335 +451,209 @@ print MAP '&lt;img src=iconbar.png usemap="#pumpkins"&gt;',
 	$$row[1], "\n";
 $dbh-&gt;do('DROP TABLE iconic');
 </pre>
-<img src=iconbar.png usemap="#pumpkins"><MAP NAME="pumpkins">
-<AREA ALT="123"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="104,278,126,384">
-<AREA ALT="100"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="158,298,180,384">
-<AREA ALT="78"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="213,316,235,384">
-<AREA ALT="45"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="267,345,289,384">
-<AREA ALT="50"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="322,341,344,384">
+</td></tr></table>
+<table border=0>
+<tr><td valign=top>
+<img src='imgs/iconbar.png' usemap="#pumpkins">
+<MAP NAME="pumpkins">
+<AREA ALT="123"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="96,278,118,384">
+<AREA ALT="100"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="152,298,174,384">
+<AREA ALT="78"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="208,316,230,384">
+<AREA ALT="45"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="264,345,286,384">
+<AREA ALT="50"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="320,341,342,384">
 <AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="376,323,398,384">
-<AREA ALT="30"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="431,358,453,384">
-<AREA ALT="36"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="485,353,507,384">
-<AREA ALT="67"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="540,326,562,384">
-<AREA ALT="234"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="594,182,616,384">
-<AREA ALT="201"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="649,211,671,384">
-<AREA ALT="194"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="703,217,725,384">
-<AREA ALT="123"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="126,278,148,384">
-<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="180,323,202,384">
-<AREA ALT="65"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="235,328,257,384">
-<AREA ALT="35"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="289,353,311,384">
-<AREA ALT="40"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="344,349,366,384">
-<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="398,323,420,384">
-<AREA ALT="90"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="453,306,475,384">
-<AREA ALT="80"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="507,315,529,384">
-<AREA ALT="67"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="562,326,584,384">
-<AREA ALT="134"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="616,268,638,384">
-<AREA ALT="301"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="671,125,693,384">
-<AREA ALT="250"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="725,169,747,384">
-<AREA ALT="123"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="104,278,126,384">
-<AREA ALT="100"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="158,298,180,384">
-<AREA ALT="78"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="213,316,235,384">
-<AREA ALT="45"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="267,345,289,384">
-<AREA ALT="50"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="322,341,344,384">
-<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="376,323,398,384">
-<AREA ALT="30"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="431,358,453,384">
-<AREA ALT="36"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="485,353,507,384">
-<AREA ALT="67"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="540,326,562,384">
-<AREA ALT="234"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="594,182,616,384">
-<AREA ALT="201"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="649,211,671,384">
-<AREA ALT="194"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="703,217,725,384">
-<AREA ALT="123"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="126,278,148,384">
-<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="180,323,202,384">
-<AREA ALT="65"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="235,328,257,384">
-<AREA ALT="35"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="289,353,311,384">
-<AREA ALT="40"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="344,349,366,384">
-<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="398,323,420,384">
-<AREA ALT="90"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="453,306,475,384">
-<AREA ALT="80"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="507,315,529,384">
-<AREA ALT="67"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="562,326,584,384">
-<AREA ALT="134"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="616,268,638,384">
-<AREA ALT="301"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="671,125,693,384">
-<AREA ALT="250"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="725,169,747,384">
+<AREA ALT="30"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="432,358,454,384">
+<AREA ALT="36"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="488,353,510,384">
+<AREA ALT="67"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="544,326,566,384">
+<AREA ALT="234"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="600,182,622,384">
+<AREA ALT="201"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="656,211,678,384">
+<AREA ALT="194"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="712,217,734,384">
+<AREA ALT="123"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="119,278,141,384">
+<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="175,323,197,384">
+<AREA ALT="65"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="231,328,253,384">
+<AREA ALT="35"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="287,353,309,384">
+<AREA ALT="40"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="343,349,365,384">
+<AREA ALT="70"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="399,323,421,384">
+<AREA ALT="90"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="455,306,477,384">
+<AREA ALT="80"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="511,315,533,384">
+<AREA ALT="67"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="567,326,589,384">
+<AREA ALT="134"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="623,268,645,384">
+<AREA ALT="301"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="679,125,701,384">
+<AREA ALT="250"  HREF="http://www.presicient.com/samplemap.pl"  SHAPE=RECT COORDS="735,169,757,384">
 </MAP>
+</td></tr></table>
+<table border=0>
+<tr><td width="10%">&nbsp;</td>
+<td valign=top>
 <p>
 <a name="iconhisto"></a>
 <h3>Iconic Histogram with Imagemap</h3>
 <pre>
-    $sth = $dbh-&gt;prepare("select histogram, imagemap from symline
-    where WIDTH=500 AND HEIGHT=500 AND X-AXIS='Some Domain' and
-    Y-AXIS='Some Range' AND
+$sth = $dbh-&gt;prepare(
+"select histogram, imagemap from symline
+where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and
+    Y_AXIS='Some Range' AND
     TITLE='Iconic Histogram Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
     FORMAT='PNG' AND ICON='pumpkin.png' AND
-    MAPNAME='iconhisto' AND SHOWGRID=1 AND GRIDCOLOR=red AND
-    TEXTCOLOR=newcolor AND
+    MAPNAME='iconhisto' AND SHOWGRID=1 AND GRIDCOLOR='red' AND
+    TEXTCOLOR='newcolor' AND
     MAPSCRIPT='ONCLICK=\"alert(''Got X=:X, Y=:Y'')\"' AND
     MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
     AND MAPTYPE='HTML'");
-    $sth-&gt;execute;
-    $row = $sth-&gt;fetchrow_arrayref;
-    dump_img($row, 'png', 'iconhisto');
+$sth-&gt;execute;
+$row = $sth-&gt;fetchrow_arrayref;
+dump_img($row, 'png', 'iconhisto');
 </pre>
-<img src=iconhisto.png alt='iconhisto' usemap=#iconhisto>
+<img src='imgs/iconhisto.png' alt='iconhisto' usemap=#iconhisto>
 <MAP NAME="iconhisto">
-<AREA ALT="23"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-24&y=23&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-24, Y=23')"  SHAPE=RECT COORDS="174,321,231,371">
-<AREA ALT="-39"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-25&y=-39&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-25, Y=-39')"  SHAPE=RECT COORDS="79,260,174,310">
-<AREA ALT="102"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-26&y=102&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-26, Y=102')"  SHAPE=RECT COORDS="174,199,425,249">
-<AREA ALT="67"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-27&y=67&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-27, Y=67')"  SHAPE=RECT COORDS="174,137,339,187">
-<AREA ALT="80"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-28&y=80&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-28, Y=80')"  SHAPE=RECT COORDS="174,76,371,126">
+<AREA ALT="23"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-24&y=23&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-24, Y=23')"  SHAPE=RECT COORDS="194,321,247,371">
+<AREA ALT="-39"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-25&y=-39&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-25, Y=-39')"  SHAPE=RECT COORDS="105,260,194,310">
+<AREA ALT="102"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-26&y=102&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-26, Y=102')"  SHAPE=RECT COORDS="194,199,428,249">
+<AREA ALT="67"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-27&y=67&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-27, Y=67')"  SHAPE=RECT COORDS="194,137,348,187">
+<AREA ALT="80"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-28&y=80&z=&plotno=0"  ONCLICK="alert('Got X=2002-01-28, Y=80')"  SHAPE=RECT COORDS="194,76,378,126">
 </MAP>
 <p>
 <a name="logtempline"></a>
 <h3>Logarithmic Temporal Range Linegraph</h3>
 <pre>
-    $dbh-&gt;do('create table logtempline (xdate date, y interval)');
-    $sth = $dbh-&gt;prepare('insert into logtempline values(?, ?)');
-    for ($i = 0; $i &lt;= $#xdate2; $i++) {
-        $sth-&gt;execute($xdate2[$i], $ytime2[$i]);
-    }
+$dbh-&gt;do('create table logtempline (xdate date, y interval)');
+$sth = $dbh-&gt;prepare('insert into logtempline values(?, ?)');
+for ($i = 0; $i &lt;= $#xdate2; $i++) {
+    $sth-&gt;execute($xdate2[$i], $ytime2[$i]);
+}
 
-    $sth = $dbh-&gt;prepare("select linegraph, imagemap from logtempline
-    where WIDTH=500 AND HEIGHT=500 AND
+$sth = $dbh-&gt;prepare(
+"select linegraph, imagemap from logtempline
+where WIDTH=500 AND HEIGHT=500 AND
     TITLE='Logarithmic Temporal Range Linegraph Test' AND
     SIGNATURE='(C)2002, GOWI Systems' AND
-    X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
-    X-ORIENT='VERTICAL' AND Y-LOG=1 AND
-    FORMAT='PNG' AND COLORS=newcolor AND
-    SHOWGRID=1 AND SHOWVALUES=1 AND SHAPE=fillcircle AND
+    X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
+    X_ORIENT='VERTICAL' AND Y_LOG=1 AND
+    FORMAT='PNG' AND COLORS='newcolor' AND
+    SHOWGRID=1 AND SHOWVALUES=1 AND SHAPE='fillcircle' AND
     MAPNAME='logtempline' AND
     MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
     AND MAPTYPE='HTML'");
-    $sth-&gt;execute;
-    $row = $sth-&gt;fetchrow_arrayref;
-    dump_img($row, 'png', 'logtempline');
+$sth-&gt;execute;
+$row = $sth-&gt;fetchrow_arrayref;
+dump_img($row, 'png', 'logtempline');
 </pre>
-<img src=logtempline.png alt='logtempline' usemap=#logtempline>
+<img src='imgs/logtempline.png' alt='logtempline' usemap=#logtempline>
 <MAP NAME="logtempline">
-<AREA ALT="(1970-01-24,00:12:33.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1970-01-24&y=00:12:33.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="64,338,4">
-<AREA ALT="(1975-01-25,11:28:59.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1975-01-25&y=11:28:59.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="96,237,4">
-<AREA ALT="(1985-01-26,255:57:32.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1985-01-26&y=255:57:32.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="160,158,4">
-<AREA ALT="(1997-01-27,2222:22:21.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1997-01-27&y=2222:22:21.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="237,103,4">
-<AREA ALT="(2030-01-28,4328:06:00.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2030-01-28&y=4328:06:00.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="448,87,4">
+<AREA ALT="(1970-01-24,00:12:33.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1970-01-24&y=00:12:33.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="74,338,4">
+<AREA ALT="(1975-01-25,11:28:59.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1975-01-25&y=11:28:59.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="105,237,4">
+<AREA ALT="(1985-01-26,255:57:32.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1985-01-26&y=255:57:32.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="168,158,4">
+<AREA ALT="(1997-01-27,2222:22:21.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=1997-01-27&y=2222:22:21.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="243,103,4">
+<AREA ALT="(2030-01-28,4328:06:00.99)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2030-01-28&y=4328:06:00.99&z=&plotno=0"  SHAPE=CIRCLE COORDS="449,87,4">
 </MAP>
 <p>
 <a name="composite"></a>
 <h3>Composite Image</h3>
 <pre>
-    $sth = $dbh-&gt;prepare("select image, imagemap from
+$sth = $dbh-&gt;prepare(
+"select image, imagemap from
     (select linegraph from simpline
-        where color=newcolor and shape=fillcircle) simpline,
+    where color='newcolor' and shape='fillcircle') simpline,
     (select pointgraph from simppie
-        where color=blue and shape=opensquare) simppt,
+    where color='blue' and shape='opensquare') simppt,
     (select areagraph from complpa
-        where color=green) simparea,
+    where color='green') simparea,
     (select barchart from complpa
-        where color=red) simpbar
-    where WIDTH=500 AND HEIGHT=500 AND
+    where color='red') simpbar
+where WIDTH=500 AND HEIGHT=500 AND
     TITLE='Composite Bar/Line/Point/Areagraph Test' AND
     SIGNATURE='(C)2002, GOWI Systems' AND
-    X-AXIS='Some Domain' AND Y-AXIS='Some Range' AND
+    X_AXIS='Some Domain' AND Y_AXIS='Some Range' AND
     FORMAT='PNG' AND
     MAPNAME='compblpa' AND
     MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
     AND MAPTYPE='HTML'");
-    $sth-&gt;execute;
-    $row = $sth-&gt;fetchrow_arrayref;
-    dump_img($row, 'png', 'compblpa');
-    print "compblpa OK\n";
+$sth-&gt;execute;
+$row = $sth-&gt;fetchrow_arrayref;
+dump_img($row, 'png', 'compblpa');
+print "compblpa OK\n";
 </pre>
-<img src=compblpa.png alt='compblpa' usemap=#compblpa><p>
+<img src='imgs/compblpa.png' alt='compblpa' usemap=#compblpa><p>
 <MAP NAME="compblpa">
-<AREA ALT="35"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=35&z=&plotno=2"  SHAPE=CIRCLE COORDS="121,230,4">
-<AREA ALT="45"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=45&z=&plotno=2"  SHAPE=CIRCLE COORDS="191,212,4">
-<AREA ALT="55"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=55&z=&plotno=2"  SHAPE=CIRCLE COORDS="261,193,4">
-<AREA ALT="65"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=65&z=&plotno=2"  SHAPE=CIRCLE COORDS="330,175,4">
-<AREA ALT="75"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=75&z=&plotno=2"  SHAPE=CIRCLE COORDS="400,157,4">
-<AREA ALT="35"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=35&z=&plotno=3"  SHAPE=RECT COORDS="92,230,150,293">
-<AREA ALT="45"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=45&z=&plotno=3"  SHAPE=RECT COORDS="162,212,220,293">
-<AREA ALT="55"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=55&z=&plotno=3"  SHAPE=RECT COORDS="232,193,290,293">
-<AREA ALT="65"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=65&z=&plotno=3"  SHAPE=RECT COORDS="301,175,359,293">
-<AREA ALT="75"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=75&z=&plotno=3"  SHAPE=RECT COORDS="371,157,429,293">
-<AREA ALT="23"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=23&z=&plotno=0"  SHAPE=CIRCLE COORDS="121,251,4">
-<AREA ALT="-39"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=-39&z=&plotno=0"  SHAPE=CIRCLE COORDS="191,364,4">
-<AREA ALT="102"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=102&z=&plotno=0"  SHAPE=CIRCLE COORDS="261,108,4">
-<AREA ALT="67"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=67&z=&plotno=0"  SHAPE=CIRCLE COORDS="330,172,4">
-<AREA ALT="80"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=80&z=&plotno=0"  SHAPE=CIRCLE COORDS="400,148,4">
-<AREA ALT="53"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=53&z=&plotno=1"  SHAPE=CIRCLE COORDS="121,197,4">
-<AREA ALT="39"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=39&z=&plotno=1"  SHAPE=CIRCLE COORDS="191,222,4">
-<AREA ALT="127"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=127&z=&plotno=1"  SHAPE=CIRCLE COORDS="261,63,4">
-<AREA ALT="89"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=89&z=&plotno=1"  SHAPE=CIRCLE COORDS="330,132,4">
-<AREA ALT="108"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=108&z=&plotno=1"  SHAPE=CIRCLE COORDS="400,97,4">
+<AREA ALT="35"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=35&z=&plotno=2"  SHAPE=CIRCLE COORDS="130,230,4">
+<AREA ALT="45"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=45&z=&plotno=2"  SHAPE=CIRCLE COORDS="198,212,4">
+<AREA ALT="55"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=55&z=&plotno=2"  SHAPE=CIRCLE COORDS="266,193,4">
+<AREA ALT="65"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=65&z=&plotno=2"  SHAPE=CIRCLE COORDS="334,175,4">
+<AREA ALT="75"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=75&z=&plotno=2"  SHAPE=CIRCLE COORDS="402,157,4">
+<AREA ALT="35"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=35&z=&plotno=3"  SHAPE=RECT COORDS="101,230,159,293">
+<AREA ALT="45"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=45&z=&plotno=3"  SHAPE=RECT COORDS="169,212,227,293">
+<AREA ALT="55"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=55&z=&plotno=3"  SHAPE=RECT COORDS="237,193,295,293">
+<AREA ALT="65"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=65&z=&plotno=3"  SHAPE=RECT COORDS="305,175,363,293">
+<AREA ALT="75"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=75&z=&plotno=3"  SHAPE=RECT COORDS="373,157,431,293">
+<AREA ALT="23"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=23&z=&plotno=0"  SHAPE=CIRCLE COORDS="130,251,4">
+<AREA ALT="-39"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=-39&z=&plotno=0"  SHAPE=CIRCLE COORDS="198,364,4">
+<AREA ALT="102"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=102&z=&plotno=0"  SHAPE=CIRCLE COORDS="266,108,4">
+<AREA ALT="67"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=67&z=&plotno=0"  SHAPE=CIRCLE COORDS="334,172,4">
+<AREA ALT="80"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=80&z=&plotno=0"  SHAPE=CIRCLE COORDS="402,148,4">
+<AREA ALT="53"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=53&z=&plotno=1"  SHAPE=CIRCLE COORDS="130,197,4">
+<AREA ALT="39"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=39&z=&plotno=1"  SHAPE=CIRCLE COORDS="198,222,4">
+<AREA ALT="127"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=127&z=&plotno=1"  SHAPE=CIRCLE COORDS="266,63,4">
+<AREA ALT="89"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=89&z=&plotno=1"  SHAPE=CIRCLE COORDS="334,132,4">
+<AREA ALT="108"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=108&z=&plotno=1"  SHAPE=CIRCLE COORDS="402,97,4">
 </MAP>
 <p>
 <a name="gantt"></a>
 <h3>Gantt Chart</h3>
 <pre>
-    $dbh-&gt;do('create table simpgantt (task varchar(30),
-        starts date, ends date, assignee varchar(3), pctcomplete integer,
-        dependent varchar(30))');
-    $sth = $dbh-&gt;prepare('insert into simpgantt values(?,?,?,?,?,?)');
-    for ($i = 0; $i &lt;= $#tasks; $i++) {
-        $sth-&gt;execute($tasks[$i], $starts[$i], $ends[$i], $assigned[$i],
-            $pct[$i], $depends[$i]);
-    }
+$dbh-&gt;do(
+'create table simpgantt (task varchar(30),
+    starts date, ends date, assignee varchar(3), pctcomplete integer,
+    dependent varchar(30))');
+$sth = $dbh-&gt;prepare('insert into simpgantt values(?,?,?,?,?,?)');
+for ($i = 0; $i &lt;= $#tasks; $i++) {
+    $sth-&gt;execute($tasks[$i], $starts[$i], $ends[$i], $assigned[$i],
+        $pct[$i], $depends[$i]);
+}
 
-    $sth = $dbh-&gt;prepare("select gantt, imagemap from simpgantt
-    where WIDTH=500 AND HEIGHT=500 AND
+$sth = $dbh-&gt;prepare(
+"select gantt, imagemap from simpgantt
+where WIDTH=500 AND HEIGHT=500 AND
     TITLE='Simple Gantt Chart Test' AND
     SIGNATURE='(C)2002, GOWI Systems' AND
-    X-AXIS='Tasks' AND Y-AXIS='Schedule' AND
-    COLOR=red AND LOGO='gowilogo.png' AND
+    X_AXIS='Tasks' AND Y_AXIS='Schedule' AND
+    COLOR='red' AND LOGO='gowilogo.png' AND
     MAPNAME='simpgantt' AND
     MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X&y=:Y&z=:Z&plotno=:PLOTNUM'
     AND MAPTYPE='HTML' AND
-    X-ORIENT='VERTICAL' AND
+    X_ORIENT='VERTICAL' AND
     FORMAT='PNG'");
-    $sth-&gt;execute;
-    $row = $sth-&gt;fetchrow_arrayref;
-    dump_img($row, 'png', 'simpgantt');
+$sth-&gt;execute;
+$row = $sth-&gt;fetchrow_arrayref;
+dump_img($row, 'png', 'simpgantt');
 </pre>
-<img src=simpgantt.png alt='simpgantt' usemap=#simpgantt><p>
+<img src='imgs/simpgantt.png' alt='simpgantt' usemap=#simpgantt><p>
 <MAP NAME="simpgantt">
-<AREA ALT="2002-01-24->2002-01-31"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-24&y=2002-01-31&z=25:DAA&plotno=First task"  SHAPE=RECT COORDS="79,68.5,110,81.5">
-<AREA ALT="2002-01-27->2002-02-27"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-27&y=2002-02-27&z=0:KPD&plotno=Another task"  SHAPE=RECT COORDS="92,138.5,228,151.5">
-<AREA ALT="2002-02-01->2002-02-25"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-02-01&y=2002-02-25&z=37:DWE&plotno=2nd Task"  SHAPE=RECT COORDS="114,208.5,219,221.5">
-<AREA ALT="2002-02-14->2002-03-10"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-02-14&y=2002-03-10&z=0:SAM&plotno=3rd task"  SHAPE=RECT COORDS="171,278.5,276,291.5">
-<AREA ALT="2002-03-28->2002-04-15"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-03-28&y=2002-04-15&z=0:WLA&plotno=Final task"  SHAPE=RECT COORDS="355,348.5,434,361.5">
+<AREA ALT="2002-01-24->2002-01-31"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-24&y=2002-01-31&z=25:DAA&plotno=First%20task"  SHAPE=RECT COORDS="79,68.5,110,81.5">
+<AREA ALT="2002-01-27->2002-02-27"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-01-27&y=2002-02-27&z=0:KPD&plotno=Another%20task"  SHAPE=RECT COORDS="92,138.5,228,151.5">
+<AREA ALT="2002-02-01->2002-02-25"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-02-01&y=2002-02-25&z=37:DWE&plotno=2nd%20Task"  SHAPE=RECT COORDS="114,208.5,219,221.5">
+<AREA ALT="2002-02-14->2002-03-10"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-02-14&y=2002-03-10&z=0:SAM&plotno=3rd%20task"  SHAPE=RECT COORDS="171,278.5,276,291.5">
+<AREA ALT="2002-03-28->2002-04-15"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-03-28&y=2002-04-15&z=0:WLA&plotno=Final%20task"  SHAPE=RECT COORDS="355,348.5,434,361.5">
 </MAP>
 <p>
-<a name="description"></a>
-<h2>DESCRIPTION</h2><p>
-
-DBI driver abstraction for rendering pie charts, bar charts, histograms, box & whisker charts,
-line, point, area, and candlestick graphs. The default output format is PNG;
-JPEG, or GIF format can be generated
-by setting the FORMAT property (see below), assuming the appropriate supporting
-libraries and modules are installed.<br>
-<b>BE ADVISED:</b> This is <b>BETA</B> software, and subject to change at the
-whim of the author(s). <p>
-
-Why DBD::Chart ? Basically, the idea is to make chart rendering easy for us database
-geeks...and maybe for other folks, as well. Being able to render a chart from a
-rowset by simply binding output column buffers as input parameter buffers for a
-simple INSERT, then just SELECT'ing to get the image, seemed like a nice
-abstraction.<p>
-
-BTW: This driver is 100% pure Perl.<p>
-<p>
-<a name="version"></a>
-<h2>CURRENT VERSION</h2><p>
-
-Release 0.60<p>
-
-<a href="http://www.presicient.com/dbdchart/dbdchart060.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.60.tar.gz">.tar.gz version</a>
-
-<a name="history"></a>
-<h2>CHANGE HISTORY</h2><p>
-
-Release 0.60:
-<ul>
-<li>temporal data type support
-<li>histogram support
-<li>composite images via derived tables
-<li>user defined colors
-<li>Gantt charts
-</ul>
-
-Release 0.52:
-<ul>
-<li>fix for 2D max range values
-</ul>
-
-Release 0.51:
-<ul>
-<li>3-D piechart support
-<li>multicolor, single range barcharts
-</ul>
-
-Release 0.50:
-<ul>
-<li>remove dependencies on GD::Graph (ie., added internal piechart, barchart rendering in DBD::Chart::Plot)
-<li>added iconic barcharts and datapoints (ie., use small images instead of solid bars/points)
-<li>3-D, 3 axis barcharts (X, Y, Z datapoints)
-<li>support for imagemap hotspot generation (i.e., SELECT LINEGRAPH, IMAGEMAP FROM...)
-<li>added box&whisker charts
-<li>moved logo processing from DBD::Chart to DBD::Chart::Plot
-<li>bug fix for symbolic domain areagraphs
-<li>bug fix for escaping single quotes inside a string
-</ul>
-
-Release 0.43:
-<ul>
-<li>fix to support GIF via older GD packages (many thanks to Peter Scott!)
-<li>other cosmetic fixes
-</ul>
-
-Release 0.42:
-<ul>
-<li>fix to support X-ORIENT='HORIZONTAL' on symbolic domains, candlesticks
-</ul>
-
-Release 0.41:
-<ul>
-<li>fix to strip quotes from string literal in INSERT statement
-<li>fix for string literal column index variable in prepare of INSERT
-<li>fix for Y-axis tick alignment when no grid is requested
-</ul>
-
-Release 0.40:<p>
-<ul>
-<li>fix for DECIMAL, INTEGER, etc. last columns in CREATE TABLE</li>
-<li>fix for FORMAT property to properly handle as string value</li>
-<li>added Y-MAX, Y-MIN properties to control Y-axis min/max values for barcharts</li>
-</ul>
-
-Release 0.30:<p>
-<ul>
-<li>strip newlines from SQL for prepare()
-<li>add BACKGROUND property to set background color, incl. transparent background
-<li>add FORMAT property to select PNG or JPEG
-<li>add X-ORIENT property to set X-tick label orientation
-<li>add LOGO property to set a background image
-<li>add SIGNATURE property to set a signature string in image
-<li>add placeholder support in SELECT WHERE clause
-<li>add KEEPORIGIN property to force (0,0) in the graph
-<li>auto-skip symbolic X-axis vertical tick labels when they overlap
-<li>add parameterized chart datasource (i.e., SELECT BARCHART FROM ? WHERE...)
-</ul><p>
-
-Release 0.20:<p>
-<ul>
-<li>added support for 3-D bar and pie charts (via GD::Graph3d)
-<li>added logarithmic line/point graph support
-<li>added area graphs
-<li>added candlestick charts (e.g., for daily trading range charts)
-<li>added support for non-numeric domain values
-<li>packaged for CPAN
-</ul><p>
-
-Release 0.10:<p>
-<ul>
-<li>Coded; first alpha release
-</ul><p>
-
+<hr color=silver>
 <a name="behavior"></a>
-<h2>DRIVER-SPECIFIC BEHAVIOR</h2><p>
+<h2>Driver Specific Behavior</h2><p>
 <a name="dsn"></a>
-<h3>DATA-SOURCE NAME</h3><p>
+<h3>Data Source Name</h3><p>
 
 The dsn string passed to <code>DBI->connect()</code> is simply <code>'dbi:Chart:'</code>.
 No username or password is required.<p>
 
 <a name="types"></a>
-<h3>DATA TYPES</h3><p>
+<h3>Data Types</h3><p>
 
 For purposes of this discussion, data types are assigned to
 the following classifications:<p>
 <table border=1><tr bgcolor=lightsteelblue><th>Type Class</th><th>Data Types</th></tr>
-<td align=center>Numeric</td><td>INTEGER, SMALLINT, TINYINT, FLOAT, DECIMAL</td></tr>
-<td align=center>Temporal</td><td>DATE, TIME, TIMESTAMP, INTERVAL<br>
+<tr bgcolor=white><td align=center><b>Numeric</b></td><td>INTEGER, SMALLINT, TINYINT, FLOAT, DECIMAL</td></tr>
+<tr bgcolor=white><td align=center><b>Tempora</b>l</td><td>DATE, TIME, TIMESTAMP, INTERVAL<br>
 (INTERVAL treated as HOUR-TO-SECOND interval)</td></tr>
-<td align=center>Symbolic</td><td>CHAR, VARCHAR</td></tr>
+<tr bgcolor=white><td align=center><b>Symbolic</b></td><td>CHAR, VARCHAR</td></tr>
 </table>
 The various type classes are applied as follows:
 <ul>
@@ -722,12 +682,12 @@ single quotes can escape the quotes using two consecutive quotes, e.g.
 <h3>Date, Time, Timestamp, and Interval Types</h3><p>
 DATE, TIME, TIMESTAMP, and INTERVAL values must be supplied as character strings of the following form:<p>
 <table border=1><tr bgcolor=lightsteelblue><th>Type</th><th>Format</th></tr>
-<tr><td align=center>DATE</td><td align=center>'YYYY-MM-DD', <i>.e.g.,</i> '2002-01-08'<br>
+<tr bgcolor=white><td align=center>DATE</td><td align=center>'YYYY-MM-DD', <i>.e.g.,</i> '2002-01-08'<br>
 or 'YYYY-MMM-DD' <i>.e.g.,</i> '2002-JAN-08'</td></tr>
-<tr><td align=center>TIME</td><td align=center>'HH:MM:SS[.S...]'<br>(subsecond precision optional)</td></tr>
-<tr><td align=center>TIMESTAMP</td><td align=center>'YYYY-MM-DD HH:MM:SS[.S...]' or<br>
+<tr bgcolor=white><td align=center>TIME</td><td align=center>'HH:MM:SS[.S...]'<br>(subsecond precision optional)</td></tr>
+<tr bgcolor=white><td align=center>TIMESTAMP</td><td align=center>'YYYY-MM-DD HH:MM:SS[.S...]' or<br>
 'YYYY-MMM-DD HH:MM:SS[.S...]'<br>(subsecond precision optional)</td></tr>
-<tr><td align=center>INTERVAL</td><td align=center>'[-]HHH...:MM:SS[.S...]'<br>(subsecond precision optional)
+<tr bgcolor=white><td align=center>INTERVAL</td><td align=center>'[-]HHH...:MM:SS[.S...]'<br>(subsecond precision optional)
 <br>precision up to the hour is provided</td></tr>
 </table><p>
 <p>
@@ -737,7 +697,7 @@ therefore, dates after January, 2038 or prior to December 1901 may not be suppor
 Escape clause formatting (i.e., '{d mm/dd/yyy}') will be supported in a future release.<p>
 
 <a name="parmsql"></a>
-<h3>SQL DIALECT</h3><p>
+<h3>SQL Dialect</h3><p>
 DBD::Chart uses a small subset of SQL to create, populate, render, and discard
 chart data:<p>
 <ul>
@@ -834,10 +794,10 @@ Populates the chart with the specified data. A value must be provided for each c
 in the chart (i.e., no defaults are used.).</li><p>
 
 <a name="select"></a>
-<li><code><b>SELECT <i>&lt;chart-type&gt;</i> [, <i>IMAGEMAP</i> ]<br>
+<li><code><b>SELECT <i>&lt;chart-type&gt;</i> [, IMAGEMAP ]<br>
 FROM <i>? | &lt;chartname&gt; <!-- | &lt;template-uri&gt; -->|
 ( &lt;subquery&gt; ) [ &lt;queryname&gt; ] [, ( &lt;subquery&gt; )...]</i><br>
-WHERE <i>&lt;qualifier&gt; = &lt;? | literal | literallist&gt;</i> [AND ...]</b></code><p>
+WHERE <i>&lt;qualifier&gt; &lt;</i> = | IN <i>&gt; &lt; ? | literal | literallist&gt;</i> [AND ...]</b></code><p>
 Renders the image(s) from the specified chart or DBI statement handle, <!-- or XML template document, -->
 using the <i>&lt;qualifer&gt;</i>s to control how the image
 is rendered.
@@ -857,8 +817,8 @@ When any of the various <code>$sth->fetch()</code> operations is applied to the 
 <li>For PNG, JPEG, or GIF formats, images are returned as VARBINARY objects
 representing the binary image data.
 <!-- <li>For SVG formats, images are returned as VARCHAR objects representing the SVG description
-of the image.
-<li>Templates are returned as VARCHAR objects containing the XML description for of all the
+of the image. -->
+<!-- <li>Templates are returned as VARCHAR objects containing the XML description for of all the
 graph properties, as well as any supplied data points.
 -->
 <li>Imagemaps are returned as VARCHAR objects containing the HTML imagemap text.
@@ -888,26 +848,26 @@ from one or more different graph types.
 </ul><p>
 The following qualifiers are allowed:<p>
 <table border=1><tr bgcolor=orange><th>Qualifier</th><th>Description</th><th>Default<br>Value</th><th>Global</th><th>Restrictions</th></tr>
-<tr>
+<tr bgcolor=white>
 	<td align=center valign=top><b>WIDTH</b></td>
 	<td valign=top>sets the image width in pixels</td>
 	<td valign=top>400</td>
 	<td valign=top>Yes</td>
 	<td valign=top>single value only</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>HEIGHT</b></td>
 	<td valign=top>sets the image height in pixels</td>
 	<td valign=top>400</td>
 	<td valign=top>Yes</td>
 	<td valign=top>single value only</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>SHOWGRID</b></td>
 	<td valign=top>when set to 1, causes the background grid of all charts/graphs except piecharts and box&whisker charts to be displayed</td>
 	<td valign=top>0</td>
 	<td valign=top>Yes</td>
 	<td valign=top>single value only, valid values are 0 and 1.</td></tr>
-<tr>
-	<td valign=top align=center><b>COLOR</b><br>(synonym: <b>COLORS</b>)</td>
+<tr bgcolor=white>
+	<td valign=top align=center><b>COLOR</b><br>(<i>aka</i> <b>COLORS</b>)</td>
 	<td valign=top>sets the color of chart elements; may be multivalued, in which case each wedge(piechart),
 bar(barchart, histogram), box&whisker, line(linegraph), area(areagraph), pointset(scattergraph), or candlestick-set
 uses the next color in the list. Valid color values are names from the <a href="#colormap">COLORMAP</a> table
@@ -915,11 +875,12 @@ uses the next color in the list. Valid color values are names from the <a href="
 <code>white, lgray, gray, dgray, black, lblue, blue, dblue, gold, lyellow,
 yellow, dyellow, lgreen, green. dgreen, lred, red, dred, lpurple,
 purple, dpurple, lorange, orange, pink, dpink, marine, cyan, lbrown, dbrown.</code></td>
-	<td valign=top>black</td>
+	<td valign=top>'black'</td>
 	<td valign=top>No</td>
-	<td valign=top>The colorlist wraps if more range valuesets are defined than colors. Ignored for iconic barcharts/histograms</td></tr>
-<tr>
-	<td valign=top align=center><b>ICON</b><br>(synonym: <b>ICONS</b>)</td>
+	<td valign=top>Multiple colors can be specified via either the = or IN operator, followed by a parenthesized
+	list of color names.<br>The colorlist wraps if more range valuesets are defined than colors. Ignored for iconic barcharts/histograms</td></tr>
+<tr bgcolor=white>
+	<td valign=top align=center><b>ICON</b><br>(<i>aka</i> <b>ICONS</b>)</td>
 	<td valign=top>sets an icon image to be used to render the bars for barcharts, or datapoints
 	for line, point, area, and candlestick graphs.<p>
 	The number of icons per bar is based the ratio of the icon pixel height to the the maximum image
@@ -931,23 +892,26 @@ purple, dpurple, lorange, orange, pink, dpink, marine, cyan, lbrown, dbrown.</co
 	</td>
 	<td valign=top>None.</td>
 	<td valign=top>No</td>
-	<td valign=top>String name of a compatible format image file (PNG, JPEG, GIF).
+	<td valign=top>String name of a compatible format image file (PNG, JPEG, GIF).<br>
+	Multiple icons can be specified via either the = or IN operator, followed by a parenthesized
+	list of filenames.<br>
 	Not valid for piecharts. May be multivalued. Icon list wraps if more ranges are defined than icons.</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>GRIDCOLOR</b></td>
 	<td valign=top>sets the color of any background grid lines. Default black</td>
-	<td valign=top>black</td>
+	<td valign=top>'black'</td>
 	<td valign=top>Yes</td>
-	<td valign=top>Single valued</td></tr>
-<tr>
-	<td valign=top align=center><b>SHAPE</b></b><br>(synonym: <b>SHAPES</b>)</td>
+	<td valign=top>Single string value</td></tr>
+<tr bgcolor=white>
+	<td valign=top align=center><b>SHAPE</b></b><br>(<i>aka</i> <b>SHAPES</b>)</td>
 	<td valign=top>sets the shape of points for line, area, point, or candlestick graphs;
 	may be multivalued. Valid values are <code>fillsquare, opensquare, horizcross, diagcross, filldiamond, opendiamond,
 fillcircle, opencircle, icon.</code> Default none.</td>
-	<td valign=top>fillcircle</td>
+	<td valign=top>'fillcircle'</td>
 	<td valign=top>No</td>
-	<td valign=top>An icon shape requires one or more icon files to be specified with the ICON attribute.</td></tr>
-<tr>
+	<td valign=top>Multiple shapes can be specified via either the = or IN operator, followed by a parenthesized
+	list of shape names.<br>An icon shape requires one or more icon files to be specified with the ICON attribute.</td></tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>SHOWPOINTS</b></td>
 	<td valign=top>for line, area, and candlestick graphs, determines whether datapoints are
 		explicitly rendered</td>
@@ -955,7 +919,7 @@ fillcircle, opencircle, icon.</code> Default none.</td>
 	<td valign=top>No</td>
 	<td valign=top>single value only. Ignored for pie and bar charts, and pointgraphs.
 	Valid values are 0 and 1.</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>SHOWVALUES</b></td>
 	<td valign=top>for all chart types except pie and Gantt,
 	determines whether the datapoint values are displayed.
@@ -967,62 +931,62 @@ fillcircle, opencircle, icon.</code> Default none.</td>
 	<td valign=top>0</td>
 	<td valign=top>No</td>
 	<td valign=top>single value only, valid values are 0 and 1, ignored for pie charts.</td></tr>
-<tr>
-	<td valign=top align=center><b>X-LOG</b></td>
-	<td valign=top>for line, area, point, and candlestick graphs, causes values along the X-AXIS to be plotted in log<sub>10</sub> form;</td>
+<tr bgcolor=white>
+	<td valign=top align=center><b>X_LOG</b><br>(<i>aka</i> <b>X-LOG</b>)</td>
+	<td valign=top>for line, area, point, and candlestick graphs, causes values along the X axis to be plotted in log<sub>10</sub> form;</td>
 	<td valign=top>0</td>
 	<td valign=top>Yes</td>
-	<td valign=top>All domain values must be &gt; 0 when X-LOG is enabled.</td></tr>
-<tr>
-	<td valign=top align=center><b>Y-LOG</b></td>
-	<td valign=top>for barchart, line, area, point, and candlestick graphs, causes values along the Y-AXIS to be plotted in log<sub>10</sub> form;</td>
+	<td valign=top>All domain values must be &gt; 0 when X_LOG is enabled.</td></tr>
+<tr bgcolor=white>
+	<td valign=top align=center><b>Y_LOG</b><br>(<i>aka</i> <b>Y-LOG</b>)</td>
+	<td valign=top>for barchart, line, area, point, and candlestick graphs, causes values along the Y axis to be plotted in log<sub>10</sub> form;</td>
 	<td valign=top>0</td>
 	<td valign=top>Yes</td>
-	<td valign=top>All range values must be &gt; 0 when Y-LOG is enabled.</td></tr>
-<tr>
-	<td valign=top align=center><b>X-AXIS</b></td>
-	<td valign=top>sets the label string on the X-AXIS of line, area, point, and candlestick graphs.</td>
+	<td valign=top>All range values must be &gt; 0 when Y_LOG is enabled.</td></tr>
+<tr bgcolor=white>
+	<td valign=top align=center><b>X_AXIS</b><br>(<i>aka</i> <b>X-AXIS</b>)</td>
+	<td valign=top>sets the label string on the X axis of line, area, point, and candlestick graphs.</td>
 	<td valign=top>'X-Axis'</td>
 	<td valign=top>Yes</td>
 	<td valign=top>Single string value</td></tr>
-<tr>
-	<td valign=top align=center><b>Y-AXIS</b></td>
-	<td valign=top>sets the label string on the Y-AXIS.</td>
+<tr bgcolor=white>
+	<td valign=top align=center><b>Y_AXIS</b><br>(<i>aka</i> <b>Y-AXIS</b>)</td>
+	<td valign=top>sets the label string on the Y axis.</td>
 	<td valign=top>'Y-Axis'</td>
 	<td valign=top>Yes</td>
 	<td valign=top>Single string value; ignored for piecharts and box&whisker charts</td></tr>
-<tr>
-	<td valign=top align=center><b>Z-AXIS</b></td>
-	<td valign=top>sets the label string on the Z-AXIS. Also directs plotting engine to render
+<tr bgcolor=white>
+	<td valign=top align=center><b>Z_AXIS</b><br>(<i>aka</i> <b>Z-AXIS</b>)</td>
+	<td valign=top>sets the label string on the Z axis. Also directs plotting engine to render
 	true 3 axis barchart.</td>
 	<td valign=top>'Z-Axis'</td>
 	<td valign=top>Yes</td>
 	<td valign=top>Single string value; valid for barcharts/histograms only, ignored for all others</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>TITLE</b></td>
 	<td valign=top>sets the title string of the graph.</td>
 	<td valign=top>None.</td>
 	<td valign=top>Yes</td>
 	<td>&nbsp;</td></tr>
-<tr>
-	<td valign=top align=center><b>3-D</b></td>
+<tr bgcolor=white>
+	<td valign=top align=center><b>THREE_D</b><br>(<i>aka</i> <b>3-D</b>)</td>
 	<td valign=top>sets the 3-D effect on piecharts, barcharts, and histograms.</td>
 	<td valign=top>0</td>
 	<td valign=top>No</td>
 	<td>&nbsp;</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>BACKGROUND</b></td>
 	<td valign=top>sets the background color</td>
-	<td valign=top>white</td>
+	<td valign=top>'white'</td>
 	<td valign=top>Yes</td>
-	<td valign=top>single value only, from list of legal colors or <code>transparent</code>.</td></tr>
-<tr>
+	<td valign=top>single string value only, from list of legal colors or <code>transparent</code>.</td></tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>TEXTCOLOR</b></td>
 	<td valign=top>sets the color of text in the image.</td>
-	<td valign=top>black</td>
+	<td valign=top>'black'</td>
 	<td valign=top>No</td>
-	<td valign=top>Single value from the list of valid colors.</td></tr>
-<tr>
+	<td valign=top>Single string value from the list of valid colors.</td></tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>LOGO</b></td>
 	<td valign=top>sets a background image; default none, single value only. Accepts a filename
 (optionally including path info) of an image file of either PNG, JPEG, or GIF format.
@@ -1032,27 +996,27 @@ The image will be centered under the graph image.</td>
 	<td valign=top>If the image size is less than the defined
 specified WIDTH and/or HEIGHT, the BACKGROUND color will be used to fill to the edges. If
 the image exceeds the WIDTH and/or HEIGHT, the image will be clipped to fit.</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>SIGNATURE</b></td>
 	<td valign=top>sets a signature string to be printed in tiny font in the
 lower right hand corner of the image. E.g. "Copyright(C) 2001, GOWI Systems. All rights reserved.".</td>
 	<td valign=top>None.</td>
 	<td valign=top>Yes</td>
 	<td valign=top>single value, text string only, default none.</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>FORMAT</b></td>
 	<td valign=top>sets the output image format, either PNG, JPEG, or GIF</td>
 	<td valign=top>PNG</td>
 	<td valign=top>Yes</td>
 	<td valign=top>Single value, string, either 'PNG','JPEG', 'GIF' (case insensitive).
 	Some formats require additional support libraries (See <a href="#conform">PREREQUISITE SOFTWARE</a> below).</td></tr>
-<tr>
-	<td valign=top align=center><b>X-ORIENT</b></td>
+<tr bgcolor=white>
+	<td valign=top align=center><b>X_ORIENT</b><br>(<i>aka</i> <b>X-ORIENT</b>)</td>
 	<td valign=top>sets the display angle of the X-axis tick labels</td>
 	<td valign=top>Horizontal</td>
 	<td valign=top>Yes</td>
 	<td valign=top>single value, case-insensitive string, 'horizontal' or 'vertical'</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>KEEPORIGIN</b></td>
 	<td valign=top>forces the origin axes (0,0) in the image.
 	Normally, bar, line, point, area, and candlestick graphs automatically
@@ -1062,34 +1026,35 @@ to 1 to force the origin axis to be included. </td>
 	<td valign=top>Yes</td>
 	<td valign=top>single value, either 0 or 1. Ignored for piecharts.</td></tr>
 <!--
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>TEMPLATE</b></td>
 	<td valign=top>Establishes an XML template that describes graph properties. Any additional
 	properties provided in the WHERE clause will override the template value(s).</td>
 	<td valign=top>None.</td>
 	<td>Single string value of a URI: e.g., 'http://www.presicient.com/simplebars.xml' or
-	'file://topdir/childdir/sample.xml'</td></tr>
-<tr>
+	'file://topdir/childdir/sample.xml'</td></tr> -->
+<!--
+<tr bgcolor=white>
 	<td valign=top align=center><b>FONT</b></td>
 	<td valign=top>sets the font face for text in the image.</td>
-	<td valign=top>Default GD::Text font</td>
+	<td valign=top>Default GD::Text font for PNG, JPEG<br>Courier for SVG</td>
 	<td valign=top>No</td>
 	<td>Single string value</td></tr> -->
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>MAPTYPE</b></td>
 	<td valign=top>set the type of imagemap</td>
 	<td valign=top>HTML</td>
 	<td valign=top>Yes</td>
 	<td valign=top>Single string value either 'HTML' or 'Perl'
 	</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>MAPNAME</b></td>
 	<td valign=top>set the name of the map generated for HTML imagemaps</td>
 	<td valign=top>'plot'</td>
 	<td valign=top>Yes</td>
 	<td valign=top>Single string value; only alphanumerics or '_' allowed.
 	</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>MAPURL</b></td>
 	<td valign=top>sets the base URL for HTML IMAGEMAPs.</td>
 	<td valign=top>None</td>
@@ -1115,7 +1080,7 @@ to 1 to force the origin axis to be included. </td>
 	(separated by a colon) for Gantt charts.
 	</ol>
 	</td></tr>
-<tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>MAPSCRIPT</b></td>
 	<td valign=top>set the text of a client-side scripting tag to be included in
 	HTML imagemaps. E.g., <br>
@@ -1168,6 +1133,7 @@ or open multiple statement handles of the same SELECT statement if possible.
 the Tk::JPEG PPM from ActiveState.
 <li>Support for GIF image formats requires a compatible version of the GD
 modules (pre 1.20).
+<!-- <li>Support for SVG image formats requires SVG.pm v. 2.0 or greater. -->
 <li>Composite images can only be constructed from compatible chart types:
 <ul>
 <li>piecharts, Gantt charts, and 3-axis barcharts/histograms must be used alone (i.e., a single graph composite).
@@ -1183,6 +1149,18 @@ associated plot in any legend
 generated for the composite image. If no name is given for a derived table query,
 the default name "PLOTn", where n is the sequence number of the query in the image,
 will be used.
+<li>As of version 0.61, syntax has been modified to more closely adhere to standard SQL.
+The following changes were made:
+<ul>
+<li>Hyphenated property names (X-LOG, Y-LOG, X-AXIS, Y-AXIS, Z-AXIS, X-ORIENT, 3-D) have
+replaced the hyphen with an underscore; in addition, '3-D' has been replaced with THREE_D.
+<li>Color and shape names are now treated as string values and should be quoted.
+<li>The IN operator is now supported when specifying a value list for the COLOR, SHAPE,
+or ICON properties.
+</ul>
+Please note that <b>all prior behaviors have been preserved</b> in order to maintain
+backward compatibility. These changes were made to ease any future interoperability
+with other SQL based tools, e.g., SQL::Statement.
 </ul>
 </li><p>
 <a name="update"></a>
@@ -1212,7 +1190,7 @@ Note that the &lt;, &lt;=, &gt;, &gt;= predicate operators now fully support tem
 <p>
 
 <a name="colormap"></a>
-<h3>COLORMAPS</h3>
+<h3>Colormaps</h3>
 The colors used to render the various image elments can be adjusted by the
 application by modifying the predefined COLORMAP table. The COLORMAP table
 is predefined as follows:
@@ -1228,36 +1206,36 @@ The color component values must be specified between 0 and 255.
 <p>
 The following values are predefined in the COLORMAP table:
 <table border=1><tr><th bgcolor=lightgrey>Name</th><th bgcolor=red>RedValue</th><th bgcolor=green>GreenValue</th><th bgcolor=blue>BlueValue</th></tr>
-<tr><td align=center>white</td><td>255</td><td>255</td><td>255</td></tr>
-<tr><td align=center>lgray</td><td>191</td><td>191</td><td>191</td></tr>
-<tr><td align=center>gray</td><td>127</td><td>127</td><td>127</td></tr>
-<tr><td align=center>dgray</td><td>63</td><td>63</td><td>63</td></tr>
-<tr><td align=center>black</td><td>0</td><td>0</td><td>0</td></tr>
-<tr><td align=center>lblue</td><td>0</td><td>0</td><td>255</td></tr>
-<tr><td align=center>blue</td><td>0</td><td>0</td><td>191</td></tr>
-<tr><td align=center>dblue</td><td>0</td><td>0</td><td>127</td></tr>
-<tr><td align=center>gold</td><td>255</td><td>215</td><td>0</td></tr>
-<tr><td align=center>lyellow</td><td>255</td><td>255</td><td>0</td></tr>
-<tr><td align=center>yellow</td><td>191</td><td>191</td><td>0</td></tr>
-<tr><td align=center>dyellow</td><td>127</td><td>127</td><td>0</td></tr>
-<tr><td align=center>lgreen</td><td>0</td><td>255</td><td>0</td></tr>
-<tr><td align=center>green</td><td>0</td><td>191</td><td>0</td></tr>
-<tr><td align=center>dgreen</td><td>0</td><td>127</td><td>0</td></tr>
-<tr><td align=center>lred</td><td>255</td><td>0</td><td>0</td></tr>
-<tr><td align=center>red</td><td>191</td><td>0</td><td>0</td></tr>
-<tr><td align=center>dred</td><td>127</td><td>0</td><td>0</td></tr>
-<tr><td align=center>lpurple</td><td>255</td><td>0</td><td>255</td></tr>
-<tr><td align=center>purple</td><td>191</td><td>0</td><td>191</td></tr>
-<tr><td align=center>dpurple</td><td>127</td><td>0</td><td>127</td></tr>
-<tr><td align=center>lorange</td><td>255</td><td>183</td><td>0</td></tr>
-<tr><td align=center>orange</td><td>255</td><td>127</td><td>0</td></tr>
-<tr><td align=center>pink</td><td>255</td><td>183</td><td>193</td></tr>
-<tr><td align=center>dpink</td><td>255</td><td>105</td><td>180</td></tr>
-<tr><td align=center>marine</td><td>127</td><td>127</td><td>255</td></tr>
-<tr><td align=center>cyan</td><td>0</td><td>255</td><td>255</td></tr>
-<tr><td align=center>lbrown</td><td>210</td><td>180</td><td>140</td></tr>
-<tr><td align=center>dbrown</td><td>165</td><td>42</td><td>42</td></tr>
-<tr><td align=center>transparent</td><td>1</td><td>1</td><td>1</td></tr>
+<tr bgcolor=white><td align=center>white</td><td>255</td><td>255</td><td>255</td></tr>
+<tr bgcolor=white><td align=center>lgray</td><td>191</td><td>191</td><td>191</td></tr>
+<tr bgcolor=white><td align=center>gray</td><td>127</td><td>127</td><td>127</td></tr>
+<tr bgcolor=white><td align=center>dgray</td><td>63</td><td>63</td><td>63</td></tr>
+<tr bgcolor=white><td align=center>black</td><td>0</td><td>0</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>lblue</td><td>0</td><td>0</td><td>255</td></tr>
+<tr bgcolor=white><td align=center>blue</td><td>0</td><td>0</td><td>191</td></tr>
+<tr bgcolor=white><td align=center>dblue</td><td>0</td><td>0</td><td>127</td></tr>
+<tr bgcolor=white><td align=center>gold</td><td>255</td><td>215</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>lyellow</td><td>255</td><td>255</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>yellow</td><td>191</td><td>191</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>dyellow</td><td>127</td><td>127</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>lgreen</td><td>0</td><td>255</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>green</td><td>0</td><td>191</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>dgreen</td><td>0</td><td>127</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>lred</td><td>255</td><td>0</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>red</td><td>191</td><td>0</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>dred</td><td>127</td><td>0</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>lpurple</td><td>255</td><td>0</td><td>255</td></tr>
+<tr bgcolor=white><td align=center>purple</td><td>191</td><td>0</td><td>191</td></tr>
+<tr bgcolor=white><td align=center>dpurple</td><td>127</td><td>0</td><td>127</td></tr>
+<tr bgcolor=white><td align=center>lorange</td><td>255</td><td>183</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>orange</td><td>255</td><td>127</td><td>0</td></tr>
+<tr bgcolor=white><td align=center>pink</td><td>255</td><td>183</td><td>193</td></tr>
+<tr bgcolor=white><td align=center>dpink</td><td>255</td><td>105</td><td>180</td></tr>
+<tr bgcolor=white><td align=center>marine</td><td>127</td><td>127</td><td>255</td></tr>
+<tr bgcolor=white><td align=center>cyan</td><td>0</td><td>255</td><td>255</td></tr>
+<tr bgcolor=white><td align=center>lbrown</td><td>210</td><td>180</td><td>140</td></tr>
+<tr bgcolor=white><td align=center>dbrown</td><td>165</td><td>42</td><td>42</td></tr>
+<tr bgcolor=white><td align=center>transparent</td><td>1</td><td>1</td><td>1</td></tr>
 </table><p>
 For example, to define a new color:
 <pre>
@@ -1283,7 +1261,7 @@ problems, so stick to alphanumerics, e.g., 'red3'.
 <p>
 
 <a name="imagemaps"></a>
-<h3>IMAGEMAPS</h3>
+<h3>Imagemaps</h3>
 Imagemaps can be generated by including the <code>IMAGEMAP</code> column as the 2nd field
 in the SELECTed fieldlist.
 HTML client-side imagemaps are generated if the <code>MAPTYPE</code> qualifier is 'HTML',
@@ -1294,7 +1272,7 @@ The resulting HTML imagemap will have the following behaviors based on the type 
 requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualifiers:<p>
 <table border=1>
 <tr bgcolor=lightsteelblue><th>Graph Type</th><th>Hotspot Area</th><th>ALT tag</th><th>Special Variable<br>Values</th></tr>
-<tr><td valign=top align=center><b>Piechart</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Piechart</b></td>
 	<td valign=top>Polygon starting from center and<br>connecting 10&deg; arcs along the circumference of the wedge.</td>
 	<td valign=top>Wedge value followed by wedge percent in parentheses<br>
 	e.g., "1234(16%)"</td>
@@ -1306,7 +1284,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 		<li>:Z = &lt;wedge's percent of total&gt;
 		</ol>
 	</td></tr>
-<tr><td valign=top align=center><b>2-D Barchart and Histogram</b></td>
+<tr bgcolor=white><td valign=top align=center><b>2-D Barchart and Histogram</b></td>
 	<td valign=top>Complete area of each bar</td>
 	<td valign=top>Range value for the bar</td>
 	<td>
@@ -1317,7 +1295,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 		<li>:Z = &lt;empty-string&gt;
 		</ol>
 	</td></tr>
-<tr><td valign=top align=center><b>3-D Barchart(Histogram)<br>(including 3-axis)</b></td>
+<tr bgcolor=white><td valign=top align=center><b>3-D Barchart(Histogram)<br>(including 3-axis)</b></td>
 	<td valign=top>Complete area of top(right side) face of each bar</td>
 	<td valign=top>Range value for the bar</td>
 	<td>
@@ -1328,7 +1306,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 		<li>:Z = &lt;Z-axis label value for the bar&gt;
 		</ol>
 	</td></tr>
-<tr><td valign=top align=center><b>Line, point, area graph</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Line, point, area graph</b></td>
 	<td valign=top>8-pixel diameter circle centered on each datapoint</td>
 	<td valign=top>(domain, range) values of the datapoint</td>
 	<td>
@@ -1339,7 +1317,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 		<li>:Z = &lt;empty-string&gt;
 		</ol>
 	</td></tr>
-<tr><td valign=top align=center><b>Candlestick</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Candlestick</b></td>
 	<td valign=top>8-pixel diameter circle centered on<br>each datapoint, both top and bottom of stick</td>
 	<td valign=top>(domain, range) values of the datapoint</td>
 	<td>
@@ -1350,7 +1328,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 		<li>:Z = &lt;'top' | 'bottom'&gt; depending on which endpoint of candlestick is focused.
 		</ol>
 	</td></tr>
-<tr><td valign=top align=center><b>Box & Whisker</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Box & Whisker</b></td>
 	<td valign=top>the area of the plotted box, and an<br>
 	8-pixel diameter circle centered on<br> the lower and upper ends of the whicksers</td>
 	<td valign=top>median[lower quartile..upper quartile] values of the box, and
@@ -1363,7 +1341,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 		<li>:Z = &lt;upper quartile value&gt;
 		</ol>
 	</td></tr>
-<tr><td valign=top align=center><b>Gantt chart</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Gantt chart</b></td>
 	<td valign=top>the area of each task's bar</td>
 	<td valign=top>start date '->' end date</td>
 	<td>
@@ -1387,7 +1365,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 	<th><code>X</code></th>
 	<th><code>Y</code></th>
 	<th><code>Z</code></th></tr>
-<tr><td valign=top align=center><b>Piechart</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Piechart</b></td>
 	<td valign=top>POLY</td>
 	<td valign=top>arrayref of (x,y) image pixel coordinates of polygon
 	starting from center and connecting 10&deg; arcs along the circumference of the wedge.</td>
@@ -1395,21 +1373,21 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 	<td valign=top align=center>wedge label</td>
 	<td valign=top align=center>associated wedge value</td>
 	<td valign=top align=center>wedge's percent of total</td></tr>
-<tr><td valign=top align=center><b>2-D Barchart and Histogram</b></td>
+<tr bgcolor=white><td valign=top align=center><b>2-D Barchart and Histogram</b></td>
 	<td valign=top>RECT</td>
 	<td valign=top>arrayref of (x,y) image pixel coordinates of rectangle of associated bar</td>
 	<td valign=top align=center>range number of the bar</td>
 	<td valign=top align=center>domain label</td>
 	<td valign=top align=center>range value</td>
 	<td valign=top align=center>undef</td></tr>
-<tr><td valign=top align=center><b>3-D Barchart(Histogram)<br>(including 3-axis)</b></td>
+<tr bgcolor=white><td valign=top align=center><b>3-D Barchart(Histogram)<br>(including 3-axis)</b></td>
 	<td valign=top>POLY</td>
 	<td valign=top>arrayref of (x,y) image pixel coordinates of top(right side) face of associated bar</td>
 	<td valign=top align=center>range number of the bar</td>
 	<td valign=top align=center>domain label for the bar</td>
 	<td valign=top align=center>range value for the bar</td>
 	<td valign=top align=center>Z-axis label value for the bar</td></tr>
-<tr><td valign=top align=center><b>Line, point, area graph</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Line, point, area graph</b></td>
 	<td valign=top>CIRCLE</td>
 	<td valign=top>arrayref of (xcenter, ycenter, radius) image pixel coordinates of 8-pixel
 	diameter circle centered on the datapoint</td>
@@ -1417,7 +1395,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 	<td valign=top align=center>domain value for the datapoint</td>
 	<td valign=top align=center>range value for the datapoint</td>
 	<td valign=top align=center>undef</td></tr>
-<tr><td valign=top align=center><b>Candlestick</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Candlestick</b></td>
 	<td valign=top>CIRCLE</td>
 	<td valign=top>arrayref of (xcenter, ycenter, radius) image pixel coordinates of 8-pixel diameter
 	circle centered on<br>each datapoint, both top and bottom of stick</td>
@@ -1425,7 +1403,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 	<td valign=top align=center>domain value for the datapoint</td>
 	<td valign=top align=center>range value for the datapoint</td>
 	<td valign=top align=center>'top' | 'bottom', depending on which candlestick endpoint is focused.</td></tr>
-<tr><td valign=top align=center><b>Box & Whisker</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Box & Whisker</b></td>
 	<td valign=top>RECT, CIRCLE</td>
 	<td valign=top>arrayref of (x,y of upper left of box, x.y of lower right of box) image pixel coordinates of
 	the box</td>
@@ -1433,7 +1411,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 	<td valign=top align=center>median value of the box</td>
 	<td valign=top align=center>lower quartile value of the box</td>
 	<td valign=top align=center>Upper quartile value of the box.</td></tr>
-<tr><td valign=top align=center><b>Gantt</b></td>
+<tr bgcolor=white><td valign=top align=center><b>Gantt</b></td>
 	<td valign=top>RECT</td>
 	<td valign=top>arrayref of (x,y of upper left of bar, x.y of lower right of bar)
 		image pixel coordinates of each task's bar</td>
@@ -1445,7 +1423,7 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 <p>
 
 <a name="errors"></a>
-<h3>ERROR HANDLING</h3><p>
+<h3>Error Handling</h3><p>
 
 Any errors generated from improper SQL usage are flagged with an error value of -1, and
 appropriate text in the errstr. Errors emanating from DBD::Chart::Plot
@@ -1453,14 +1431,14 @@ will be flagged in err and errstr with whatever info is returned.
 <p>
 
 <a name="diags"></a>
-<h3>DIAGNOSTICS</h3><p>
+<h3>Diagnostics</h3><p>
 
 DBI provides the <code>trace()</code> function to enable various levels
 of trace information. DBD::Chart currently doesn't add any traces to this.
 <p>
 
 <a name="specattr"></a>
-<h3> DRIVER-SPECIFIC ATTRIBUTES</h3><p>
+<h3>Driver Specific Attributes</h3><p>
 
 <ul>
 <li>chart_noverify - when set to 1 during connect(), verification of data values with target
@@ -1468,7 +1446,7 @@ columns is bypassed (to provide some performance improvement).
 </ul><p>
 
 <a name="funcs"></a>
-<h3> DRIVER-SPECIFIC FUNCTIONS</h3><p>
+<h3>Driver Specific Functions</h3><p>
 
 The following functions are provided to optimize data movement:<br>
 <b><i>Note:</b>generalized versions of these functions are currently
@@ -1488,117 +1466,196 @@ using the ordinal tuple number as the hashkey.<p>
 SELECT only returns a single row at a time, namely, the chart image and (optionally)
 an imagemap.</i><p>
 
-<a name="conform"></a>
-<h2>PREREQUISITES AND CONFORMANCE</h2><p>
+<a name="history"></a>
+<h2>Change History</h2><p>
 
-DBD::Chart requires the following (versions are recommended
-only, cuz they're the version I built with...if you're feeling
-frisky, you can try older or newer versions.): <p>
+Release 0.61:
 <ul>
-<li>Perl version 5.6.0
-<li>DBI module 1.14.
-<li>GD module 1.32
-<li>GD::Text (<i>aka GDTextUtil</i>) module 0.80
-<li>Time::Local
-<!-- <li>SVG-PL 1.01
-<li>XML::Simple
-<li>XML::Writer -->
+<li>fix multicolor histograms
+<li>fix :PLOTNUM escape processing for HTML imagemaps
+<li>improved SQL compatibility:
+<ul>
+<li>replaced hyphenated property names w/ underscore
+<li>support quoted color and shape names
+<li>support IN operator for valuelists
 </ul>
-
-Be advised that these modules require the following (non-Perl) libraries:<p>
-<ul>
-<li> <a href="http://www.boutell.com/gd/">libgd</a>
-<li> <a href="http://www.libpng.org/pub/png">libpng</a>
-<li> <a href="http://www.info-zip.org/pub/infozip/zlib/">zlib</a>
-<li> <a href="http://www.ijg.org/">jpeg-6b</a> (for JPEG support)
+<li>fix for tick labels overwriting axis labels
+<li>fix for temporal data alignment
 </ul><p>
 
-The following DBI functions are not supported:
-<pre>
-DBI->data_sources()
-$dbh->prepare_cached()
-$sth->table_info()
-$dbh->tables()
-$dbh->type_info_all()
-$dbh->type_info()
-</pre>
+Release 0.60:
+<ul>
+<li>temporal data type support
+<li>histogram support
+<li>composite images via derived tables
+<li>user defined colors
+<li>Gantt charts
+</ul>
 
-<p>
+Release 0.52:
+<ul>
+<li>fix for 2D max range values
+</ul>
+
+Release 0.51:
+<ul>
+<li>3-D piechart support
+<li>multicolor, single range barcharts
+</ul>
+
+Release 0.50:
+<ul>
+<li>remove dependencies on GD::Graph (ie., added internal piechart, barchart rendering in DBD::Chart::Plot)
+<li>added iconic barcharts and datapoints (ie., use small images instead of solid bars/points)
+<li>3-D, 3 axis barcharts (X, Y, Z datapoints)
+<li>support for imagemap hotspot generation (i.e., SELECT LINEGRAPH, IMAGEMAP FROM...)
+<li>added box&whisker charts
+<li>moved logo processing from DBD::Chart to DBD::Chart::Plot
+<li>bug fix for symbolic domain areagraphs
+<li>bug fix for escaping single quotes inside a string
+</ul>
+
+Release 0.43:
+<ul>
+<li>fix to support GIF via older GD packages (many thanks to Peter Scott!)
+<li>other cosmetic fixes
+</ul>
+
+Release 0.42:
+<ul>
+<li>fix to support X-ORIENT='HORIZONTAL' on symbolic domains, candlesticks
+</ul>
+
+Release 0.41:
+<ul>
+<li>fix to strip quotes from string literal in INSERT statement
+<li>fix for string literal column index variable in prepare of INSERT
+<li>fix for Y-axis tick alignment when no grid is requested
+</ul>
+
+Release 0.40:<p>
+<ul>
+<li>fix for DECIMAL, INTEGER, etc. last columns in CREATE TABLE</li>
+<li>fix for FORMAT property to properly handle as string value</li>
+<li>added Y-MAX, Y-MIN properties to control Y-axis min/max values for barcharts</li>
+</ul>
+
+Release 0.30:<p>
+<ul>
+<li>strip newlines from SQL for prepare()
+<li>add BACKGROUND property to set background color, incl. transparent background
+<li>add FORMAT property to select PNG or JPEG
+<li>add X-ORIENT property to set X-tick label orientation
+<li>add LOGO property to set a background image
+<li>add SIGNATURE property to set a signature string in image
+<li>add placeholder support in SELECT WHERE clause
+<li>add KEEPORIGIN property to force (0,0) in the graph
+<li>auto-skip symbolic X-axis vertical tick labels when they overlap
+<li>add parameterized chart datasource (i.e., SELECT BARCHART FROM ? WHERE...)
+</ul><p>
+
+Release 0.20:<p>
+<ul>
+<li>added support for 3-D bar and pie charts (via GD::Graph3d)
+<li>added logarithmic line/point graph support
+<li>added area graphs
+<li>added candlestick charts (e.g., for daily trading range charts)
+<li>added support for non-numeric domain values
+<li>packaged for CPAN
+</ul><p>
+
+Release 0.10:<p>
+<ul>
+<li>Coded; first alpha release
+</ul><p>
+
 <a name="bugs"></a>
-<h2>KNOWN BUGS</h2><p>
+<h2>Known Bugs</h2><p>
 
-<table border=1><tr>
+<table border=1><tr bgcolor=white>
 <th align=center>Bug Number</th>
     <th align=center>Report<br>Date</th>
     <th align=center>Release<br>Reported in</th>
     <th align=center>Description</th>
     <th align=center>Status</th>
     <th align=center>Fix<br>Release</th>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>1</td>
 	<td align=center>2001-Mar-16</td>
 	<td align=center>0.20</td>
-	<td align=center>SQL statements with newlines won't prepare()</td>
+	<td align=left>SQL statements with newlines won't prepare()</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.30</td>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>2</td>
 	<td align=center>2001-May-09</td>
 	<td align=center>0.30</td>
-	<td align=center>INTEGER column definition as last column in CREATE TABLE causes an error</td>
+	<td align=left>INTEGER column definition as last column in CREATE TABLE causes an error</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.40</td>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>3</td>
 	<td align=center>2001-May-09</td>
 	<td align=center>0.30</td>
-	<td align=center>FORMAT property not properly handled as string property</td>
+	<td align=left>FORMAT property not properly handled as string property</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.40</td>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>4</td>
 	<td align=center>2001-Jun-01</td>
 	<td align=center>0.40</td>
-	<td align=center>Y-axis ticks not properly aligned when grid disabled</td>
+	<td align=left>Y-axis ticks not properly aligned when grid disabled</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.41</td>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>5</td>
 	<td align=center>2001-Jun-01</td>
 	<td align=center>0.40</td>
-	<td align=center>INSERT of string literal value kept quote mark</td>
+	<td align=left>INSERT of string literal value kept quote mark</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.41</td>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>6</td>
 	<td align=center>2001-Jun-01</td>
 	<td align=center>0.40</td>
-	<td align=center>INSERT of string literal used bad column index variable</td>
+	<td align=left>INSERT of string literal used bad column index variable</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.41</td>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>7</td>
 	<td align=center>2001-Oct-01</td>
 	<td align=center>0.41</td>
-	<td align=center>X-ORIENT='HORIZONTAL' didn't work with symbolic domains, candlesticks</td>
+	<td align=left>X-ORIENT='HORIZONTAL' didn't work with symbolic domains, candlesticks</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.42</td>
-</tr><tr>
+</tr><tr bgcolor=white>
 	<td align=center>8</td>
 	<td align=center>2001-Dec-14</td>
 	<td align=center>0.51</td>
-	<td align=center>2-D barcharts w/ multiranges crashed</td>
+	<td align=left>2-D barcharts w/ multiranges crashed</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.52</td>
+</tr><tr bgcolor=white>
+	<td align=center>9</td>
+	<td align=center>2002-Feb-07</td>
+	<td align=center>0.60</td>
+	<td align=left>:PLOTNUM imagemap variable value not properly escaped for Gantt charts</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.61</td>
+</tr><tr bgcolor=white>
+	<td align=center>10</td>
+	<td align=center>2002-Mar-14</td>
+	<td align=center>0.60</td>
+	<td align=left>multicolor histograms only use 1 color</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.61</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
 
 <ul>
-<li>programmable fonts
-<li>Gantt charts
-<li>SVG support
 <li>surfacemaps ?
+<li>statistical distribution curves (Poisson, Gaussian, etc.)
 <li>XML template support
 <li>some limited meta-data capability
 <li> <i>Any suggestions?</i>
@@ -1606,7 +1663,7 @@ $dbh->type_info()
 <p>
 
 <a name="acks"></a>
-<h2>ACKNOWLEDGEMENTS</h2><p>
+<h2>Acknowledgements</h2><p>
 
 Many thanks to all the authors of the various GD, PNG, JPEG, SVG, and zlib modules.
 Special thanks to all the initial victims, er, users for their comments,
@@ -1619,7 +1676,7 @@ Special thanks to
 </ul>
 
 <a name="refs"></a>
-<h2>REFERENCES</h2><p>
+<h2>References</h2><p>
 
 <ul>
 <li><a href="http://www.symbolstone.org/technology/perl/DBI/">Official DBI Site</a>
@@ -1630,14 +1687,14 @@ Special thanks to
 <li><a href="http://www.activestate.com">ActiveState</a> (for Perl software for Windows)
 </ul>
 
-<h2>AUTHOR</h2><p>
+<h2>Author</h2><p>
 
 <a href="mailto:darnold@presicient.com">Dean Arnold</a><p>
 
 <a name="copy"></a>
-<h2>COPYRIGHT</h2><p>
+<h2>Copyright</h2><p>
 
-Copyright (c) 2001, Dean Arnold, USA<br>
+Copyright (c) 2001,2002, Dean Arnold, Presicient Corp., USA<br>
 Affiliations:<br>
 <ul>
 <li><a href="http://www.presicient.com">Presicient Corp.</a>,<br>
@@ -1651,13 +1708,14 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.<p>
 
-I'm offering the software <b>AS IS</b>, and <b>ACCEPT NO
+The software is offered <b>AS IS</b>, and the author <b>ACCEPTS NO
 LIABILITY FOR ANY ERRORS OR OMMISSIONS IN, OR LOSSES INCURRED AS A
 RESULT OF USING DBD::Chart.</B><p>
 I reserve the right to provide support for this software
 to individual sites under a separate (possibly fee-based)
 agreement.<p>
-
-<center><i>Last updated February 5, 2002</i>
+</td></tr></table>
+<hr color=silver>
+<center><i>Last updated April 10, 2002</i>
 
 </body></html>

@@ -2,14 +2,21 @@
 #
 # DBD::Chart::Plot -- Plotting engine for DBD::Chart
 #
-#	Copyright (C) 2001 by Dean Arnold <darnold@presicient.net>
+#	Copyright (C) 2001,2002 by Dean Arnold <darnold@presicient.com>
 #
 #   You may distribute under the terms of the Artistic License, 
 #	as specified in the Perl README file.
 #
 #	Change History:
 #
-#	0.60	2001-Jan-12		D. Arnold
+#	0.61	2002-Feb-07		D. Arnold
+#		fix for :PLOTNUM imagemap variable in Gantt chart
+#		fix for undef range values
+#		added 'dot' point shape (contributed by Andrea Spinelli)
+#		fix for temporal alignment
+#		fix for tick labels overwriting axis labels
+#
+#	0.60	2002-Jan-12		D. Arnold
 #		support temporal datatypes
 #		support histograms
 #		support composite images
@@ -52,7 +59,7 @@
 require 5.6.0;
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.60';
+$DBD::Chart::Plot::VERSION = '0.61';
 
 use GD;
 use Time::Local;
@@ -112,7 +119,8 @@ my %shapes = (
 'opendiamond', 6,
 'fillcircle', 7,
 'opencircle', 8,
-'icon', 9);
+'icon', 9,
+'dot', 10);
 #
 #	logarithmic steps for axis scaling
 #
@@ -743,11 +751,16 @@ sub set2DBarPoints {
 #
 #	eliminate undefined data points
 #
-		next unless (defined($$xary[$i]) && defined($$yary[$i]));
+		next unless defined($$xary[$i]);
 		$x = $$xary[$i];
 		$y = $$yary[$i];
 
-		$x = convert_temporal($x, $obj->{timeDomain}) if $obj->{timeDomain}; 
+		$x = convert_temporal($x, $obj->{timeDomain}) if $obj->{timeDomain};
+
+		$domVals->{$x} = defined($domVals) ? scalar(keys(%$domVals)) : 0
+			unless defined($domVals->{$x});
+		
+		if (defined($y)) {
 		$y = convert_temporal($y, $obj->{timeRange}) if $obj->{timeRange};
 #
 #	validate the range values
@@ -767,9 +780,6 @@ sub set2DBarPoints {
 		$ty = $obj->{yLog} ? log($y)/log(10) : $y;
 		$ylo = ($ty >= 0) ? 0 : $y;
 		$yhi = ($ty < 0) ? 0 : $y;
-		
-		$domVals->{$x} = defined($domVals) ? scalar(keys(%$domVals)) : 0
-			unless defined($domVals->{$x});
 #
 #	force data into array in same order as any prior definition
 		$idx = $domVals->{$x} * 3;
@@ -780,6 +790,7 @@ sub set2DBarPoints {
 			unless ($obj->{xMaxLen} && ($obj->{xMaxLen} >= length($x)));
 		$ymin = $ylo if ($ylo < $ymin);
 		$ymax = $yhi if ($yhi > $ymax);
+		}
 	}
 	push(@{$obj->{data}}, \@data);
 	push(@{$obj->{props}}, $props);
@@ -954,8 +965,8 @@ sub setPoints {
 #
 #	eliminate undefined data points
 #
-		($x, $y) = ($$xary[$i], $$yary[$i]);
-		next unless (defined($x) && defined($y));
+		$x = $$xary[$i];
+		next unless defined($x);
 		
 		$x = convert_temporal($x, $obj->{timeDomain}) if $obj->{timeDomain};
 
@@ -1017,7 +1028,7 @@ sub setPoints {
 		$y = log($y)/log(10) if $obj->{yLog};
 		$ymin = $y if ($y < $ymin);
 		$ymax = $y if ($y > $ymax);
-
+		
 		push(@data, $x, $y), next
 			unless $obj->{symDomain};
 #
@@ -1409,7 +1420,7 @@ sub computeRanges {
 #
 	$obj->{horizStep} += (86400 - $obj->{horizStep}%86400)
 		if ((! $obj->{symDomain}) && $obj->{timeDomain} && 
-			($obj->{timeDomain}=~/^YYYY$/i) && 
+			($obj->{timeDomain}=~/^YYYY/i) && 
 			($obj->{horizStep}%86400 != 0));
 	
 	$yh = $yl * 2 if ($yh == $yl);
@@ -2016,7 +2027,7 @@ sub plotBoxAxes {
 				restore_temporal(10**$k, $obj->{timeDomain}) : 10**$k,
 			$img->stringUp(gdSmallFont, $px-$sfh/2, 
 				$py+length($powk)*$sfw, $powk, $obj->{textColor})
-				if ($n == 1);
+				if (($n == 1) && ($px+$sfh < $xStart));
 
 			($n, $i)  = (0, $k)
 				if ($n > $#logsteps);
@@ -2034,6 +2045,7 @@ sub plotBoxAxes {
 			$obj->pt2pxl($i, $yh) : ($px, $py+2);
 		$img->line($px, ($obj->{vertGrid} ? $py : $py-2), $px, $p1y, $obj->{gridColor});
 
+		next if ($obj->{xAxisVert} && ($px+$sfh >= $xStart));
 		$prtX = $obj->{timeDomain} ? restore_temporal($i, $obj->{timeDomain}) : $i;
 		$img->stringUp(gdSmallFont, $px-($sfh>>1), 
 			$py+2+length($prtX)*$sfw, $prtX, $obj->{textColor}), next
@@ -2297,7 +2309,7 @@ sub plotAxes {
 	}
 #
 #	draw X axis label
-	my ($len, $xStart);
+	my ($len, $xStart, $xStart2);
 	($p2x, $p2y) = $obj->pt2pxl($xh, $yl);
 #		$obj->{vertGrid} || $obj->{horizGrid}) ? $yl : $yaxpt),
 	$len = $sfw * length($obj->{xAxisLabel}),
@@ -2314,8 +2326,8 @@ sub plotAxes {
 	$img->line($p1x, $p1y, $p2x, $p2y, $obj->{gridColor})
 		if ((! $obj->{'vertGrid'}) && (! $obj->{horizGrid}));
 
-	$xStart = $p2x - length($obj->{yAxisLabel}) * ($sfw >> 1),
-	$img->string(gdSmallFont, ($xStart>10 ? $xStart : 10), 
+	$xStart2 = $p2x - length($obj->{yAxisLabel}) * ($sfw >> 1),
+	$img->string(gdSmallFont, ($xStart2 > 10 ? $xStart2 : 10), 
 		$p2y - 3*($sfh>>1), $obj->{yAxisLabel},  $obj->{textColor})
 		if ($obj->{yAxisLabel});
 #
@@ -2341,12 +2353,14 @@ sub plotAxes {
 				$obj->pt2pxl($k, $yh) : ($px, $py+2);
 			$img->line($px, ($obj->{vertGrid} ? $py : $py-2), 
 				$px, $p1y, $obj->{gridColor});
-
+#
+#	don't draw tick labels if we're overwriting the axis label
+#
 			$powk = ($obj->{timeDomain}) ? 
 				restore_temporal(10**$k, $obj->{timeDomain}) : 10**$k,
 			$img->stringUp(gdSmallFont, $px-$sfh/2, 
 				$py+length($powk)*$sfw, $powk, $obj->{textColor})
-				if ($n == 1);
+				if (($n == 1) && ($px+$sfh < $xStart));
 
 			($n, $i)  = (0 , $k)
 				if ($n > $#logsteps);
@@ -2367,7 +2381,7 @@ sub plotAxes {
 #
 #	skip the label if it would overlap
 #
-			next if ($obj->{xAxisVert} && (($sfh+1) > ($px - $prevx)));
+			next if ($obj->{xAxisVert} && ($sfh+1 > ($px - $prevx)));
 #
 #	truncate long labels
 #
@@ -2376,11 +2390,13 @@ sub plotAxes {
 			$txt = substr($txt, 0, 22) . '...' 
 				if (length($txt) > 25);
 
-			$prevx = $px,
-			$img->stringUp(gdSmallFont, $px-($sfh>>1), 
-				$py+2+length($txt)*$sfw, $txt, $obj->{textColor}),
-			next
-				if $obj->{xAxisVert};
+			if ($obj->{xAxisVert}) {
+				$prevx = $px;
+				next if ($px+$sfh >= $xStart);
+				$img->stringUp(gdSmallFont, $px-($sfh>>1), 
+					$py+2+length($txt)*$sfw, $txt, $obj->{textColor});
+				next;
+			}
 
 			next if (((length($txt)+1) * $sfw) > ($px - $prevx));
 			$prevx = $px;
@@ -2407,6 +2423,8 @@ sub plotAxes {
 				($px - $prevx < (length($txt) * $sfw)));
 			next if ($obj->{xAxisVert} && ($px - $prevx < $sfw));
 			$prevx = $px;
+			next if ($obj->{xAxisVert} &&  ($px+$sfh >= $xStart));
+			
 			$img->stringUp(gdSmallFont, $px-($sfh>>1), 
 				$py+2+length($txt)*$sfw, $txt, $obj->{textColor}),
 			next
@@ -2518,7 +2536,7 @@ sub plotHistoAxes {
   	}
 #
 #	draw horizontal axis label
-	my ($len, $xStart);
+	my ($len, $xStart, $xStart2);
 	$len = $sfw * length($obj->{yAxisLabel}),
 	$xStart = ($p2x+$len/2 > $obj->{width}-10) ? 
 		($obj->{width}-10-$len) : ($p2x-$len/2),
@@ -2528,8 +2546,8 @@ sub plotHistoAxes {
 
 # vertical axis label
 	($p2x, $p2y) = $obj->pt2pxl($xh, $yl),
-	$xStart = $p2x - ((length($obj->{xAxisLabel}) * $sfw) >> 1),
-	$img->string(gdSmallFont, ($xStart>10 ? $xStart : 10), 
+	$xStart2 = $p2x - ((length($obj->{xAxisLabel}) * $sfw) >> 1),
+	$img->string(gdSmallFont, ($xStart2 > 10 ? $xStart2 : 10), 
 		$p2y - 3*($sfh>>1), $obj->{xAxisLabel},  $obj->{textColor})
 		if $obj->{xAxisLabel};
 #
@@ -2598,6 +2616,7 @@ sub plotHistoAxes {
 
 			$prevx = $px;
 
+			next if ($obj->{xAxisVert} && ($px+$sfh >= $xStart));
 			$img->stringUp(gdSmallFont, $px-($sfh>>1), 
 				$py+2+length($powk)*$sfw, $powk, $obj->{textColor}),
 			next
@@ -2621,6 +2640,7 @@ sub plotHistoAxes {
 			(length($txt) * ($sfw>>1) < ($px - $prevx)));
 		$prevx = $px;
 
+		next if ($obj->{xAxisVert} && ($px+$sfh >= $xStart));
 		$img->stringUp(gdSmallFont, $px-($sfh>>1), 
 			$py+2+length($txt)*$sfw, $txt, $obj->{textColor}),
 		next
@@ -2750,8 +2770,14 @@ sub make_marker {
 		if ($mtype == 7);
 
 # must be Circle, open
-	$brush->arc( 4, 4, 8, 8, 0, 360, $clr );
-	return $brush;
+	$brush->arc( 4, 4, 8, 8, 0, 360, $clr ),
+	return $brush
+		if ($mtype == 8);
+#
+#	dot - contributed by Andrea Spinelli
+	$brush->setPixel( 4,4, $clr ),
+	return  $brush
+ 		if ( $mtype == 10 );
 }
 
 sub getIcon {
@@ -3360,6 +3386,7 @@ sub updateImagemap {
 	$x =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
 	$y =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
 	$z =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
+	$plotNum =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
 	my $imgmap = $obj->{imgMap};
 #
 #	interpolate special variables
@@ -3966,7 +3993,7 @@ by spaces. The following properties may be set on a per-plot basis
 	blue       zaxis                   horizcross
 	dblue      histo                   diagcross
 	gold                               icon
-	lyellow	
+	lyellow	                           dot
 	yellow
 	dyellow
 	lgreen
@@ -4084,6 +4111,8 @@ The area of each bar in the chart is mapped.
 =item programmable fonts
 
 =item symbolic ranges for scatter graphs
+
+=item axis labels for 3-D charts
 
 =item surfacemaps
 

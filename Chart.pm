@@ -7,6 +7,14 @@
 #
 #	History:
 #
+#		0.61	2001-Mar-14	D. Arnold
+#			Fix for multicolor histos
+#			Replace hyphenated properties with
+#				underscores
+#			Support quoted color and shape names
+#			Support IN (...) syntax for color, shape, and icon lists
+#			added 'dot' shape (contributed by Andrea Spinelli)
+#
 #		0.60	2001-Jan-12	D. Arnold
 #			Temporal datatypes
 #			Appl. defined colors
@@ -71,21 +79,21 @@ our %mincols = (
 
 our %binary_props = (
 'SHOWGRID', 1, 
-'X-LOG', 1, 
-'Y-LOG', 1, 
-'3-D', 1, 
+'X_LOG', 1, 
+'Y_LOG', 1, 
+'THREE_D', 1, 
 'SHOWPOINTS', 1, 
 'SHOWVALUES', 1, 
 'KEEPORIGIN', 1);
 	
 our %string_props = (
-'X-AXIS', 1, 
-'Y-AXIS', 1, 
-'Z-AXIS', 1, 
+'X_AXIS', 1, 
+'Y_AXIS', 1, 
+'Z_AXIS', 1, 
 'TITLE', 1, 
 'SIGNATURE', 1, 
 'LOGO', 1, 
-'X-ORIENT', 1, 
+'X_ORIENT', 1, 
 'FORMAT', 1,
 'FONT', 1,
 'TEMPLATE', 1,
@@ -93,6 +101,20 @@ our %string_props = (
 'MAPSCRIPT', 1,
 'MAPNAME', 1,
 'MAPTYPE', 1
+);
+
+our %trans_props = (
+'X-AXIS', 'X_AXIS',
+'Y-AXIS', 'Y_AXIS',
+'Z-AXIS', 'Z_AXIS',
+'X-LOG', 'X_LOG',
+'Y-LOG', 'Y_LOG',
+'3-D', 'THREE_D',
+'Y-MAX', 'Y_MAX',
+'Y-MIN', 'Y_MIN',
+'COLORS', 'COLOR',
+'ICONS', 'ICON',
+'SHAPES', 'SHAPE'
 );
 
 our %valid_props	= ( 
@@ -105,6 +127,9 @@ our %valid_props	= (
 'X-AXIS', 1, 
 'Y-AXIS', 1,
 'Z-AXIS', 1, 
+'X_AXIS', 1, 
+'Y_AXIS', 1,
+'Z_AXIS', 1, 
 'TITLE', 1, 
 'COLOR', 1, 
 'COLORS', 1, 
@@ -113,6 +138,7 @@ our %valid_props	= (
 'SHAPE', 1,
 'SHAPES', 1,
 'X-ORIENT', 1, 
+'X_ORIENT', 1, 
 'FORMAT', 1, 
 'LOGO', 1, 
 'X-LOG', 1, 
@@ -120,6 +146,11 @@ our %valid_props	= (
 '3-D', 1,
 'Y-MAX', 1, 
 'Y-MIN', 1,
+'X_LOG', 1, 
+'Y_LOG', 1, 
+'THREE_D', 1,
+'Y_MAX', 1, 
+'Y_MIN', 1,
 'ICON', 1,
 'ICONS', 1,
 'FONT', 1,
@@ -177,7 +208,8 @@ our %valid_shapes = (
 'opendiamond', 6,
 'fillcircle', 7,
 'opencircle', 8,
-'icon', 9);
+'icon', 9,
+'dot', 10);
 
 {
 package DBD::Chart;
@@ -186,7 +218,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.60';
+$DBD::Chart::VERSION = '0.61';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
@@ -304,18 +336,36 @@ my %inv_pieprop = (
 'X-AXIS', 1, 
 'Y-AXIS', 1, 
 'Z-AXIS', 1, 
+'X_AXIS', 1, 
+'Y_AXIS', 1, 
+'Z_AXIS', 1, 
 'SHOWVALUES', 1, 
 'X-LOG', 1, 
 'Y-LOG', 1, 
 'Y-MAX', 1, 
 'Y-MIN', 1,
+'X_LOG', 1, 
+'Y_LOG', 1, 
+'Y_MAX', 1, 
+'Y_MIN', 1,
 'ICON', 1,
 'ICONS', 1
 );
 
-my %inv_barprop = ('SHAPE', 1, 'SHAPES', 1, 'SHOWPOINTS', 1, 'X-LOG', 1);
+my %inv_barprop = (
+'SHAPE', 1, 
+'SHAPES', 1, 
+'SHOWPOINTS', 1, 
+'X-LOG', 1,
+'X_LOG', 1
+);
 
-my %inv_candle = ('X-LOG', 1, '3-D', 1);
+my %inv_candle = (
+'X_LOG', 1,
+'THREE_D', 1,
+'X-LOG', 1,
+'3-D', 1
+);
 #
 #	defaults for simple queries
 my %dfltprops = ( 
@@ -325,22 +375,22 @@ my %dfltprops = (
 'SHOWGRID', 0, 
 'SHOWPOINTS', 0, 
 'SHOWVALUES', 0, 
-'X-AXIS', 'X axis', 
-'Y-AXIS', 'Y axis', 
-'Z-AXIS', undef, 
+'X_AXIS', 'X axis', 
+'Y_AXIS', 'Y axis', 
+'Z_AXIS', undef, 
 'TITLE', '', 
 'COLORS', \@dfltcolors, 
-'X-LOG', 0, 
-'Y-LOG', 0, 
-'3-D', 0, 
+'X_LOG', 0, 
+'Y_LOG', 0, 
+'THREE_D', 0, 
 'BACKGROUND', 'white',
 'SIGNATURE', undef, 
 'LOGO', undef, 
-'X-ORIENT', 'DEFAULT', 
+'X_ORIENT', 'DEFAULT', 
 'FORMAT', 'PNG',
 'KEEPORIGIN', 0, 
-'Y-MAX', undef, 
-'Y-MIN', undef,
+'Y_MAX', undef, 
+'Y_MIN', undef,
 'ICONS', undef,
 'FONT', undef,
 'GRIDCOLOR', 'black',
@@ -357,16 +407,16 @@ my %dfltglobals = (
 'WIDTH', 300, 
 'HEIGHT', 300,
 'SHOWGRID', 0, 
-'X-AXIS', 'X axis', 
-'Y-AXIS', 'Y axis', 
+'X_AXIS', 'X axis', 
+'Y_AXIS', 'Y axis', 
 'TITLE', '', 
-'X-LOG', 0, 
-'Y-LOG', 0, 
-'3-D', 0, 
+'X_LOG', 0, 
+'Y_LOG', 0, 
+'THREE_D', 0, 
 'BACKGROUND', 'white',
 'SIGNATURE', undef, 
 'LOGO', undef, 
-'X-ORIENT', 'DEFAULT', 
+'X_ORIENT', 'DEFAULT', 
 'FORMAT', 'PNG',
 'KEEPORIGIN', 0, 
 'FONT', undef,
@@ -457,20 +507,20 @@ my %global_props	= (
 'KEEPORIGIN', 1, 
 'SIGNATURE', 1, 
 'SHOWGRID', 1, 
-'X-AXIS', 1,
-'Y-AXIS', 1,
-'Z-AXIS', 1,
+'X_AXIS', 1,
+'Y_AXIS', 1,
+'Z_AXIS', 1,
 'TITLE', 1,
 'WIDTH', 1, 
 'HEIGHT', 1, 
-'X-ORIENT', 1, 
+'X_ORIENT', 1, 
 'FORMAT', 1,
 'LOGO', 1,
-'X-LOG', 1,
-'Y-LOG', 1,
-'3-D', 1,
-'Y-MAX', 1,
-'Y-MIN', 1,
+'X_LOG', 1,
+'Y_LOG', 1,
+'THREE_D', 1,
+'Y_MAX', 1,
+'Y_MIN', 1,
 'TEMPLATE', 1,
 'GRIDCOLOR', 1,
 'TEXTCOLOR', 1,
@@ -603,7 +653,7 @@ sub restore_strings {
 		if ($t ne '');
 
 	$str=~s/''/'/g;
-	$str=~s/^'(.*)'$/$1/;
+	$str=~s/^'(.*)'$/$1/g;
 	return $str;
 }
 
@@ -611,24 +661,33 @@ sub parse_props {
 	my ($ctype, $t, $numphs, $is_subquery, $strlits) = @_;
 	
 	my %props = $is_subquery ? %dfltcomposites : ($ctype eq 'IMAGE' ? %dfltglobals : %dfltprops);
-	my $prop;
+	my ($prop, $op);
 	$t=~s/\s*AND\s*/\r/ig;
 	my @preds = split("\r", $t);
-#	$t=~s/''/\x01/g;	# convert escaped quote into something we can ignore
+
 	foreach (@preds) {
 
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = "Unrecognized property declaration.",
 		return (undef, $t)
-			unless (($prop, $t)=/^([^\s=]+)\s*=\s*(.*)$/);
+			unless (($prop, $op, $t)=/^([^\s=]+)\s*(=|IN)\s*(.+)$/i);
 
 		$prop = uc $prop;
+		$op = uc $op;
 		$t=~s/\s*$//;
 
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = "Unrecognized property $prop.",
 		return (undef, $t)
 			unless $valid_props{$prop};
+#
+#	translate the property if it has synonym
+		$prop = $trans_props{$prop} if $trans_props{$prop};
+
+		$DBD::Chart::err = -1,
+		$DBD::Chart::errstr = "Property $prop not valid with valuelist.",
+		return (undef, $t)
+			if (($op eq 'IN') && ($prop!~/^COLOR|SHAPE|ICON$/));
 
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = "Property $prop not valid in subquery.",
@@ -674,13 +733,15 @@ sub parse_props {
 
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = 
-			"Y-MAX and Y-MIN deprecated as of release 0.50.",
+			"Y_MAX and Y_MIN deprecated as of release 0.50.",
 		next
-			if (($prop eq 'Y-MAX') || ($prop eq 'Y-MIN'));
+			if (($prop eq 'Y_MAX') || ($prop eq 'Y_MIN'));
 
 		if (($prop eq 'BACKGROUND') || ($prop eq 'GRIDCOLOR') || 
 			($prop eq 'TEXTCOLOR')) { 
 
+			$t = restore_strings($prop, $t, $strlits)
+				if ($t=~/<\d+>/);
 			$t = lc $t;
 			$props{$prop} = $t,
 			next
@@ -692,49 +753,53 @@ sub parse_props {
 			return (undef, $t);
 		}
 
-		$prop = 'COLOR' if ($prop eq 'COLORS');
-		$prop = 'ICON' if ($prop eq 'ICONS');
-		$prop = 'SHAPE' if ($prop eq 'SHAPES');
  		if (($prop eq 'COLOR') || ($prop eq 'SHAPE')) {
  			my @colors = ();
 			$props{ $prop } = \@colors;
 
-			push(@colors, lc $t),
+			$t = restore_strings($prop, $t, $strlits)
+				if ($t=~/^<\d+>$/);
+			push(@colors, $t),
 			next
- 				if ($t=~/^\w+$/);
-
-			$DBD::Chart::err = -1,
-			$DBD::Chart::errstr = "Invalid value for $prop property.",
-			return (undef, $t)
 	 			unless ($t=~/^\(([^\)]+)\)$/);
 
 			$t = lc $1;
 			$t=~s/\s+//g;
 			@colors = split(',', $t);
+			for (my $i = 0; $i <= $#colors; $i++) {
+				$colors[$i] = "?$$numphs",
+				$$numphs++,
+				next
+					if ($colors[$i] eq '?');
+
+				next unless ($colors[$i]=~/^<\d+>$/);
+				$colors[$i] = restore_strings($prop, $colors[$i], $strlits);
+			}
 			next;
  		}
  		if ($prop eq 'ICON') {
  			my @icons = ();
 			$props{ $prop } = \@icons;
 
-			$icons[0] = restore_strings($prop, $t, $strlits),
-			next
+			$t = restore_strings($prop, $t, $strlits)
  				if ($t=~/^<\d+>$/);
 
- 			if ($t=~/^\(([^\)]+)\)$/) {
- 				$t = $1;
- 				$t=~s/\s+//g;
- 				@icons = split(',', $t);
- 				for (my $i = 0; $i <= $#icons; $i++) {
- 					next if (uc $icons[$i] eq 'NULL');
- 					$icons[$i] = restore_strings($prop, $icons[$i], $strlits);
- 				}
- 				next;
- 			}
+			$icons[0] = $t,
+			next
+ 				unless ($t=~/^\(([^\)]+)\)$/);
 
-			$DBD::Chart::err = -1;
-			$DBD::Chart::errstr = "Invalid value for ICON property.";
-			return (undef, $t);
+			$t = $1;
+			$t=~s/\s+//g;
+			@icons = split(',', $t);
+			for (my $i = 0; $i <= $#icons; $i++) {
+				next if (uc $icons[$i] eq 'NULL');
+				$icons[$i] = "?$$numphs",
+				$$numphs++,
+				next
+					if ($icons[$i] eq '?');
+				next unless ($icons[$i]=~/^<\d+>$/);
+				$icons[$i] = restore_strings($prop, $icons[$i], $strlits);
+ 			}
  		}
 	} # end while
 
@@ -748,8 +813,8 @@ sub parse_props {
 		}
 	}
 	if (defined($props{'SHAPE'})) {
-		my $colors = $props{'SHAPE'};
-		foreach $prop (@$colors) {
+		my $shapes = $props{'SHAPE'};
+		foreach $prop (@$shapes) {
 			next if $valid_shapes{$prop};
 			$DBD::Chart::err = -1;
 			$DBD::Chart::errstr = "Unknown point shape $prop.";
@@ -757,10 +822,10 @@ sub parse_props {
 		}
 	}
 	$DBD::Chart::err = -1,
-	$DBD::Chart::errstr = "Invalid value for 'X-ORIENT' property.",
+	$DBD::Chart::errstr = "Invalid value for 'X_ORIENT' property.",
 	return (undef, $t)
-		if (($props{'X-ORIENT'}) && 
-			($props{'X-ORIENT'}!~/^(HORIZONTAL|VERTICAL|DEFAULT)$/i));
+		if (($props{'X_ORIENT'}) && 
+			($props{'X_ORIENT'}!~/^(HORIZONTAL|VERTICAL|DEFAULT)$/i));
 
 	$DBD::Chart::err = -1,
 	$DBD::Chart::errstr = "Invalid value for 'MAPTYPE' property.",
@@ -2243,7 +2308,7 @@ sub execute {
 			$img->setOptions( bgColor => $$props{BACKGROUND},
 				textColor => $$props{TEXTCOLOR},
 				gridColor => $$props{GRIDCOLOR} ,
-				threed => $$props{'3-D'});
+				threed => $$props{THREE_D});
 
 			$img->setOptions( title => $$props{TITLE})
 				if $$props{TITLE};
@@ -2262,25 +2327,25 @@ sub execute {
 
 			$img->setOptions( logo => $$props{LOGO}) if $$props{LOGO};
 
-			$img->setOptions( 'xAxisLabel' => $$props{'X-AXIS'})
-				if ($$props{'X-AXIS'});
-			$img->setOptions( 'yAxisLabel' => $$props{'Y-AXIS'})
-				if ($$props{'Y-AXIS'});
-			$img->setOptions( 'zAxisLabel' => $$props{'Z-AXIS'})
-				if ($$props{'Z-AXIS'});
+			$img->setOptions( 'xAxisLabel' => $$props{'X_AXIS'})
+				if ($$props{'X_AXIS'});
+			$img->setOptions( 'yAxisLabel' => $$props{'Y_AXIS'})
+				if ($$props{'Y_AXIS'});
+			$img->setOptions( 'zAxisLabel' => $$props{'Z_AXIS'})
+				if ($$props{'Z_AXIS'});
 			
-			$img->setOptions( 'xAxisVert' => ($$props{'X-ORIENT'} eq 'VERTICAL'))
-				if ($$props{'X-ORIENT'});
+			$img->setOptions( 'xAxisVert' => ($$props{'X_ORIENT'} eq 'VERTICAL'))
+				if ($$props{'X_ORIENT'});
 			
 			$img->setOptions( 'horizGrid' => 1, 
 				'vertGrid' => ($$dtypes[$i] ne 'BARCHART'))
 				if ($$props{'SHOWGRID'});
 
 			$img->setOptions( 'xLog' => 1)
-				if ($$props{'X-LOG'});
+				if ($$props{'X_LOG'});
 			
 			$img->setOptions( 'yLog' => 1)
-				if ($$props{'Y-LOG'});
+				if ($$props{'Y_LOG'});
 			
 			$img->setOptions( 'keepOrigin' => 1)
 				if ($$props{'KEEPORIGIN'});
@@ -2292,14 +2357,14 @@ sub execute {
 #
 		my @colors = ();
 		my $clist = ($$props{'COLOR'}) ? $$props{'COLOR'} : \@dfltcolors;
-		$t = ($$dtypes[$i] eq 'PIECHART') ? scalar @{$$data[0]} : @$data;
-		$t-- unless (($$dtypes[$i] eq 'BOXCHART') || ($$dtypes[$i] eq 'PIECHART'));
+		$t = ($$dtypes[$i] eq 'PIECHART') ? scalar @{$$data[0]} : scalar @$data;
+		$t-- unless (($$dtypes[$i] eq 'BOXCHART') || # ($$dtypes[$i] eq 'HISTOGRAM') || 
+			($$dtypes[$i] eq 'PIECHART'));
 		$t /= 2 if ($$dtypes[$i] eq 'CANDLESTICK');
-		$t = 1 if ($$props{'Z-AXIS'});
+		$t = 1 if ($$props{'Z_AXIS'});
 		$t = scalar @{$$data[0]}
-			if (($$dtypes[$i] eq 'BARCHART') && 
-			(scalar @$clist > 1) && 
-			(scalar @$data == 2));
+			if ((($$dtypes[$i] eq 'BARCHART') || ($$dtypes[$i] eq 'HISTOGRAM')) && 
+			(scalar @$clist > 1) && (scalar @$data == 2));
 		for ($k = 0, $j = 0; $k < $t; $k++) {
 			push(@colors, $$clist[$j++]);
 			$j = 0 if ($j >= scalar(@$clist));
@@ -2339,7 +2404,7 @@ sub execute {
 					($timetype{$zdomain} eq $timetype{$$types[2]})) ||
 				($symboltype{$zdomain} && $symboltype{$$types[2]}));
 
-		$zdomain = $$types[2] if ((! $zdomain) && $$props{'Z-AXIS'});
+		$zdomain = $$types[2] if ((! $zdomain) && $$props{'Z_AXIS'});
 		$img->setOptions( 'symDomain' => 1)
 			if ($is_symbolic || 
 				($symboltype{$xdomain} && ($$dtypes[$i] ne 'GANTT')));
@@ -2397,7 +2462,7 @@ sub execute {
 #	default x-axis label orientation is vertical for candlesticks
 #	and symbollic domains
 #
-		$img->setOptions( 'xAxisVert' => ($$props{'X-ORIENT'} ne 'HORIZONTAL'))
+		$img->setOptions( 'xAxisVert' => ($$props{'X_ORIENT'} ne 'HORIZONTAL'))
 			if ((! $numtype{$$types[0]}) || ($$dtypes[$i] eq 'CANDLESTICK'));
 #
 #	force a legend if more than 1 range or plot
@@ -2411,7 +2476,7 @@ sub execute {
 #			push query name (default PLOTn) onto legends array
 #		}
 #
-		if (! $$props{'Z-AXIS'}) {
+		if (! $$props{'Z_AXIS'}) {
 			if ((($$dtypes[$i] ne 'CANDLESTICK') && (scalar(@$data) > 2)) || 
 				(($$dtypes[$i] eq 'BOXCHART') && (scalar(@$data) > 1)) ||
 				(scalar(@$data) > 3)) {
@@ -2453,7 +2518,7 @@ sub execute {
 #	bars are grouped
 #
 			$propstr = ($$dtypes[$i] eq 'HISTOGRAM') ? 'histo ' : 'bar ';
-			if ($$props{'Z-AXIS'}) {
+			if ($$props{'Z_AXIS'}) {
 				$DBD::Chart::err = -1,
 				$DBD::Chart::errstr = $img->{errmsg},
 				return undef
@@ -2796,7 +2861,7 @@ See L<GD(3)>, L<GD::Graph(3)> for details about the graphing engines.
 
 =item DBI 1.14 minimum
 
-=item DBD::Chart::Plot 0.60 (included with this package)
+=item DBD::Chart::Plot 0.61 (included with this package)
 
 =item GD X.XX minimum
 
@@ -2826,11 +2891,11 @@ whip up a PPM in the future.
 
 For Unix, extract it with
 
-    gzip -cd DBD-Chart-0.60.tar.gz | tar xf -
+    gzip -cd DBD-Chart-0.61.tar.gz | tar xf -
 
 and then enter the following:
 
-    cd DBD-Chart-0.60
+    cd DBD-Chart-0.61
     perl Makefile.PL
     make
 
