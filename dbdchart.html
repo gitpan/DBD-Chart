@@ -1,7 +1,7 @@
 <html>
 <head>
-<title>DBD::Chart 0.62 - Perl DBI Driver abstraction for rendering charts and graphs</title>
-<META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD">
+<title>DBD::Chart 0.70 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD, Quadtree, Gantt">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
 <body background='imgs/grey.jpg' link='blue' vlink='darkred'>
@@ -32,6 +32,9 @@
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#logtempline">Log. Temporal Range Linegraph</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#composite">Composite Image</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#gantt">Gantt Chart</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#quad">Quadtree Chart</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#stackarea">Cumulative Areagraph</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#stack3Dbar">Cumulative Areagraph</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.presicient.com/dbdchart/plottest/plottest.html">Lots more examples...</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.presicient.com/dbdchart/testres.html">Still more examples...</a><br>
 </font>
@@ -67,7 +70,8 @@
 <a href="#acks">Acknowledgements</a><br>
 <a href="#refs">References</a><br>
 <a href="#copy">Copyright</a></b>
-</font>
+</font><p>
+<i>Last updated August 2, 2002</i>
 </td>
 <td>&nbsp;&nbsp;</td>
 <td align=left valign=top>
@@ -75,9 +79,20 @@
 <a name="description"></a>
 <h2>Description</h2><p>
 
-DBI driver abstraction for rendering pie charts, bar charts, histograms, box & whisker charts,
-line, point, area, and candlestick graphs. The default output format is PNG;
-JPEG or GIF format can be generated
+DBI driver abstraction for rendering
+<ul>
+<li>pie charts
+<li>bar charts
+<li>histograms
+<li>box & whisker charts
+<li>linegraphs
+<li>pointgraphs (scatter graphs)
+<li>areagraphs
+<li>candlestick graphs
+<li>Gantt charts
+<li> quadtree graphs
+</ul><p>
+The default output format is PNG; JPEG or GIF format can be generated
 by setting the FORMAT property (see below), assuming the appropriate supporting
 libraries and modules are installed.<br>
 <b>BE ADVISED:</b> This is <b>BETA</B> software, and subject to change at the
@@ -94,10 +109,10 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>Current Version</h2><p>
 
-Release 0.62<p>
+Release 0.70<p>
 
-<a href="http://www.presicient.com/dbdchart/dbdchart062.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.62.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart070.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.70.tar.gz">.tar.gz version</a>
 <p>
 <a name="conform"></a>
 <h2>Prerequisites and Conformance</h2><p>
@@ -635,6 +650,136 @@ dump_img($row, 'png', 'simpgantt');
 <AREA ALT="2002-03-28->2002-04-15"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=2002-03-28&y=2002-04-15&z=0:WLA&plotno=Final%20task"  SHAPE=RECT COORDS="355,348.5,434,361.5">
 </MAP>
 <p>
+<a name='quad'></a>
+<h3>Quadtree Chart</h3>
+<pre>
+$dbh-&gt;do('CREATE TABLE myquad (
+		Sector		varchar(30),
+		Subsector	varchar(30),
+		Stock		varchar(30),
+		RelMktCap	integer,
+		PctChange	float)');
+$sth = $dbh-&gt;prepare('insert into myquad values(?,?,?,?,?)');
+$sth-&gt;execute(@{$_}) foreach (@dataset);
+
+$sth = $dbh-&gt;prepare(
+"SELECT QUADTREE, IMAGEMAP FROM myquad
+WHERE COLORS IN ('red', 'black', 'green')
+	AND WIDTH=500 AND HEIGHT=500
+	AND TITLE='My Quadtree'
+	AND MAPTYPE='HTML'
+	AND MAPNAME='quadtree'
+	AND MAPURL=
+'http://www.presicient.com/cgi-bin/quadtree.pl?group=:X\&item=:Y\&value=:Z\&intensity=:PLOTNUM'");
+$sth-&gt;execute;
+$row = $sth-&gt;fetchrow_arrayref;
+</pre>
+<img src=imgs/quadtree.png alt='quadtree' usemap=#quadtree><p>
+<MAP NAME="quadtree">
+<AREA ALT="Energy:Power Utility:Edison=800(-1.5)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Energy:Power%20Utility&item=Edison&value=800&intensity=-1.5"  SHAPE=RECT COORDS="40,40,118,118">
+<AREA ALT="Energy:Oil Discovery:Schumberger=300(-1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Energy:Oil%20Discovery&item=Schumberger&value=300&intensity=-1"  SHAPE=RECT COORDS="118,40,148,118">
+<AREA ALT="Energy:Oil Producers:Exxon=1200(-2)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Energy:Oil%20Producers&item=Exxon&value=1200&intensity=-2"  SHAPE=RECT COORDS="40,118,148,204">
+<AREA ALT="Retail:Specialty:Sharper Image=100(2.3)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=&item=&value=100&intensity=2.3"  SHAPE=RECT COORDS="148,40,161,98">
+<AREA ALT="Retail:Dept. Store:Nordstrom=400(1.2)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Retail:Dept.%20Store&item=Nordstrom&value=400&intensity=1.2"  SHAPE=RECT COORDS="161,40,214,98">
+<AREA ALT="Retail:Discount:Walmart=900(1.5)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Retail:Discount&item=Walmart&value=900&intensity=1.5"  SHAPE=RECT COORDS="148,98,214,204">
+<AREA ALT="Service:Restaurant:YUM=240(1.1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Service:Restaurant&item=YUM&value=240&intensity=1.1"  SHAPE=RECT COORDS="40,204,72,261">
+<AREA ALT="Service:Media:Disney=690(-1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Service:Media&item=Disney&value=690&intensity=-1"  SHAPE=RECT COORDS="72,204,214,241">
+<AREA ALT="Service:Media:Tribune=350(-1.3)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Service:Media&item=Tribune&value=350&intensity=-1.3"  SHAPE=RECT COORDS="72,241,214,261">
+<AREA ALT="Finance:Banks:Banc of America=1400(1.7)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=&item=&value=1400&intensity=1.7"  SHAPE=RECT COORDS="214,40,305,159">
+<AREA ALT="Finance:Brokerages:Morgan Stanley=760(1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=&item=&value=760&intensity=1"  SHAPE=RECT COORDS="214,159,272,261">
+<AREA ALT="Finance:Insurance:Allianz=430(-1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Finance:Insurance&item=Allianz&value=430&intensity=-1"  SHAPE=RECT COORDS="272,159,305,261">
+<AREA ALT="Telecomm:CLEC:Verizon=1300(-1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Telecomm:CLEC&item=Verizon&value=1300&intensity=-1"  SHAPE=RECT COORDS="40,261,103,420">
+<AREA ALT="Telecomm:Long distance:ATT=900(1.1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Telecomm:Long%20distance&item=ATT&value=900&intensity=1.1"  SHAPE=RECT COORDS="103,261,147,420">
+<AREA ALT="Telecomm:Wireless:Cingular=550(0.7)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Telecomm:Wireless&item=Cingular&value=550&intensity=0.7"  SHAPE=RECT COORDS="40,420,147,460">
+<AREA ALT="Manufacturing:Aerospace:Boeing=1600(-3)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Manufacturing:Aerospace&item=Boeing&value=1600&intensity=-3"  SHAPE=RECT COORDS="147,261,254,376">
+<AREA ALT="Manufacturing:Heavy Equipement:John Deere=750(0)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=&item=&value=750&intensity=0"  SHAPE=RECT COORDS="254,261,305,376">
+<AREA ALT="Manufacturing:Durable Goods:Whirlpool=400(2)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Manufacturing:Durable%20Goods&item=Whirlpool&value=400&intensity=2"  SHAPE=RECT COORDS="147,376,295,397">
+<AREA ALT="Manufacturing:Automotive:GM=1200(3)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Manufacturing:Automotive&item=GM&value=1200&intensity=3"  SHAPE=RECT COORDS="147,397,295,460">
+<AREA ALT="Manufacturing:Other:Fruit of the Loom=100(-1.4)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=&item=&value=100&intensity=-1.4"  SHAPE=RECT COORDS="295,376,305,460">
+<AREA ALT="Health Care:HMO:Kaiser=1100(2)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Health%20Care:HMO&item=Kaiser&value=1100&intensity=2"  SHAPE=RECT COORDS="305,40,372,168">
+<AREA ALT="Health Care:Services:Medical Billing Inc=250(1.2)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=&item=&value=250&intensity=1.2"  SHAPE=RECT COORDS="305,168,354,207">
+<AREA ALT="Health Care:Hospital:Bethel=320(0.5)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Health%20Care:Hospital&item=Bethel&value=320&intensity=0.5"  SHAPE=RECT COORDS="305,207,354,258">
+<AREA ALT="Health Care:Equipment:XYZ=200(-0.4)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Health%20Care:Equipment&item=XYZ&value=200&intensity=-0.4"  SHAPE=RECT COORDS="354,168,372,258">
+<AREA ALT="Transportation:Airlines:UAL=1000(-1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Transportation:Airlines&item=UAL&value=1000&intensity=-1"  SHAPE=RECT COORDS="372,40,416,217">
+<AREA ALT="Transportation:Rails:Union Pacific=1000(2)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=&item=&value=1000&intensity=2"  SHAPE=RECT COORDS="416,40,460,217">
+<AREA ALT="Transportation:Trucking:Longhaul=450(1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=Transportation:Trucking&item=Longhaul&value=450&intensity=1"  SHAPE=RECT COORDS="372,217,460,258">
+<AREA ALT="High Tech:Hardware:Dell=800(1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=High%20Tech:Hardware&item=Dell&value=800&intensity=1"  SHAPE=RECT COORDS="305,258,356,379">
+<AREA ALT="High Tech:Biotech:Merck=1000(1.4)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=High%20Tech:Biotech&item=Merck&value=1000&intensity=1.4"  SHAPE=RECT COORDS="356,258,421,379">
+<AREA ALT="High Tech:Software:Microsoft=1200(-1.1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=High%20Tech:Software&item=Microsoft&value=1200&intensity=-1.1"  SHAPE=RECT COORDS="305,379,421,460">
+<AREA ALT="High Tech:Semiconductor:Intel=1000(-2.1)"  HREF="http://www.presicient.com/cgi-bin/quadtree.pl?group=High%20Tech:Semiconductor&item=Intel&value=1000&intensity=-2.1"  SHAPE=RECT COORDS="421,258,460,460">
+</MAP>
+<p>
+<a name='stackarea'></a>
+<h3>Cumulative Areagraph</h3>
+<pre>
+$sth = $dbh-&gt;prepare('insert into stackbar values(?, ?, ?)');
+$sth-&gt;execute($x[$_], $y2[$_], $y3[$_])
+	foreach (0..$#x);
+
+$sth = $dbh-&gt;prepare("select areagraph, imagemap from stackbar
+where WIDTH=500 AND HEIGHT=500 AND X_AXIS='Some Domain' and Y_AXIS='Some Range' AND
+TITLE='Stacked Areagraph Test' AND SIGNATURE='(C)2002, GOWI Systems' AND
+FORMAT='PNG' AND SHOWVALUES=1 AND STACK=1 AND
+MAPNAME='stackarea' AND
+MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X\&y=:Y\&z=:Z\&plotno=:PLOTNUM'
+AND MAPTYPE='HTML' AND COLORS IN ('red', 'green')");
+$sth-&gt;execute;
+$row = $sth-&gt;fetchrow_arrayref;
+</pre>
+<img src=imgs/stackarea.png alt='stackarea' usemap=#stackarea><p>
+<MAP NAME="stackarea">
+<AREA ALT="(10,88)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=88&z=&plotno=0"  SHAPE=CIRCLE COORDS="102,266,4">
+<AREA ALT="(20,84)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=84&z=&plotno=0"  SHAPE=CIRCLE COORDS="184,274,4">
+<AREA ALT="(30,182)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=182&z=&plotno=0"  SHAPE=CIRCLE COORDS="266,76,4">
+<AREA ALT="(40,154)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=154&z=&plotno=0"  SHAPE=CIRCLE COORDS="347,133,4">
+<AREA ALT="(50,183)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=183&z=&plotno=0"  SHAPE=CIRCLE COORDS="429,74,4">
+<AREA ALT="(10,53)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=53&z=&plotno=0"  SHAPE=CIRCLE COORDS="102,337,4">
+<AREA ALT="(20,39)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=39&z=&plotno=0"  SHAPE=CIRCLE COORDS="184,365,4">
+<AREA ALT="(30,127)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=127&z=&plotno=0"  SHAPE=CIRCLE COORDS="266,187,4">
+<AREA ALT="(40,89)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=89&z=&plotno=0"  SHAPE=CIRCLE COORDS="347,264,4">
+<AREA ALT="(50,108)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=108&z=&plotno=0"  SHAPE=CIRCLE COORDS="429,226,4">
+</MAP>
+<p>
+<a name='stack3Dbar'></a>
+<h3>Cumulative 3-D Barchart</h3>
+<pre>
+$dbh-&gt;do('create table stackbar (x integer, ylo integer, yhi integer)');
+$sth = $dbh-&gt;prepare('insert into stackbar values(?, ?, ?)');
+$sth-&gt;execute($x[$_], $y1[$_], $y3[$_])
+	foreach (0..$#x);
+
+$sth = $dbh-&gt;prepare("select barchart, imagemap from stackbar
+where WIDTH=500
+AND HEIGHT=500
+AND X_AXIS='Some Domain'
+AND Y_AXIS='Some Range'
+AND TITLE='Stacked 3-D Barchart Test'
+AND SIGNATURE='(C)2002, GOWI Systems'
+AND FORMAT='PNG'
+AND SHOWVALUES=1
+AND STACK=1
+AND THREE_D=1
+AND MAPNAME='stack3dbar'
+AND MAPURL='http://www.gowi.com/cgi-bin/sample.pl?x=:X\&y=:Y\&z=:Z\&plotno=:PLOTNUM'
+AND MAPTYPE='HTML'
+AND COLORS IN ('yellow', 'blue')");
+$sth-&gt;execute;
+$row = $sth-&gt;fetchrow_arrayref;
+</pre>
+<img src=imgs/stack3Dbar.png alt='stack3Dbar' usemap=#stack3Dbar><p>
+<MAP NAME="stack3Dbar">
+<AREA ALT="(10, 23)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=23&z=1&plotno=0"  SHAPE=POLY COORDS="82,274,115,255,181,255,148,274">
+<AREA ALT="(10, 58)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=10&y=58&z=1&plotno=0"  SHAPE=POLY COORDS="82,225,115,206,181,206,148,225">
+<AREA ALT="(20, -39)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=-39&z=1&plotno=0"  SHAPE=POLY COORDS="156,306,189,287,255,287,222,306">
+<AREA ALT="(20, 45)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=20&y=45&z=1&plotno=0"  SHAPE=POLY COORDS="156,243,189,224,255,224,222,243">
+<AREA ALT="(30, 102)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=102&z=1&plotno=0"  SHAPE=POLY COORDS="230,164,263,145,329,145,296,164">
+<AREA ALT="(30, 157)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=30&y=157&z=1&plotno=0"  SHAPE=POLY COORDS="230,88,263,69,329,69,296,88">
+<AREA ALT="(40, 67)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=67&z=1&plotno=0"  SHAPE=POLY COORDS="304,213,337,194,403,194,370,213">
+<AREA ALT="(40, 132)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=40&y=132&z=1&plotno=0"  SHAPE=POLY COORDS="304,123,337,104,403,104,370,123">
+<AREA ALT="(50, 80)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=80&z=1&plotno=0"  SHAPE=POLY COORDS="378,195,411,176,477,176,444,195">
+<AREA ALT="(50, 155)"  HREF="http://www.gowi.com/cgi-bin/sample.pl?x=50&y=155&z=1&plotno=0"  SHAPE=POLY COORDS="378,91,411,72,477,72,444,91">
+</MAP>
+<p>
 <hr color=silver>
 <a name="behavior"></a>
 <h2>Driver Specific Behavior</h2><p>
@@ -722,7 +867,7 @@ which must follow these rules:<p>
 each bar (if only a single domain column is defined) or group of bars (if more than 1 domain column is defined).
 <li>the remaining columns must be numeric. When more than 1 domain column is defined, the column
 values are plotted in groups by the associated label, i.e., all domains for each row are plotted
-in a group.
+in a group (or stacked if the STACK or CUMULATIVE property is specified, see below).
 </ul>
 <li><b>for 3 axis barcharts:</b>
 <ul>
@@ -745,6 +890,7 @@ associated line or pointset.
 <li>numeric and temporal domain datasets do not need to be INSERT'ed in order; the charting engine will automatically
 sort the domain values into ascending order. Symbolic domains will be plotted in the same order
 as they are INSERT'd.
+<li>Areagraphs may be stacked (see STACK property description below).
 </ol><p>
 <b>For candlestick graphs:</b>
 <ol>
@@ -754,7 +900,7 @@ which may be of any type.
 <li>the 2nd column must be numeric, and is used as the minimum (bottom) value of the candlestick.
 <li>the 3rd column must be numeric, and is used as the maximum (top) value of the candlestick.
 <li>multiple sets of candlesticks can be plotted in the same graph by defining additional
-(minimum, maximum) columns.
+(minimum, maximum) columns (or stacked if the STACK or CUMULATIVE property is specified, see below).
 </ol><p>
 <b>For box & whisker graphs:</b>
 <ol>
@@ -781,6 +927,40 @@ names of tasks which are dependent upon initiation of the current row's task.
 <li>only a single Gantt plot is allowed, and may not be used in a composite
 image.
 </ol><p>
+<b>For Quadtrees:</b>
+<ol>
+<li>At least 3 columns must be defined
+<li>the first N columns define a flattened hierachy, followed
+by a numeric or interval value column, and, lastly, a numeric or interval intensity column.
+The first N columns are treated as symbolic categorical classifications, where the first column
+is the set of major categories, the second column is the set of subcategories under the
+major categories defined by the first column, the 3rd column is a set of subcategories under
+the subcateogries defined by the 2nd column, etc. E.g.,
+<pre>
+CREATE TABLE stock_market_map (
+	Market_sector	varchar(30),
+	Market_subsector varchar(30),
+	Stock_symbol	varchar(6),
+	Market_cap	float,
+	Pct_change	dec(5,3)
+);
+</pre>
+<li>NULL values in any of the category columns will have undefined results.
+<li>NULL values in either the value or intensity column will have undefined results.
+<li>only a single quadtree chart is allowed, and is not compatible with any other
+chart type in a composite image.
+<li>the area of the graph is recursively subdivided down to the final item, where the
+areas assigned to each division are proportionately equal to the sum of the associated
+(sub)category's value column.
+<li>The resulting portions of the quadtree will be assigned colors based on a colorlist
+(or the default colorlist [ black, blue, green, purple, red, orange, yellow, white ])
+wherein the minimum intensity is assigned to the first color in the list, and the
+maximum intensity is assigned to the last color in the list, and all intervening
+intensities are generated using a simple linear interpolation within the RGB value
+ranges of the colorlist.
+<li>Any imagemap defined for the quadtree will define links at the lowest category level.
+</ol>
+<p>
 Column qualifers (e.g., NOT NULL, CASESPECIFIC, etc.) are not supported.</li><p>
 
 <a name="drop"></a>
@@ -843,6 +1023,7 @@ with the plot color).
 <li><b>POINTGRAPH</b> - generates a pointgraph (i.e., scatter-graph)
 <li><b>CANDLESTICK</b> - generates a candlestick graph
 <li><b>GANTT</b> - generates a Gantt chart
+<li><b>QUADTREE</b> - generates a Quadtree chart
 <li><b>IMAGE</b> - used only when derived tables are specified; creates a composite image
 from one or more different graph types.
 </ul><p>
@@ -878,7 +1059,8 @@ purple, dpurple, lorange, orange, pink, dpink, marine, cyan, lbrown, dbrown.</co
 	<td valign=top>'black'</td>
 	<td valign=top>No</td>
 	<td valign=top>Multiple colors can be specified via either the = or IN operator, followed by a parenthesized
-	list of color names.<br>The colorlist wraps if more range valuesets are defined than colors. Ignored for iconic barcharts/histograms</td></tr>
+	list of color names.<br>The colorlist wraps if more range valuesets are defined than colors. Ignored for iconic barcharts/histograms.
+	See prior description of Quadtree processing for details on quadtree color mapping.</td></tr>
 <tr bgcolor=white>
 	<td valign=top align=center><b>ICON</b><br>(<i>aka</i> <b>ICONS</b>)</td>
 	<td valign=top>sets an icon image to be used to render the bars for barcharts, or datapoints
@@ -895,7 +1077,7 @@ purple, dpurple, lorange, orange, pink, dpink, marine, cyan, lbrown, dbrown.</co
 	<td valign=top>String name of a compatible format image file (PNG, JPEG, GIF).<br>
 	Multiple icons can be specified via either the = or IN operator, followed by a parenthesized
 	list of filenames.<br>
-	Not valid for piecharts. May be multivalued. Icon list wraps if more ranges are defined than icons.</td></tr>
+	Not valid for piecharts, gantt charts, or quadtrees. May be multivalued. Icon list wraps if more ranges are defined than icons.</td></tr>
 <tr bgcolor=white>
 	<td valign=top align=center><b>GRIDCOLOR</b></td>
 	<td valign=top>sets the color of any background grid lines. Default black</td>
@@ -906,7 +1088,7 @@ purple, dpurple, lorange, orange, pink, dpink, marine, cyan, lbrown, dbrown.</co
 	<td valign=top align=center><b>SHAPE</b></b><br>(<i>aka</i> <b>SHAPES</b>)</td>
 	<td valign=top>sets the shape of points for line, area, point, or candlestick graphs;
 	may be multivalued. Valid values are <code>fillsquare, opensquare, horizcross, diagcross, filldiamond, opendiamond,
-fillcircle, opencircle, icon.</code> Default none.</td>
+fillcircle, opencircle, icon, dot</code>. Default none.</td>
 	<td valign=top>'fillcircle'</td>
 	<td valign=top>No</td>
 	<td valign=top>Multiple shapes can be specified via either the = or IN operator, followed by a parenthesized
@@ -1041,6 +1223,23 @@ to 1 to force the origin axis to be included. </td>
 	<td valign=top>No</td>
 	<td>Single string value</td></tr> -->
 <tr bgcolor=white>
+	<td align=center valign=top><b>LINEWIDTH</b></td>
+	<td valign=top>sets the width in pixels of the plot line in linegraphs, or of the candlestick
+	in candlestick charts</td>
+	<td valign=top>1</td>
+	<td valign=top>No</td>
+	<td valign=top>single number value only between 1 and 100</td></tr>
+<tr bgcolor=white>
+	<td valign=top align=center><b>STACK<br><i>aka</i> CUMULATIVE</b></td>
+	<td valign=top>causes multirange barchart, histograms, areagraphs, and candlestick charts to 'stack'
+	their ranges, i.e, render a single bar or candlestick for all ranges, with the 2nd range
+	value added to the 1st, the 3rd added to the 1st and 2nd, etc. Areagraphs will stack their
+	ranges appropriately.</td>
+	<td valign=top>0</td>
+	<td valign=top>no</td>
+	<td valign=top>either 1 or 0
+	</td></tr>
+<tr bgcolor=white>
 	<td valign=top align=center><b>MAPTYPE</b></td>
 	<td valign=top>set the type of imagemap</td>
 	<td valign=top>HTML</td>
@@ -1136,7 +1335,7 @@ modules (pre 1.20).
 <!-- <li>Support for SVG image formats requires SVG.pm v. 2.0 or greater. -->
 <li>Composite images can only be constructed from compatible chart types:
 <ul>
-<li>piecharts, Gantt charts, and 3-axis barcharts/histograms must be used alone (i.e., a single graph composite).
+<li>piecharts, Gantt charts, quadtrees, and 3-axis barcharts/histograms must be used alone (i.e., a single graph composite).
 <li>histograms are only compatible with other histograms
 <li>3-d barcharts are only compatible with other 3-d barcharts
 <li>all other types are compatible with one another
@@ -1352,6 +1551,17 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 		<li>:Z = &lt;pct. complete:assignee&gt;
 		</ol>
 	</td></tr>
+<tr bgcolor=white><td valign=top align=center><b>Quadtree chart</b></td>
+	<td valign=top>the area of each subdivision</td>
+	<td valign=top>[Category:subcategory:...]item, value, intensity</td>
+	<td>
+		<ol>
+		<li>:PLOTNUM = &lt;categorized item name&gt;
+		<li>:X = &lt;value&gt;
+		<li>:Y = &lt;intensity&gt;
+		<li>:Z = &lt;NA&gt;
+		</ol>
+	</td></tr>
 </table>
 <p>
 A Perl imagemap will have the following behaviors based on the type of chart/graph
@@ -1419,6 +1629,14 @@ requested, and the values specified (if any) for the MAPURL and MAPSCRIPT qualif
 	<td valign=top align=center>start date/time</td>
 	<td valign=top align=center>end date/time</td>
 	<td valign=top align=center>pct. complete:assignee</td></tr>
+<tr bgcolor=white><td valign=top align=center><b>Quadtree chart</b></td>
+	<td valign=top>RECT</td>
+	<td valign=top>arrayref of (upper left x,y; lower right x,y)
+		image pixel coordinates of each item's subdivision</td>
+	<td valign=top align=center>categorized item name</td>
+	<td valign=top align=center>item value</td>
+	<td valign=top align=center>item intensity</td>
+	<td valign=top align=center>N/A</td></tr>
 </table>
 <p>
 
@@ -1441,25 +1659,36 @@ of trace information. DBD::Chart currently doesn't add any traces to this.
 <h3>Driver Specific Attributes</h3><p>
 
 <ul>
-<li>chart_noverify - when set to 1 during connect(), verification of data values with target
-columns is bypassed (to provide some performance improvement).
+<li>chart_noverify - connect() attribute; when set to 1, verification of data values with target
+columns is bypassed (to provide some performance improvement).<p>
+<li>chart_map_modifier - prepare() attribute; can be set to a sub reference to provide a
+application-specific function for modifying HTML imagemap elements. The specified
+sub will be passed a hashref containing the following elements:<p>
+<ul>
+<li>URL - any string provided with the MAPURL property
+<li>Script - an string provided with the MAPSCRIPT property
+<li>AltText - the ALT tag text that will be associated with the datapoint
+<li>PLOTNUM - the associated plot number
+<li>X - the X value of the datapoint
+<li>Y - the Y value of the datapoint
+<li>Z - the Z value of the datapoint
+</ul>
+
+The application can replace the URL, Script, or AltText items with their
+own values. The callback is called after the initial ALT text is generated,
+but prior to any special variable replacement in either the URL or script text.
+The URL and Script will be subject to special variable replacement after
+the callback returns.
 </ul><p>
 
 <a name="funcs"></a>
 <h3>Driver Specific Functions</h3><p>
 
-The following functions are provided to optimize data movement:<br>
-<b><i>Note:</b>generalized versions of these functions are currently
-under consideration for addition to the DBI specification.</i><p>
-<ul>
-<li><code>$sth->chart_bind_param_array($paramnum, \@paramary [\%attr | $typespec])</code><p>
-binds an array of parameters to the statement; the entire array of parameters will be
-consumed when the statement is executed.<p>
-<li><code>$sth->chart_bind_param_status(\@stsary | \%stshash)</code><p>
-binds an array or hash to receive parameter status information when parameter array binding has been
-used on the statement. If the array version is used, then status for every supplied parameter
-tuple is returned; if a hash is used, then only the status of unsuccessful parameter tuples is reported,
-using the ordinal tuple number as the hashkey.<p>
+<b>NOTE:</b> As of DBI-1.23 and DBD::Chart 0.70, DBD::Chart supports the native DBI
+array binding interfaces bind_param_array() and execute_array(). The
+<code>$sth->chart_bind_param_array($paramnum, \@paramary [\%attr | $typespec])</code>
+and <code>$sth->chart_bind_param_status(\@stsary | \%stshash)</code> interfaces
+are now deprecated (though they continue to be supported).
 </ul>
 
 <i><b>Note:</b> array binding of output values is not supported, since
@@ -1468,6 +1697,26 @@ an imagemap.</i><p>
 
 <a name="history"></a>
 <h2>Change History</h2><p>
+
+Release 0.70:
+<ul>
+<li>added quadtrees
+<li>added stacked barcharts/histograms/candlesticks/areagraphs
+<li>fixed SHOWVALUES to apply to individual graphs, rather than as a global
+property, unless explicitly applied to the global image.
+<li>implemented official DBI parameter array binding i/f.
+<li>successfully tested with DBI::PurePerl
+<li>added LINEWIDTH property
+<li>added chart_map_modifier prepare() attribute
+<li>added support for NULLs in SHAPES list
+<li>improved heuristic scaling of TIMESTAMP datatypes
+<li>added some simple installation tests
+</ul>
+
+Release 0.63:
+<ul>
+<li>fix Gantt chart date axis tick alignment
+</ul><p>
 
 Release 0.62:
 <ul>
@@ -1663,16 +1912,24 @@ Release 0.10:<p>
 	<td align=center>0.62</td>
 </tr><tr bgcolor=white>
 	<td align=center>12</td>
-	<td align=center>2002-May-07</td>
+	<td align=center>2002-May-16</td>
 	<td align=center>0.62</td>
-	<td align=left>invalid date aligment on Gantt charts</td>
+	<td align=left>invalid alignment of ticks on date axis of Gantt chart</td>
 	<td align=center>Fixed</td>
 	<td align=center>0.63</td>
+</tr><tr bgcolor=white>
+	<td align=center>13</td>
+	<td align=center>2002-Jun-01</td>
+	<td align=center>0.63</td>
+	<td align=left>SHOWVALUES property was applied globally, even when specified on individual graph</td>
+	<td align=center>Fixed</td>
+	<td align=center>0.70</td>
 </tr></table>
 <a name="todo"></a>
 <h2>TO DO List</h2><p>
 
 <ul>
+<li>SVG
 <li>surfacemaps ?
 <li>statistical distribution curves (Poisson, Gaussian, etc.)
 <li>XML template support
@@ -1684,7 +1941,7 @@ Release 0.10:<p>
 <a name="acks"></a>
 <h2>Acknowledgements</h2><p>
 
-Many thanks to all the authors of the various GD, PNG, JPEG, SVG, and zlib modules.
+Many thanks to all the authors of the various GD, PNG, JPEG, and zlib modules.
 Special thanks to all the initial victims, er, users for their comments,
 complaints, and suggestions.<p>
 Special thanks to
@@ -1692,6 +1949,8 @@ Special thanks to
 <li><a href="mailto:Peter@PSDT.com">Peter Scott</a> for the GIF support and a few other fixes!
 <li>Terry Jones for testing and suggestions.
 <li>Andy Duncan for evangelical and moral support.
+<li>Mike Vanole for numerous suggestions and sanity checking
+<li><a href='http://www.netdave.com'>Dave Cook</a> for technical advice and zymotic artistry
 </ul>
 
 <a name="refs"></a>
@@ -1735,6 +1994,5 @@ to individual sites under a separate (possibly fee-based)
 agreement.<p>
 </td></tr></table>
 <hr color=silver>
-<center><i>Last updated April 22, 2002</i>
 
 </body></html>

@@ -9,6 +9,15 @@
 #
 #	Change History:
 #
+#	0.70	2002-Jun-10		D. Arnold
+#		add stacked bar, histo, area, and candlestick graphs
+#		add quadtree graph
+#		support new property keywords stack, showvalues
+#		consolidated candlestick w/ 2D bars functions
+#		add programmable linewidth to linegraph, candlesticks
+#		add mapModifier callback
+#		support NULL shapes entries
+#
 #	0.63	2002-May-16		D. Arnold
 #		fix for Gantt chart date axis alignment
 #
@@ -60,17 +69,21 @@
 #		- Coded.
 #
 require 5.6.0;
-package DBD::Chart::Plot;
+use strict 'vars';
 
-$DBD::Chart::Plot::VERSION = '0.63';
+{
+package DBD::Chart::Plot;
 
 use GD;
 use Time::Local;
-use strict;
+use GD qw(gdBrushed gdSmallFont gdTinyFont gdMediumBoldFont);
+
+$DBD::Chart::Plot::VERSION = '0.70';
+
 #
 #	list of valid colors
 #
-my @clrlist = qw(
+our @clrlist = qw(
 	white lgray	gray dgray black lblue blue dblue gold lyellow	
 	yellow	dyellow	lgreen	green dgreen lred red dred lpurple	
 	purple dpurple lorange orange pink dpink marine	cyan	
@@ -78,7 +91,7 @@ my @clrlist = qw(
 #
 #	RGB of valid colors
 #
-my %colors = (
+our %colors = (
 	white	=> [255,255,255], 
 	lgray	=> [191,191,191], 
 	gray	=> [127,127,127],
@@ -113,7 +126,7 @@ my %colors = (
 #
 #	pointshapes
 #
-my %shapes = (
+our %valid_shapes = (
 'fillsquare', 1,
 'opensquare', 2,
 'horizcross', 3,
@@ -123,17 +136,19 @@ my %shapes = (
 'fillcircle', 7,
 'opencircle', 8,
 'icon', 9,
-'dot', 10);
+'dot', 10,
+'null', 11);
+
 #
 #	logarithmic steps for axis scaling
 #
-my @logsteps = (0, log(2)/log(10), log(3)/log(10), log(4)/log(10), 
+our @logsteps = (0, log(2)/log(10), log(3)/log(10), log(4)/log(10), 
 	log(5)/log(10), 1.0);
 #
 #	index of vertex pts for 3-D barchart
 #	polygonal visible faces
 #
-my @polyverts = ( 
+our @polyverts = ( 
 [ 1*2, 2*2,	3*2, 4*2 ],	# top face
 [ 0*2, 1*2, 4*2, 5*2 ],	# front face
 [ 4*2, 3*2, 6*2, 5*2 ]	# side face
@@ -142,7 +157,7 @@ my @polyverts = (
 # indices of 3-D projection vertices
 #	mapped to line segments
 #
-my @vert2lines = (
+our @vert2lines = (
 1*2, 4*2, 	# top front l-r
 0*2, 1*2,	# left front b-t
 0*2, 5*2,	# bottom front l-r
@@ -157,7 +172,7 @@ my @vert2lines = (
 #
 #	indices of 3-D projection of axes planes
 #
-my @axesverts = (
+our @axesverts = (
 	0*2, 1*2,	# left wall
 	1*2, 3*2,
 	3*2, 2*2,
@@ -178,10 +193,10 @@ my @axesverts = (
 #
 #	font sizes
 #
-my ($sfw,$sfh) = (gdSmallFont->width, gdSmallFont->height);
-my ($tfw,$tfh) = (gdTinyFont->width, gdTinyFont->height);
+our ($sfw,$sfh) = (gdSmallFont->width, gdSmallFont->height);
+our ($tfw,$tfh) = (gdTinyFont->width, gdTinyFont->height);
 
-my %valid_attr = qw(
+our %valid_attr = qw(
 	width 1
 	height 1
 	genMap 1
@@ -214,20 +229,22 @@ my %valid_attr = qw(
 	font 1
 	logo 1
 	timeRange 1
+	mapModifier 1
+	lineWidth 1
 );
-my @lines = ( 
+our @lines = ( 
 [ 0*2, 4*2,	5*2, 1*2 ],	# top face
 [ 0*2, 1*2, 3*2, 2*2 ],	# front face
 [ 1*2, 5*2, 7*2, 3*2 ]	# side face
 );
 
-my %month = ( 'JAN', 0, 'FEB', 1, 'MAR', 2, 'APR', 3, 'MAY', 4, 'JUN', 5, 
+our %month = ( 'JAN', 0, 'FEB', 1, 'MAR', 2, 'APR', 3, 'MAY', 4, 'JUN', 5, 
 'JUL', 6, 'AUG', 7, 'SEP', 8, 'OCT', 9, 'NOV', 10, 'DEC', 11);
-my @monthmap = qw( JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC );
+our @monthmap = qw( JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC );
 #
 #	URI escape map
 #
-my %escapes = ();
+our %escapes = ();
 for (0..255) {
     $escapes{chr($_)} = sprintf("%%%02X", $_);
 }
@@ -241,9 +258,10 @@ use constant HISTO => 32;
 use constant BAR => 64;
 use constant CANDLE => 128;
 use constant GANTT => 256;
+use constant QUADTREE => 512;
 
-my %typemap = ( 'BAR', BAR, 'HISTO', HISTO, 'FILL', AREA, 
-	'CANDLE', CANDLE, 'BOX', BOX, 'GANTT', GANTT);
+our %typemap = ( 'BAR', BAR, 'HISTO', HISTO, 'FILL', AREA, 
+	'CANDLE', CANDLE, 'BOX', BOX, 'GANTT', GANTT, 'QUADTREE', QUADTREE );
 
 sub new {
     my $class = shift;
@@ -281,6 +299,8 @@ sub new {
 #	timeDomain - 1 => domain is temporal
 #	icon - name of icon image file for iconic barcharts/points
 #	logo - name of background logo image file
+#	mapModifier - ref to callback to modify imagemap entries
+#	lineWidth - width of linegraph/candlestick in pixels
 #
 sub init {
 	my ($obj, $w, $h, $colormap) = @_;
@@ -363,6 +383,7 @@ sub init {
 	$obj->{title} = '';
 	$obj->{signature} = '';
 	$obj->{legend} = 0; 	# 1 => render legend
+	$obj->{legendPos} = 0;	# current legend index
 	$obj->{showValues} = 0; # 1 => print datapoint values
 	$obj->{horizGrid} = 0;	# 1 => print y-axis gridlines
 	$obj->{vertGrid} = 0;	# 1 => print x-axis gridlines
@@ -383,10 +404,14 @@ sub init {
 	$obj->{black} = $black; 
 	$obj->{transparent} = $img->colorAllocate(@{$colors{'transparent'}});
 
-#	for now these aren't used, but someday we'll let them be configured
 	$obj->{bgColor} = $white; # background color
 	$obj->{gridColor} = $black;
 	$obj->{textColor} = $black;
+
+	$obj->{mapModifier} = undef;
+	$obj->{lineWidth} = undef;
+	
+#	for now these aren't used, but someday we'll let them be configured
 	$obj->{font} = 'gd';
 
 # set image basic properties
@@ -480,137 +505,49 @@ sub restore_temporal {
 	return undef; # for completeness, shouldn't get here
 }
 
-sub setCandlePoints {
-	my ($obj, $xary, @ranges) = @_;
-	my $props = pop @ranges;
-	my $num_ranges = @ranges;
-	$obj->{errmsg} = 'Missing a min or max range array.', return undef
-		unless ($num_ranges == 2);
-#
-#	validate environment
-#
-	$obj->{errmsg} = 'Candle not compatible with 3-D plots.', return undef
-		if ($obj->{threed} || $obj->{zAxis});
-
-	$obj->{errmsg} = 'Incompatible plot types.', return undef
-		if ($obj->{plotTypes} & (HISTO|BOX|PIE|GANTT));
-#
-#	require prior line/point/areas to explicitly decclare domain type
-	$obj->{errmsg} = 'Incompatible plot domain types.', return undef
-		if (($obj->{plotTypes} & (LINE|POINT|AREA)) && (! $obj->{symDomain}));
-
-	$obj->{symDomain} = 1;
-	$obj->{plotTypes} |= CANDLE;
-#
-#	now translate/validate datapoints
-	my ($x, $yaryl, $yaryh,$i, $yl, $yh);
-	$yaryl = $ranges[0];
-	$yaryh = $ranges[1];
-
-	$obj->{errmsg} = 'Unbalanced dataset.',
-	return undef
-		if (($#$xary != $#$yaryl) || ($#$xary != $#$yaryh));
-		
-	my ($ymin, $ymax) = ($obj->{yl}, $obj->{yh});
-	$ymin = 1E38 unless defined($ymin);
-	$ymax = -1E38 unless defined($ymax);
-#
-# record/merge the dataset
-	my $domVals = $obj->{domainValues};
-	my @data = ();
-	my $idx = 0;
-	for (my $i = 0; $i <= $#$xary; $i++) {
-		next unless (defined($$xary[$i]) && 
-			defined($$yaryl[$i]) && defined($$yaryh[$i]));
-
-		($x, $yl, $yh) = ($$xary[$i], $$yaryl[$i], $$yaryh[$i]);
-		$x = convert_temporal($x, $obj->{timeDomain}) if $obj->{timeDomain}; 
-		$yl = convert_temporal($yl, $obj->{timeRange}),
-		$yh = convert_temporal($yh, $obj->{timeRange})
-			if $obj->{timeRange};
-#
-#	validate the range values
-		$obj->{errmsg} = 'Non-numeric range value ' . $yl . '.',
-		return undef
-			unless ($obj->{timeRange} || 
-				($yl=~/^[+-]?\d+\.?\d*([Ee][+-]?\d+)?$/));
-
-		$obj->{errmsg} = 'Non-numeric range value ' . $yh . '.',
-		return undef
-			unless ($obj->{timeRange} || 
-				($yh=~/^[+-]?\d+\.?\d*([Ee][+-]?\d+)?$/));
-
-		$obj->{errmsg} = 'Invalid value supplied for logarithmic axis.',
-		return undef
-			if ($obj->{yLog} && (($yl <= 0) || ($yh <= 0)));
-
-		$domVals->{$x} = defined($domVals) ? scalar(keys(%$domVals)) : 0
-			unless ($domVals->{$x});
-#
-#	force data into array in same order as any prior definition
-		$idx = $domVals->{$x} * 3;
-		$data[$idx++] = $x;
-		$data[$idx++] = $obj->{yLog} ? log($$yaryl[$i])/log(10) : $$yaryl[$i];
-		$data[$idx] = $obj->{yLog} ? log($$yaryh[$i])/log(10) : $$yaryh[$i];
-
-		$obj->{xMaxLen} = length($x) 
-			unless ($obj->{xMaxLen} && ($obj->{xMaxLen} >= length($x)));
-		
-		$ymin = $$yaryl[$i] unless (defined($ymin) && ($$yaryl[$i] >= $ymin));
-		$ymax = $$yaryh[$i] unless (defined($ymin) && ($$yaryh[$i] <= $ymax));
-	}
-	push(@{$obj->{data}}, \@data);
-	push(@{$obj->{props}}, $props);
-#
-#	set width of the sticks
-#
-	$obj->{brushWidth} = 2;
-	$obj->{yl} = $ymin;
-	$obj->{yh} = $ymax;
-	$obj->{xl} = 1;
-	$obj->{xh} = scalar(keys(%$domVals));
-	$obj->{haveScale} = 0; # invalidate any prior min-max calculations
-	return 1;
-}
-
 sub set3DBarPoints {
-	my ($obj, $xary, $yary, $zary, $props, $type) = @_;
+	my ($obj, $xary, @ranges) = @_;
+	my $type = pop @ranges;
+	my $props = pop @ranges;
+	my ($yary, $zary);
 	my ($ymin, $ymax) = ($obj->{yl}, $obj->{yh});
+	my $ymaxlen = 0;
 #
 #	verify:
 #		2 range sets if 3-axis
 #		each rangeset has same number of elements as domain
 #
 	my $hasZaxis = ($obj->{zAxisLabel});
+	$zary = pop @ranges
+		if $hasZaxis;
 	
-	$obj->{errmsg} = '3-axis chart requires 2 ranges.', 
-	return undef
-		if ($hasZaxis && (! $props));
-
-	$type = $props,
-	$props = $zary, 
-	$zary = undef
-		unless $hasZaxis;
-
 	my @zs = ();
 	my %zhash = ();
 	my %xhash = ();
 	my @xs = ();
 	my @xvals = @$xary;
+	my $ys;
 	my ($xval, $zval) = (0,1);
 	my $i = 0;
+	my ($x, $y, $z);
 	my $maxlen = 0;
 #
 #	collect all X's and convert if needed
-	for ($i = 0; $i <= $#xvals; $i++) {
-		$xvals[$i] = convert_temporal($xvals[$i], $obj->{timeDomain})
+	foreach (0..$#xvals) {
+		$xvals[$_] = convert_temporal($xvals[$_], $obj->{timeDomain})
 			if $obj->{timeDomain};
-		next if $xhash{$xvals[$i]};
-		push(@xs, $xvals[$i]);
-		$xhash{$xvals[$i]} = 1;
-		$maxlen = length($xvals[$i]) if (length($xvals[$i]) > $maxlen);
+		next if $xhash{$xvals[$_]};
+		push(@xs, $xvals[$_]);
+		$xhash{$xvals[$_]} = 1;
+		$maxlen = length($xvals[$_]) if (length($xvals[$_]) > $maxlen);
 	}
 	$obj->{xMaxLen} = $maxlen;
+
+	foreach (@ranges) {
+		$obj->{errmsg} = 'Unbalanced dataset.',
+		return undef
+			if ($#$xary != $#$_);
+	}
 
 	if ($hasZaxis) {
 #
@@ -620,18 +557,23 @@ sub set3DBarPoints {
 
 		$obj->{errmsg} = 'Unbalanced dataset.',
 		return undef
-			if (($#$xary != $#$yary) || ($#$xary != $#$zary));
+			if ($#$xary != $#$zary);
 #
 #	collect distinct Z and X values, and correlate them
 #	with the assoc. Y value via hashes
 #
 		$maxlen = 0;
-		for ($i = 0; $i <= $#$zary; $i++) {
-			$zval = $$zary[$i];
+		foreach $z (0..$#$zary) {
+			$zval = $$zary[$z];
 			push(@zs, $zval),
 			$zhash{$zval} = { }
 				unless $zhash{$zval};
-			$zhash{$zval}->{$xvals[$i]} = $$yary[$i];
+			$zhash{$zval}->{$xvals[$z]} = [ 0 ] unless $zhash{$zval}->{$xvals[$z]};
+			$ys = $zhash{$zval}->{$xvals[$z]};
+			foreach (@ranges) {
+				$ymaxlen = length($$_[$z]) if (length($$_[$z]) > $ymaxlen);
+				push(@$ys, $$_[$z]);
+			}
 			$maxlen = length($zval) if (length($zval) > $maxlen);
 		}
 		$obj->{zMaxLen} = $maxlen;
@@ -639,17 +581,18 @@ sub set3DBarPoints {
 	else {
 		$obj->{errmsg} = 'Incompatible plot types.', return undef
 			unless (($obj->{plotTypes} == 0) || ($obj->{plotTypes} & $type));
-
-		$obj->{errmsg} = 'Unbalanced dataset.',
-		return undef
-			if ($#$xary != $#$yary);
 #
 #	synthesize Z axis values so we can process same as true 3 axis
 #
 		push(@zs, 1);
 		$zhash{1} = { };
-		for ($i = 0; $i <= $#$xary; $i++) {
-			$zhash{1}->{$xvals[$i]} = $$yary[$i];
+		foreach $x (0..$#$xary) {
+			$zhash{1}->{$xvals[$x]} = [ 0 ] unless $zhash{1}->{$xvals[$x]};
+			$ys = $zhash{1}->{$xvals[$x]};
+			foreach (@ranges) {
+				$ymaxlen = length($$_[$x]) if (length($$_[$x]) > $ymaxlen);
+				push(@$ys, $$_[$x]);
+			}
 		}
 		$obj->{zMaxLen} = 0;
 	}
@@ -672,31 +615,55 @@ sub set3DBarPoints {
 #
 	my $zCard = scalar @zs;	# go from last Z value forward
 	my $xCard = scalar @xs;
-	my ($znum, $xnum, $y) = (0,0,0);
+	my ($znum, $xnum) = (0,0,0);
 	my @ary = ();
+	my $lasty;
+	my $j;
 	for (my $z = $zCard; $z > 0; $z--) {
-		foreach my $x (1..$xCard) {
-			$y = $zhash{$zs[$z-1]}->{$xs[$x-1]};
+		foreach $x (1..$xCard) {
+			$ys = $zhash{$zs[$z-1]}->{$xs[$x-1]};
 #
-#	data is stored in output array as (X, Ymin, Ymax, Z, ...)
+#	adapt for neg to pos swings
 #
-			$y = convert_temporal($y, $obj->{timeRange}) 
-				if $obj->{timeRange};
+			if (($$ys[1] < 0) && (($#$ys == 1) || ($$ys[$#$ys] >= 0))) {
+				$i = 1;
+				$$ys[$i-1] = $$ys[$i], 
+				$i++ 
+					while (($i <= $#$ys) && ($$ys[$i] < 0));
+				$$ys[$i-1] = 0;
+			}
+#
+#	data is stored in output array as (X, [ Ymin..Ymax ], Z, ...)
+#
+			$lasty = 0;
+			my $starts = ($$ys[0] == 0) ? 1 : 0;
+			foreach $i ($starts..$#$ys) {
+				$y = $$ys[$i];
+				$y = convert_temporal($y, $obj->{timeRange}) 
+					if $obj->{timeRange};
 
-			$obj->{errmsg} = "Non-numeric range value $y.",
-			return undef
-				unless ($obj->{timeRange} || 
-					($y=~/^[+-]?\.?\d\d*(\.\d*)?([Ee][+-]?\d+)?$/));
+				$obj->{errmsg} = "Non-numeric range value $y.",
+				return undef
+					unless ($obj->{timeRange} || 
+						($y=~/^[+-]?\.?\d\d*(\.\d*)?([Ee][+-]?\d+)?$/));
 		
-			$obj->{errmsg} = 
-				'Negative value supplied for logarithmic axis.',
-			return undef
-				if (($obj->{yLog}) && ($y <= 0));
+				$obj->{errmsg} = 
+					'Negative value supplied for logarithmic axis.',
+				return undef
+					if (($obj->{yLog}) && ($y <= 0));
+#
+#	on - to + transition, reset increment
+				$lasty = 0 if (($lasty < 0) && ($y >= 0));
 
-			$y = log($y)/log(10) if ($obj->{yLog});
-			$ymin = $y unless (defined($ymin) && ($ymin <= $y));
-			$ymax = $y unless (defined($ymax) && ($ymax >= $y));
-			push(@ary, $x, ($y >= 0) ? 0 : $y, ($y < 0) ? 0 : $y, $z);
+				$y += $lasty;
+				$y = log($y)/log(10) if ($obj->{yLog});
+				$$ys[$i] = $y;
+				$lasty = $y;
+
+				$ymin = $y unless (defined($ymin) && ($ymin <= $y));
+				$ymax = $y unless (defined($ymax) && ($ymax >= $y));
+			}
+			push(@ary, $x, $ys, $z);
 		}
 	}
 # record the dataset; use stack to support multi-graph images
@@ -713,33 +680,40 @@ sub set3DBarPoints {
 	$obj->{haveScale} = 0;	# invalidate prior min-max calculations
 	$obj->{barCount}++;
 	$obj->{symDomain} = 0;	# to avoid a later sort
+	$obj->{yMaxlen} = $ymaxlen;
 	return 1;
 }
 
-#
-#	2-Axis barchart
-#
 sub set2DBarPoints {
-	my ($obj, $xary, $yary, $props, $type) = @_;
+	my ($obj, $xary, @ranges) = @_;
 
-	$obj->{errmsg} = 'Unbalanced dataset.',
-	return undef
-		if ($#$xary != $#$yary);
+	my $type = pop @ranges;
+	my $props = pop @ranges;
+	
+	foreach (@ranges) {
+		$obj->{errmsg} = 'Unbalanced dataset.',
+		return undef
+			if ($#$xary != $#$_);
+	}
 #
 #	validate environment
 #
+	$obj->{errmsg} = 'Candlesticks require a minimum and maximum range value.', 
+	return undef
+		unless (($type != CANDLE) || ($#ranges > 0));
+
 	$obj->{errmsg} = 'Incompatible plot types.', return undef
 		if ((($type == HISTO) && $obj->{plotTypes} && ($obj->{plotTypes}^HISTO)) ||
 			(($type != HISTO) && ($obj->{plotTypes} & HISTO)));
 
 	$obj->{errmsg} = 'Incompatible plot domain types.', return undef
-		if (($obj->{plotTypes} & (BOX|PIE|GANTT)) ||
+		if (($obj->{plotTypes} & (BOX|PIE|GANTT|QUADTREE)) ||
 			(($obj->{plotTypes} & (LINE|POINT|AREA)) && (! $obj->{symDomain})));
 
 	$obj->{symDomain} = 1;
 	$obj->{plotTypes} |= $type;
-
-	my ($x, $y, $ylo, $yhi) = (0,0,0,0);
+	
+	my ($x, $y) = (0,0,0,0);
 	my $ty = 0;
 	my ($ymin, $ymax) = ($obj->{yl}, $obj->{yh});
 	$ymin = 1E38 unless $ymin;
@@ -755,49 +729,79 @@ sub set2DBarPoints {
 #	eliminate undefined data points
 #
 		next unless defined($$xary[$i]);
-		$x = $$xary[$i];
-		$y = $$yary[$i];
+		next if (($type == CANDLE) && (! defined($ranges[0]->[$i])));
 
+		$x = $$xary[$i];
 		$x = convert_temporal($x, $obj->{timeDomain}) if $obj->{timeDomain};
 
 		$domVals->{$x} = defined($domVals) ? scalar(keys(%$domVals)) : 0
 			unless defined($domVals->{$x});
-		
-		if (defined($y)) {
-		$y = convert_temporal($y, $obj->{timeRange}) if $obj->{timeRange};
-#
-#	validate the range values
-		$obj->{errmsg} = 'Non-numeric range value ' . $y . '.',
-		return undef
-			unless ($y=~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
-		
-		$obj->{errmsg} = 
-			'Invalid value supplied for logarithmic axis.',
-		return undef
-			if ($obj->{yLog} && ($y <= 0));
-#
-#	store datapts same as candlesticks w/ pseudo min (or max)
-#	($xval[0], 0, yval[0]); use temp to test in case its logarithmic
-#	since merge does the actual datapoint log conversion
-#
-		$ty = $obj->{yLog} ? log($y)/log(10) : $y;
-		$ylo = ($ty >= 0) ? 0 : $y;
-		$yhi = ($ty < 0) ? 0 : $y;
 #
 #	force data into array in same order as any prior definition
 		$idx = $domVals->{$x} * 3;
 		$data[$idx++] = $x;
-		$data[$idx++] = $ylo;
-		$data[$idx] = $yhi;
+		$data[$idx] = [ ];
+		my $yary = $data[$idx];
+
 		$obj->{xMaxLen} = length($x) 
 			unless ($obj->{xMaxLen} && ($obj->{xMaxLen} >= length($x)));
-		$ymin = $ylo if ($ylo < $ymin);
-		$ymax = $yhi if ($yhi > $ymax);
+#
+#	validate the range values
+		my $lasty = 0;
+#
+#	reserve the first element for our 'base' value
+#	to be determined after we compute the first 2 range elements
+		push(@$yary, undef) unless ($type == CANDLE);
+		my $first_valid = 0;
+		foreach (@ranges) {
+			$y = $_->[$i];
+#
+#	to support skipping some ranges
+			push(@$yary, undef), next unless defined($y);
+			
+			$y = convert_temporal($y, $obj->{timeRange})
+				if $obj->{timeRange};
+			$first_valid++;
+
+			$obj->{errmsg} = 'Non-numeric range value ' . $y . '.',
+			return undef
+				unless ($obj->{timeRange} || 
+					($y=~/^[+-]?\d+\.?\d*([Ee][+-]?\d+)?$/));
+
+			$obj->{errmsg} = 'Invalid value supplied for logarithmic axis.',
+			return undef
+				if ($obj->{yLog} && ($y <= 0));
+#
+#	compute cumulative range value
+			push(@$yary, 0), $lasty = 0
+				if (($lasty < 0) && ($y >= 0));
+			$y += $lasty;
+			push(@$yary, ($obj->{yLog} ? log($y)/log(10) : $y));
+			$lasty = $y unless (($type == CANDLE) && ($first_valid == 1));
+			$ymin = $y unless (defined($ymin) && ($y >= $ymin));
+			$ymax = $y unless (defined($ymax) && ($y <= $ymax));
+		}
+#
+#	now determine the base value:
+#	if we start negative, but go positive, then just use first
+#	range value as base
+#
+		if ($type != CANDLE) {
+			if (($$yary[1] < 0) && (($#$yary == 1) || ($$yary[2] > $$yary[1]))) {
+				push @$yary, 0
+					if ($#$yary == 1);
+
+				shift @$yary;	# no need for placeholder
+				next;
+			}
+#
+#	everything else starts from zero
+#
+			$$yary[0] = 0;
 		}
 	}
 	push(@{$obj->{data}}, \@data);
 	push(@{$obj->{props}}, $props);
-	push(@{$obj->{bars}}, $#{$obj->{props}});
 	$obj->{yl} = $ymin;
 	$obj->{yh} = $ymax;
 	$obj->{xl} = 1;
@@ -805,6 +809,9 @@ sub set2DBarPoints {
 	
 	$obj->{haveScale} = 0;	# invalidate any prior min-max calculations
 	$obj->{barCount}++;
+	$obj->{brushWidth} = ($obj->{lineWidth} ? $obj->{lineWidth} : 2)
+		if ($type == CANDLE);
+
 	return 1;
 }
 
@@ -822,9 +829,9 @@ sub setPiePoints {
 	
 	my $xtotal = 0;
 	my ($i, $y);
-	for ($i = 0; $i <= $#$xary; $i++) {
-		next unless (defined($$xary[$i]) && defined($$yary[$i]));
-		$y = $$yary[$i];
+	foreach (0..$#$xary) {
+		next unless (defined($$xary[$_]) && defined($$yary[$_]));
+		$y = $$yary[$_];
 		$y = convert_temporal($y, $obj->{timeRange}) if $obj->{timeRange};
 
 		$obj->{errmsg} = 'Non-numeric range value ' . $y . '.',
@@ -835,10 +842,10 @@ sub setPiePoints {
 		$obj->{errmsg} = 
 			'Negative range values not permitted for piecharts.',
 		return undef
-			if ($$yary[$i] < 0);
+			if ($y < 0);
 
 		$xtotal += $y;
-		push(@ary, $$xary[$i], $y);
+		push(@ary, $$xary[$_], $y);
 	}
 	$obj->{plotTypes} |= PIE;
 	push(@{$obj->{data}}, \@ary);
@@ -852,7 +859,7 @@ sub setBoxPoints {
 	my ($obj, $xary, $props) = @_;
 
 	$obj->{errmsg} = 'Incompatible plot types.', return undef
-		if ($obj->{plotTypes} & (PIE|HISTO|BAR|CANDLE|GANTT));
+		if ($obj->{plotTypes} & (PIE|HISTO|BAR|CANDLE|GANTT|QUADTREE));
 		
 	$obj->{errmsg} = 'Boxchart not compatible with 3-D plot types.', return undef
 		if ($obj->{threed} || $obj->{zAxis});
@@ -861,14 +868,13 @@ sub setBoxPoints {
 		if $obj->{symDomain};
 		
 	my @data = ();
-	foreach my $x (@$xary) {
-		
-		next unless defined($x);
-		$x = convert_temporal($x, $obj->{timeDomain}) if $obj->{timeDomain};
-		$obj->{errmsg} = 'Non-numeric value ' . $x . '.',
+	foreach (@$xary) {
+		next unless defined($_);
+		$_ = convert_temporal($_, $obj->{timeDomain}) if $obj->{timeDomain};
+		$obj->{errmsg} = 'Non-numeric value ' . $_ . '.',
 		return undef
-			unless ($x=~/^[+-]?\d+\.?\d*([Ee][+-]?\d+)?$/);
-		push(@data, $x);
+			unless ($_=~/^[+-]?\d+\.?\d*([Ee][+-]?\d+)?$/);
+		push(@data, $_);
 	}
 	@data = sort numerically @data;
 	$obj->{xl} = $data[0] 
@@ -907,16 +913,15 @@ sub setBoxPoints {
 sub setPoints {
 	my ($obj, $xary, @ranges) = @_;
 	my $props = pop @ranges;
-
-	return $obj->setCandlePoints($xary, @ranges, $props)
-		if ($props=~/\bcandle\b/i);
-
+#
+#	new stacked bars/candlesticks/histos
+#
 	return $obj->set3DBarPoints($xary, @ranges, $props, $typemap{uc $1})
 		if (($props=~/\b(bar|histo)\b/i) && 
 			($obj->{zAxisLabel} || $obj->{threed}));
 
 	return $obj->set2DBarPoints($xary, @ranges, $props, $typemap{uc $1})
-		if ($props=~/\b(bar|histo)\b/i);
+		if ($props=~/\b(bar|histo|candle)\b/i);
 
 	return $obj->setPiePoints($xary, @ranges, $props)
 		if ($props=~/\bpie\b/i);
@@ -926,25 +931,21 @@ sub setPoints {
 
 	return $obj->setGanttPoints($xary, @ranges, $props)
 		if ($props=~/\bgantt\b/i);
+
+	return $obj->setQuadPoints($xary, @ranges, $props)
+		if ($props=~/\bquadtree\b/i);
 #
 #	must be line/point/area, verify ranges have same num of elements
 #	as domain
 #
-	my $yary = $ranges[0];
-
-	$obj->{errmsg} = 'Unbalanced dataset.',
-	return undef
-		if ($#$xary != $#$yary);
-
 	$obj->{errmsg} = 'Incompatible plot types.', return undef
-		if ($obj->{plotTypes} & (PIE|HISTO|GANTT));
+		if ($obj->{plotTypes} & (PIE|HISTO|GANTT|QUADTREE));
 		
 	$obj->{errmsg} = 
 		'Line/point/area graph not compatible with 3-D plot types.', return undef
 		if ($obj->{threed} || $obj->{zAxis});
 
-	my $i;
-	my ($x, $y) = (0,0);
+	my ($x, $y, $yary) = (0,0, [ ]);
 	my ($xmin, $xmax, $ymin, $ymax) = 
 		($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh});
 	my $is_symbolic = $obj->{symDomain};
@@ -952,6 +953,54 @@ sub setPoints {
 	$xmax = $is_symbolic ? $#$xary + 1 : -1E38 unless defined($xmax);
 	$ymin = 1E38 unless defined($ymin);
 	$ymax = -1E38 unless defined($ymax);
+	
+	if (($props=~/\bstack\b/i) && ($props=~/\bfill\b/i)) {
+
+		foreach (@ranges) {
+			$obj->{errmsg} = 'Unbalanced dataset.',
+			return undef
+				if ($#$xary != $#$_);
+		}
+#
+#	condense the stacked values
+#
+		foreach my $i (0..$#$xary) {
+			$$yary[$i] = [ ];
+			my $ys = $$yary[$i];
+			my $lasty = 0;
+			foreach (@ranges) {
+
+				$y = $$_[$i];
+				next unless defined($y);
+				$y = convert_temporal($y, $obj->{timeRange}) 
+					if $obj->{timeRange};
+#
+#	validate the range values
+				$obj->{errmsg} = 'Non-numeric range value ' . $y . '.',
+				return undef
+					unless ($y=~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
+		
+				$obj->{errmsg} = 
+					'Invalid value supplied for logarithmic axis.',
+				return undef
+					if ($obj->{yLog} && ($y <= 0));
+
+				$y += $lasty;
+				$y = log($y)/log(10) if $obj->{yLog};
+				$ymin = $y if ($y < $ymin);
+				$ymax = $y if ($y > $ymax);
+				push @$ys, $y;
+				$lasty += $y;
+			}
+		}
+	}
+	else {
+		$yary = $ranges[0];
+
+		$obj->{errmsg} = 'Unbalanced dataset.',
+		return undef
+			if ($#$xary != $#$yary);
+	}
 #
 # record/merge the dataset
 	my $domVals = $obj->{domainValues};
@@ -964,11 +1013,11 @@ sub setPoints {
 #
 	my %xhash = ();
 	my $needsort = 0;
-	for ($i = 0; $i <= $#$xary; $i++) {
+	foreach (0..$#$xary) {
 #
 #	eliminate undefined data points
 #
-		$x = $$xary[$i];
+		$x = $$xary[$_];
 		next unless defined($x);
 		
 		$x = convert_temporal($x, $obj->{timeDomain}) if $obj->{timeDomain};
@@ -1001,10 +1050,8 @@ sub setPoints {
 
 	if ($needsort) {
 		@xs = sort numerically @xs ;
-
-		foreach $x (@xs) {
-			push @ys, $$yary[$xhash{$x}];
-		}
+		push @ys, $$yary[$xhash{$_}]
+			foreach (@xs);
 	}
 #
 #	first and last domain values are smallest and biggest now
@@ -1012,26 +1059,27 @@ sub setPoints {
 	$xmax = $xs[$#xs] unless ($is_symbolic || ($xs[$#xs] <= $xmax));
 	$xmax = 1 + $#xs  if ($is_symbolic && ($#xs >= $xmax));
 
-	for ($i = 0; $i <= $#xs; $i++) {
-		($x, $y) = ($xs[$i], $ys[$i]); # maybe shift instead ?
+	foreach (0..$#xs) {
+		($x, $y) = ($xs[$_], $ys[$_]); # maybe shift instead ?
 		next unless (defined($x) && defined($y));
 		
-		$y = convert_temporal($y, $obj->{timeRange}) if $obj->{timeRange};
+		unless (ref $y) {
+			$y = convert_temporal($y, $obj->{timeRange}) if $obj->{timeRange};
 #
 #	validate the range values
-		$obj->{errmsg} = 'Non-numeric range value ' . $y . '.',
-		return undef
-			unless ($y=~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
+			$obj->{errmsg} = 'Non-numeric range value ' . $y . '.',
+			return undef
+				unless ($y=~/^[+-]?\.?\d+\.?\d*([Ee][+-]?\d+)?$/);
 		
-		$obj->{errmsg} = 
-			'Invalid value supplied for logarithmic axis.',
-		return undef
-			if ($obj->{yLog} && ($y <= 0));
+			$obj->{errmsg} = 
+				'Invalid value supplied for logarithmic axis.',
+			return undef
+				if ($obj->{yLog} && ($y <= 0));
 
-		$y = log($y)/log(10) if $obj->{yLog};
-		$ymin = $y if ($y < $ymin);
-		$ymax = $y if ($y > $ymax);
-		
+			$y = log($y)/log(10) if $obj->{yLog};
+			$ymin = $y if ($y < $ymin);
+			$ymax = $y if ($y > $ymax);
+		}		
 		push(@data, $x, $y), next
 			unless $obj->{symDomain};
 #
@@ -1069,9 +1117,8 @@ sub sortData {
 		@xsorted = sort numerically keys(%$xhash);
 	}
 	else {
-		foreach my $x (keys(%$xhash)) {
-			$xsorted[$$xhash{$x}] = $x;
-		}
+		$xsorted[$$xhash{$_}] = $_
+			foreach (keys(%$xhash));
 	}
 	$obj->{domain} = \@xsorted;
 	$obj->{xh} = scalar @xsorted;
@@ -1148,7 +1195,8 @@ sub plot {
 #	get scale of all included plots
 #
 	$rc = $obj->computeScales()
-		unless ($obj->{haveScale} || ($plottypes == PIE));
+		unless ($obj->{haveScale} || 
+			($plottypes == PIE) || ($plottypes == QUADTREE));
 	return undef unless $rc;
 #
 #	if boxchart included, distribute the range values among the
@@ -1165,16 +1213,17 @@ sub plot {
 #
 	$rc = ($plottypes == BOX) ? $obj->plotBoxAxes :
 		($plottypes & (HISTO|GANTT)) ? $obj->plotHistoAxes :
-		$obj->plotAxes;
+		$obj->plotAxes
+		unless ($plottypes == QUADTREE);
 	return undef unless $rc;
 #
 #	now we can plot each dataset
 #
 	my @proptypes = ();
-	foreach $prop (@{$obj->{props}}) {
+	foreach (@{$obj->{props}}) {
 		push(@proptypes, $typemap{uc $1}), next 
-			if ($prop=~/\b(candle|fill|box|bar|histo|gantt)\b/i);
-		push(@proptypes, POINT),next if ($prop=~/\bnoline\b/i);
+			if /\b(candle|fill|box|bar|histo|gantt|quadtree)\b/i;
+		push(@proptypes, POINT),next if /\bnoline\b/i;
 		push(@proptypes, LINE);
 	}
 	my $plotcnt = $#{$obj->{props}} + 1;
@@ -1189,6 +1238,9 @@ sub plot {
 		return (($format) && $obj->{img}->$format);
 	}
 
+	return undef	# since quadtree must be solo
+		if (($plottypes & QUADTREE) && (! $obj->plotQuadtree(\@proptypes)));
+
 	return undef	# since histo only compatible with histo
 		if (($plottypes & HISTO) && (! $obj->plot2DBars(HISTO, \@proptypes)));
 
@@ -1202,7 +1254,7 @@ sub plot {
 		if (($plottypes & BAR) && (! $obj->plot2DBars(BAR, \@proptypes)));
 
 	return undef
-		if (($plottypes & CANDLE) && (! $obj->plotCandles(\@proptypes)));
+		if (($plottypes & CANDLE) && (! $obj->plot2DBars(CANDLE, \@proptypes)));
 
 	return undef
 		if (($plottypes & BOX) && (! $obj->plotBox(\@proptypes)));
@@ -1260,7 +1312,7 @@ sub computeScales {
 	my $plottypes = $obj->{plotTypes};
 # set axis ranges for widest/tallest/deepest dataset
 	$obj->computeRanges($xl, $xh, $yl, $yh, $zl, $zh);
-	$obj->{yl} = 0 if (($plottypes & (BAR|HISTO|CANDLE)) && ($yl == 0));
+	$obj->{yl} = 0 if (($plottypes & (BAR|HISTO)) && ($yl == 0));
 	($xl, $xh, $yl, $yh, $zl, $zh) = 
 		($obj->{xl}, $obj->{xh}, $obj->{yl}, $obj->{yh}, 
 			$obj->{zl}, $obj->{zh});
@@ -1270,13 +1322,13 @@ sub computeScales {
 #
 #	adjust mins to clip away from origin
 #
-		my $incr = ($obj->{zAxisLabel} || $obj->{threed}) ? 4 : 3;
-		for ($i = 0; $i <= $#{$obj->{props}}; $i++) {
-			next unless ($obj->{props}->[$i]=~/\b(bar|histo)\b/i);
-			my $datastack = $obj->{data}->[$i];
-			for (my $j = 1; $j <= $#$datastack; $j += $incr) {
-				$$datastack[$j] = $yl;
-			}
+		foreach (0..$#{$obj->{props}}) {
+			next unless ($obj->{props}->[$_]=~/\b(bar|histo)\b/i);
+			my $datastack = $obj->{data}->[$_];
+			my $j = 1;
+
+			$datastack->[$j]->[0] = $yl, $j += 3
+				while ($j <= $#$datastack);
 		}
 	}
 #
@@ -1338,7 +1390,6 @@ sub computeScales {
 #
 		$obj->{plotWidth} = int($twd / ($xzratio*sin(3.1415926/6) + 1)),
 		$obj->{plotDepth} = int(($twd - $obj->{plotWidth})/sin(3.1415926/6)),
-#		$obj->{plotHeight} = int($tht - ($obj->{plotDepth}*cos(3.1415926/6))),
 		$obj->{plotHeight} = int($tht - ($obj->{plotDepth}*cos(3.1415926/3))),
 		$obj->{xscale} = $obj->{plotWidth}/($xh - $xl),
 		$obj->{yscale} = $obj->{plotHeight}/($yh - $yl),
@@ -1419,12 +1470,21 @@ sub computeRanges {
 		($xd < 0.4) ? (10 ** (int($xr) - 1)) :
 		(($xd >= 0.87) ? (10 ** int($xr)) : (5 * (10 ** (int($xr) - 1))));
 #
-#	align time domain steps on 12:00 AM (zero hour) of a day
+#	align date domain steps on 12:00 AM (zero hour) of a day
+#	align timestamps on days if total interval > 3 days
+#	else align timestamps on hours if total interval > 3 hours
+#	else align timestamps on minutes
 #
-	$obj->{horizStep} += (86400 - $obj->{horizStep}%86400)
-		if ((! $obj->{symDomain}) && $obj->{timeDomain} && 
-			($obj->{timeDomain}=~/^YYYY/i) && 
-			($obj->{horizStep}%86400 != 0));
+	if ((! $obj->{symDomain}) && $obj->{timeDomain} 
+		&& ($obj->{timeDomain}=~/YYYY/i)) {
+		my $align = 
+			(($obj->{timeDomain}!~/HH/i) || 
+				($xh - $xl > (3 * 24 * 60 * 60))) ? 86400 :
+			($xh - $xl > (3 * 60 * 60)) ? 3600 : 60;
+
+		$obj->{horizStep} += ($align - $obj->{horizStep}%$align)
+			if ($obj->{horizStep}%$align != 0);
+	}
 	
 	$yh = $yl * 2 if ($yh == $yl);
 	$yl = int($yl) - ($yl < 0 ? 1 : 0),
@@ -1434,16 +1494,20 @@ sub computeRanges {
 	$xd = $xr - int($xr);
 	$obj->{vertStep} = ($xd < 0.4) ? (10 ** (int($xr) - 1)) :
 		(($xd >= 0.87) ? (10 ** int($xr)) : (5 * (10 ** (int($xr) - 1))));
-
 #
 #	align time range steps on 12:00 AM (zero hour) of a day
 #	if histo/gantt
 #
-	$obj->{vertStep} += (86400 - $obj->{vertStep}%86400)
-		if (($obj->{plotTypes} & (HISTO|GANTT)) && 
-			$obj->{timeRange} && 
-			($obj->{timeRange}=~/^YYYY/i) && 
-			($obj->{vertStep}%86400 != 0));
+	if (($obj->{plotTypes} & (HISTO|GANTT)) && 
+		$obj->{timeRange} && ($obj->{timeRange}=~/^YYYY/i)) {
+		my $align = 
+		(($obj->{timeRange}!~/HH/i) || 
+			($yh - $yl > (3 * 24 * 60 * 60))) ? 86400 :
+		($yh - $yl > (3 * 60 * 60)) ? 3600 : 60;
+
+		$obj->{vertStep} += ($align - $obj->{vertStep}%$align)
+			if ($obj->{vertStep}%$align != 0);
+	}
 #
 #	histos switch things
 	$xs = $obj->{horizStep}, 
@@ -1473,18 +1537,30 @@ sub computeRanges {
 	$obj->{xh} = (! $xm) ? 0 : $xm * (int(($xh-0.00001*$sign[1])/$xm) + $sign[1] + 1);
 #
 #	day align here too
-	$obj->{xl} = $obj->{xl} - ($obj->{xl}%86400),
-	$obj->{xh} += (86400 - ($obj->{xh}%86400)),
-		if ((! $obj->{symDomain}) && 
-			$obj->{timeDomain} && ($obj->{timeDomain}=~/^YYYY/i));
+	if ((! $obj->{symDomain}) && 
+		$obj->{timeDomain} && ($obj->{timeDomain}=~/^YYYY/i)) {
+		my $align = 
+			(($obj->{timeDomain}!~/HH/i) || 
+				($obj->{xh} - $obj->{xl} > (3 * 24 * 60 * 60))) ? 86400 :
+			($obj->{xh} - $obj->{xl} > (3 * 60 * 60)) ? 3600 : 60;
+
+		$obj->{xl} = $obj->{xl} - ($obj->{xl}%$align);
+		$obj->{xh} += ($align - ($obj->{xh}%$align));
+	}
 
 	$obj->{yl} = ($obj->{yLog}) ? $yl : (! $ym) ? 0 : $ym * (int(($yl-0.00001*$sign[2])/$ym) + $sign[2] - 1);
 	$obj->{yh} = ($obj->{yLog}) ? $yh : (! $ym) ? 0 : $ym * (int(($yh-0.00001*$sign[3])/$ym) + $sign[3] + 1);
 #
 #	day align here too
-	$obj->{yl} = $obj->{yl} - ($obj->{yl}%86400),
-	$obj->{yh} += (86400 - ($obj->{yh}%86400)),
-		if ($obj->{timeRange} && ($obj->{timeRange}=~/^YYYY/i));
+	if ($obj->{timeRange} && ($obj->{timeRange}=~/^YYYY/i)) {
+		my $align = 
+			(($obj->{timeRange}!~/HH/i) || 
+				($obj->{yh} - $obj->{yl} > (3 * 24 * 60 * 60))) ? 86400 :
+			($obj->{yh} - $obj->{yl} > (3 * 60 * 60)) ? 3600 : 60;
+
+		$obj->{yl} = $obj->{yl} - ($obj->{yl}%$align);
+		$obj->{yh} += ($align - ($obj->{yh}%$align));
+	}
 	return 1;
 }
 #
@@ -1526,6 +1602,7 @@ sub plot2DBars {
 	my ($color, $prop, $s, $colorcnt);
 	my @barcolors = ();
 	my @brushes = ();
+	my @markers = ();
 	my @props = ();
 	my $legend = $obj->{legend};
 	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, $obj->{yl}, 
@@ -1540,63 +1617,109 @@ sub plot2DBars {
 	my $ttlw = int($bars * $boff);
 	my $domain = $obj->{domain};
 	my $xhash = $obj->{domainValues};
+	my ($prtX,$prtYH,$prtYL);
+	my ($iconw, $iconh) = (0,0);
 #
 #	get indexes of all same type
-	for ($i = 0; $i <= $#$typeary; $i++) {
-		push(@tary, $i)
-			if ($$typeary[$i] == $type);
+	foreach (0..$#$typeary) {
+		push(@tary, $_)
+			if ($$typeary[$_] == $type);
 	}
 
 	for ($n = 0; $n <= $#tary; $n++) {
 		@barcolors = ();
 		@brushes = ();
+		@markers = ();
 		$marker = undef;
 		$color = 'black';
 		$k = $tary[$n];
 		$ary = $obj->{data}->[$k];
 		$t = $obj->{props}->[$k];
 		$t=~s/\s+/ /g;
-		$t = lc $t;
+#		$t = lc $t;
 		@props = split (' ', $t);
-		foreach $prop (@props) {
-			$color = $prop,
-			push (@barcolors, $prop), next
-				if ($colors{$prop});
+		my $showvals = $obj->{showValues};
+		my $stacked = 0;
+		foreach (@props) {
 #
 #	if its iconic, load the icon image
 #
-			$marker = $obj->{icons}->[$k]
-				if (($prop eq 'icon') && $obj->{icons} && 
-					$obj->{icons}->[$k]);
-		}
+			push(@markers,$1),
+			push (@barcolors, undef),
+			next
+				if /^icon:(\S+)$/i;
+
+			$_ = lc $_;
+			$showvals = 1, next
+				if ($_ eq 'showvalues');
+
+			$stacked = 1, next
+				if ($_ eq 'stack');
+
+			push (@barcolors, $_), 
+			push (@markers, undef),
+			next
+				if (($type != CANDLE) && $colors{$_});
+			
+			next unless ($type == CANDLE);
+#
+#	for candlesticks we rely on the DBD::Chart layer to provide
+#	sufficient colors and shapes as needed
+			push (@barcolors, $_), 
+			next
+				if ($colors{$_});
+#
+#	generate pointshape if requested
+#
+			push(@markers, $_),
+			next
+				if ($valid_shapes{$_} && ($_ ne 'null'));
+		} # end for each property
 #
 #	allocate each color we're using
 		$colorcnt = 0;
 		my ($bw, $bh, $bbasew, $bbaseh) = ($plottypes & HISTO) ?
 			(1, $obj->{brushWidth}, 0, $obj->{brushWidth}) :
 			($obj->{brushWidth}, 1, $obj->{brushWidth}, 0);
-		foreach $color (@barcolors) {
+
+		foreach (@barcolors) {
 			$colorcnt++;
-			$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
-				unless $obj->{$color};
+			push(@brushes, undef),
+			next 
+				unless $_;
+			$obj->{$_} = $obj->{img}->colorAllocate(@{$colors{$_}})
+				unless $obj->{$_};
 #
 #	generate brushes to draw bars
 #
 			$brush = new GD::Image($bw, $bh),
-			$ci = $brush->colorAllocate(@{$colors{$color}}),
+			$ci = $brush->colorAllocate(@{$colors{$_}}),
 			$brush->filledRectangle(0,0,$bbasew, $bbaseh,$ci),
-			push(@brushes, $brush)
-				unless $marker;
+			push(@brushes, $brush);
 		}
-
-		$marker = $obj->getIcon($marker, 1)
-			if ($marker);
+#
+#	load each icon we're using
+#
+		foreach (0..$#markers) {
+			next unless $markers[$_];
+			$markers[$_] = ($valid_shapes{$markers[$_]} && ($markers[$_] ne 'null')) ? 
+				$obj->make_marker($markers[$_], $barcolors[$_]) : 
+				$obj->getIcon($markers[$_], 1);
+		}
 #
 #	render legend if requested
 #	(a bit confusing here for multicolor single range charts?)
-		$obj->drawLegend($k, $color, $marker, $$legend[$k])
-			if (($legend) && ($$legend[$k]));
+		$obj->drawLegend($k, $barcolors[0], $markers[0], $$legend[$k])
+			if ((! $stacked) && $legend && $$legend[$k]);
 
+		if ($stacked && $legend && $$legend[$k]) {
+#
+#	there may be alignment problems here, due to the
+#	possibility of drawing multiple stacked bars in the same image
+#
+			$obj->drawLegend($_, $barcolors[$_], $markers[$_], $$legend[$k]->[$_])
+				foreach (0..$#{$$legend[$k]});
+		}
 #
 #	heuristically determine whether to print Y values vert or horiz.
 		my $yorient = (length($yl) > length($yh)) ? length($yl) : length($yh);
@@ -1608,213 +1731,168 @@ sub plot2DBars {
 #
 		my $xoffset = ($n * $obj->{brushWidth}) - $ttlw 
 			+ $boff;
-		for ($x = 0, $j = 0; $x <= $#$domain; $x++) {
+		my @val_palette = ();
+		my ($px, $py);
+		$j = 0;
+		for ($x = 0; $x <= $#$domain; $x++) {
+			($iconw,$iconh) = (0,0);
 			$i = $$xhash{$$domain[$x]} * 3;	# get actual index for the current point
 			next unless defined($$ary[$i+1]);
 
-# get top and bottom (left/right) points
-			($pxl, $pyb) = $obj->pt2pxl ( $x+1, $$ary[$i+1] );
-			($pxr, $pyt) = $obj->pt2pxl ( $x+1, $$ary[$i+2] );
+# compute top and bottom (left/right) points, and stuff into
+#	array with printable x,y and either the brush or marker we use to draw
+#	NOTE: this implementation supports stacked and unstacked
+			my @ppts = ();
+			my $ys = $$ary[$i+1];
+			$j = 0 if ($#$ys > 1);
+			foreach (0..$#$ys) {
+				($pxl, $pyb) = $obj->pt2pxl ( $x+1, $$ys[$_] );
+				($pxr, $pyt) = $obj->pt2pxl ( $x+1, $$ys[$_+1] );
+				push @ppts, $pxl, $pyb, $pxr, $pyt, $x+1, $$ys[$_], $$ys[$_+1], $j;
+				$j++;
+				$j = 0 if ($j >= $colorcnt);
+				last if ($_+1 == $#$ys);
+			}
+#
+#	render each bar segment
+			while ($#ppts > 0) {
+				$pxl = shift @ppts;
+				$pyb = shift @ppts;
+				$pxr = shift @ppts;
+				$pyt = shift @ppts;
+				$prtX = shift @ppts;
+				$prtYL = shift @ppts;
+				$prtYH = shift @ppts;
+				my $bidx = shift @ppts;
 #
 #	adjust for bar location
-			$pxl += $xoffset,
-			$pxr += $xoffset
-				unless ($plottypes & HISTO);
-			$pyb += $xoffset,
-			$pyt += $xoffset
-				if ($plottypes & HISTO);
+				$pxl += $xoffset,
+				$pxr += $xoffset
+					unless ($plottypes & HISTO);
+				$pyb += $xoffset,
+				$pyt += $xoffset
+					if ($plottypes & HISTO);
 				
 # draw line between top and bottom(left and right)
-			$j = 0 if ($j == $colorcnt);
-			$img->setBrush($brushes[$j++]),
-			$img->line($pxl, $pyb, $pxr, $pyt, gdBrushed)
-				unless $marker;
+				$img->setBrush($brushes[$bidx]),
+				$img->line($pxl, $pyb, $pxr, $pyt, gdBrushed)
+					if $brushes[$bidx];
 #
 #	unless its iconic
 #
-			$obj->drawIcons($marker, $pxl, $pyb, $pxr, $pyt)
-				if $marker;
+				$obj->drawIcons($markers[$bidx], $pxl, $pyb, $pxr, $pyt)
+					if (($type != CANDLE) && $markers[$bidx]);
+#
+#	check for shapes if its a CANDLE
+#
+# draw pointshape if requested
+				$obj->drawIcons($markers[$bidx], $pxl, $pyb, $pxl, 0),
+				$obj->drawIcons($markers[$bidx], $pxl, $pyt, $pxl, 0),
+				($iconw, $iconh) = $markers[$bidx]->getBounds()
+					if ($markers[$bidx] && ($type == CANDLE));
 #
 #	optimization
-			next unless ($obj->{genMap} || $obj->{showValues});
+				next unless ($obj->{genMap} || $showvals);
+#
+# draw top/bottom values if requested
+				if ($type == CANDLE) {
+					$prtYH = 10**$prtYH if $obj->{yLog};
+					$prtYL = 10**$prtYL if $obj->{yLog};
+					$prtYH = restore_temporal($prtYH, $obj->{timeRange}),
+					$prtYL = restore_temporal($prtYL, $obj->{timeRange}) 
+						if $obj->{timeRange};
+					$prtX = restore_temporal($prtX, $obj->{timeDomain}) 
+						if $obj->{timeDomain};
+
+# update imagemap if requested
+					$obj->updateImagemap('CIRCLE', $prtYH, $k, $prtX, 
+						$prtYH, undef, $pxl, $pyt, 4),
+					$obj->updateImagemap('CIRCLE', $prtYL, $k, $prtX,
+						$prtYL, undef, $pxl, $pyb, 4)
+						if ($obj->{genMap});
+
+					next unless ($showvals);
+#
+#	we need a better way to position the values for stacked candles
+#
+					$iconh >>= 1;
+					$img->string(gdTinyFont,$pxl-(length($prtYL) * ($tfw>>1)),
+						$pyb+4+$iconh, 
+						$prtYL, $obj->{textColor});
+					$img->string(gdTinyFont,$pxl-(length($prtYH) * ($tfw>>1)),
+						$pyt-$tfh-$iconh, 
+						$prtYH, $obj->{textColor});
+					next;
+				}
 #
 #	convert range/domain values for printing
-			my $prtY = ($$ary[$i+1]) ? $$ary[$i+1] : $$ary[$i+2];
-			$prtY = 10**($$prtY) if ($obj->{yLog});
-			my $prtX = $$ary[$i];
-			$prtY = restore_temporal($prtY, $obj->{timeRange}) 
-				if $obj->{timeRange};
-			$prtX = restore_temporal($prtX, $obj->{timeDomain}) 
-				if $obj->{timeDomain};
+				$prtYH -= $prtYL if ($prtYL > 0);
+				$prtYH = 10**($prtYH) if $obj->{yLog};
+				$prtYH = restore_temporal($prtYH, $obj->{timeRange}) 
+					if $obj->{timeRange};
+				$prtYH = $prtYL if ($prtYL < 0);
+				$prtX = restore_temporal($prtX, $obj->{timeDomain}) 
+					if $obj->{timeDomain};
 #
 # update imagemap if requested
-			$obj->updateImagemap('RECT', $prtY, $k, $prtX, 
-				$prtY, undef, $pxl-$boff, $pyt, $pxl+$boff, $pyb)
-				if (($plottypes & BAR) && $obj->{genMap});
+				$obj->updateImagemap('RECT', $prtYH, $k, $prtX, 
+					$prtYH, undef, $pxl-$boff, $pyt, $pxl+$boff, $pyb)
+					if (($plottypes & BAR) && $obj->{genMap});
 
-			$obj->updateImagemap('RECT', $prtY, $k, $prtX, 
-				$prtY, undef, $pxl, $pyt-$boff, $pxr, $pyt+$boff)
-				if (($plottypes & HISTO) && $obj->{genMap});
+				$obj->updateImagemap('RECT', $prtYH, $k, $prtX, 
+					$prtYH, undef, $pxl, $pyt-$boff, $pxr, $pyt+$boff)
+					if (($plottypes & HISTO) && $obj->{genMap});
+				
+				next unless $showvals;
 #
 #	draw vertical values for bars
-			$img->stringUp(gdTinyFont, $pxl-int($tfw/2), $pyt-4, 
-				$prtY, $obj->{textColor}), next
-				if (($plottypes & BAR) && $obj->{showValues} && 
-					($obj->{yLog} || ($yorient >= $obj->{brushWidth})));
+				$py = ($stacked) ?
+					(($prtYL < 0) ? $pyb - 4 : 
+						$pyt + 4 + int(length($prtYH) * $tfw)) :
+					(($prtYL < 0) ? $pyb + 4 + int(length($prtYH) * $tfw) :
+						$pyt - 4);
+#
+#	push info on value stack to draw after rendering bars,
+#	since stacked bars may obscure any value we write now
+				push(@val_palette, $pxl-int($tfw/2), $py, $prtYH), next
+					if (($plottypes & BAR) &&
+						($obj->{yLog} || ($yorient >= $obj->{brushWidth})));
 #
 #	unless they'll fit horiz.
-			$img->string(gdTinyFont, $pxl-int(length($prtY) * $tfw/2), $pyt-$tfh - 4, 
-				$prtY, $obj->{textColor}), next
-				if (($plottypes & BAR) && $obj->{showValues} && 
-					($yorient < $obj->{brushWidth}));
+				$py = ($stacked) ? 
+					(($prtYL < 0) ? $pyb - $tfh - 4 : $pyt + 4) :
+					(($prtYL < 0) ? $pyb + 4 : $pyt - $tfh - 4);
+				push(@val_palette, $pxl-int(length($prtYH) * $tfw/2), $py, $prtYH),
+				next
+					if (($plottypes & BAR) &&
+						($yorient < $obj->{brushWidth}));
 
-			$img->string(gdTinyFont, $pxr+int($sfw/2), $pyt-4, 
-				$prtY, $obj->{textColor})
-				if (($plottypes & HISTO) && $obj->{showValues});
-		}
-	}
-	return 1;
-}
-
-sub plotCandles {
-	my ($obj, $typeary) = @_;
-	my ($ary, $px, $py, $pyt, $pyb);
-	my ($color, $img, $prop, $s);
-	my @props = ();
-	my $legend = $obj->{legend};
-	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, $obj->{yl}, 
-		$obj->{yh});
-	my ($marker, $markw, $markh, $yoff, $wdelta, $hdelta);
-	my ($i, $j, $k, $n, $x);
-	my @tary = ();
-
-	for ($i = 0; $i <= $#$typeary; $i++) {
-		next unless ($$typeary[$i] == CANDLE);
-		push @tary, $i;
-	}
-
-	$img = $obj->{img};	
-
+				$px = ($stacked) ?
+					(($prtYL < 0) ? $pxl + $tfw : $pxr - (length($prtYH) * $tfw) - 4) :
+					(($prtYL < 0) ? $pxl - (length($prtYH) * $tfw) : $pxr + $tfw);
+				push(@val_palette, $px, $pyt-4, $prtYH), next
+					if ($plottypes & HISTO);
+			} # end while values to plot
+		} # end for each bar
 #
-#	compute the center data point, then
-#	adjust horizontal location based on brush width
-#	and data set number
+#	now render values...note that candlesticks still use old method;
+#	eventually we'll clean them up as well.
+#	We need to compute complementary colors for rendering the text
+#	inside bars!!!
 #
-	my $bars  = scalar @{$obj->{data}};
-	my $ttlw = int(($bars * $obj->{brushWidth})/2);
-	my $domain = $obj->{domain};
-	my $xhash = $obj->{domainValues};
+		while ($#val_palette >= 0) {
+			$px = shift @val_palette;
+			$py = shift @val_palette;
+			$prtYH = shift @val_palette;
 
-	for ($n = 0; $n <= $#tary; $n++) {
-		$color = 'black';
-		$marker = undef;
-		$k = $tary[$n];
-		$ary = $obj->{data}->[$k];
-		my $t = $obj->{props}->[$k];
-		$t=~s/\s+/ /g;
-		$t = lc $t;
-		@props = split (' ', $t);
-		foreach $prop (@props) {
-			$color = $prop, next
-				if ($colors{$prop});
-#
-#	generate pointshape if requested
-#
-			$marker = $prop,
+			$img->stringUp(gdTinyFont, $px, $py, $prtYH, $obj->{textColor}), 
 			next
-				if (($shapes{$prop}) && ($prop ne 'icon'));
-#
-#	if its iconic, load the icon image
-#
-			$marker = $obj->{icons}->[$k],
-			next
-				if (($prop eq 'icon') && $obj->{icons} && 
-					$obj->{icons}->[$k]);
+				if (($plottypes & BAR) &&
+					($obj->{yLog} || ($yorient >= $obj->{brushWidth})));
 
-			$marker = 'fillcircle',
-			next
-				if ((! $marker) && ($prop eq 'points'));
-					
-			$marker = undef, next 
-				if ($prop eq 'nopoints');
+			$img->string(gdTinyFont, $px, $py, $prtYH, $obj->{textColor});
 		}
-		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
-			unless $obj->{$color};
-		
-		if ($marker) {
-			$marker = ($shapes{$marker}) ? 
-				$obj->make_marker($marker, $color) :
-				$obj->getIcon($marker);
-			return undef unless $marker;
-			($markw, $markh) = $marker->getBounds();
-			$wdelta = $markw>>1;
-			$hdelta = $markh>>1;
-		}
-
-		$yoff = ($marker) ? $markh : 2;
-#
-#	render legend if requested
-#
-		$obj->drawLegend($k, $color, $marker, $$legend[$k])
-			if ($legend && $$legend[$k]);
-#
-#	generate brush to draw sticks/bars
-#
-		my $brush = new GD::Image($obj->{brushWidth}, 1);
-		my $ci = $brush->colorAllocate(@{$colors{$color}});
-		$brush->filledRectangle(0,0,$obj->{brushWidth},0,$ci);
-		$img->setBrush($brush);
-
-		my $xoffset = ($n * $obj->{brushWidth}) - $ttlw 
-			+ int($obj->{brushWidth}/2);
-
-		for ($x = 0; $x <= $#$domain; $x++) {
-			$i = $$xhash{$$domain[$x]} * 3;
-			next unless defined($$ary[$i+1]);
-
-# get top and bottom points
-			($px, $pyb) = $obj->pt2pxl ( $x+1, $$ary[$i+1] );
-			($px, $pyt) = $obj->pt2pxl ( $x+1, $$ary[$i+2] );
-			$px += $xoffset;
-				
-# draw line between top and bottom
-			$img->line($px, $pyb, $px, $pyt, gdBrushed);
-				
-# draw pointshape if requested
-			$img->copy($marker, $px-$wdelta, $pyb-$hdelta, 0, 0, 
-				$markw-1, $markh-1),
-			$img->copy($marker, $px-$wdelta, $pyt-$hdelta, 0, 0, 
-				$markw-1, $markh-1)
-				if ($marker);
-#
-#	optimization
-			next unless ($obj->{genMap} || $obj->{showValues});
-#
-#	convert range/domain values for printing
-			my $prtYH = $obj->{yLog} ? 10**($$ary[$i+2]) : $$ary[$i+2];
-			my $prtYL = $obj->{yLog} ? 10**($$ary[$i+1]) : $$ary[$i+1];
-			my $prtX = $$ary[$i];
-			$prtYH = restore_temporal($prtYH, $obj->{timeRange}),
-			$prtYL = restore_temporal($prtYL, $obj->{timeRange}) 
-				if $obj->{timeRange};
-			$prtX = restore_temporal($prtX, $obj->{timeDomain}) 
-				if $obj->{timeDomain};
-
-# update imagemap if requested
-			$obj->updateImagemap('CIRCLE', $prtYH, $k, $prtX, 
-				$prtYH, undef, $px, $pyt, 4),
-			$obj->updateImagemap('CIRCLE', $prtYL, $k, $prtX,
-				$prtYL, undef, $px, $pyb, 4)
-				if ($obj->{genMap});
-				
-# draw top/bottom values if requested
-			$img->string(gdTinyFont,$px-(length($prtYL) * ($tfw>>1)),$pyb+4, 
-				$prtYL, $obj->{textColor}),
-			$img->string(gdTinyFont,$px-(length($prtYH) * ($tfw>>1)),$pyt-$yoff-4, 
-				$prtYH, $obj->{textColor})
-				if ($obj->{showValues});
-		}	# end for each stick
-	} # end for each candle graph
+	} # end for each plot
 	return 1;
 }
 
@@ -1878,9 +1956,12 @@ sub plotBox {
 		my @props = split(' ', $t);
 		my $color = 'black';
 		my ($val, $xoff);
-		foreach $val (@props) {
-			$color = $val
-				if ($colors{$val});
+		my $showvals = $obj->{showValues};
+		foreach (@props) {
+			$showvals = 1, next if ($_ eq 'showvalues');
+
+			$color = $_
+				if ($colors{$_});
 		}
 		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
 			unless $obj->{$color};
@@ -1916,13 +1997,13 @@ sub plotBox {
 		$uq = restore_temporal($uq, $obj->{timeDomain}) ,
 		$tlex = restore_temporal($tlex, $obj->{timeDomain}),
 		$tuex = restore_temporal($tuex, $obj->{timeDomain}) 
-			if ($obj->{timeDomain} && ($obj->{genMap} || $obj->{showValues}));
+			if ($obj->{timeDomain} && ($obj->{genMap} || $showvals));
 
 		$xoff = int(length($lq) * $tfw/2),
 		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $lq, $obj->{textColor}),
 		$xoff = int(length($uq) * $tfw/2),
 		$img->string(gdTinyFont,$p2x-$xoff,$p1y-$tfh, $uq, $obj->{textColor})
-			if ($obj->{showValues});
+			if ($showvals);
 	
 		$obj->updateImagemap('RECT', "$tmed\[$lq..$uq\]", 0, $tmed, 
 			$lq, $uq, $p1x, $p1y, $p2x, $p2y)
@@ -1937,7 +2018,7 @@ sub plotBox {
 		$xoff = int(length($median) * $tfw/2),
 		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $tmed, 
 			$obj->{textColor})
-			if ($obj->{showValues});
+			if ($showvals);
 #
 #	draw whiskers
 		($p1x, $p1y) = $obj->pt2pxl($lex, $dumy);
@@ -1948,12 +2029,12 @@ sub plotBox {
 		$tmed = restore_temporal($tmed, $obj->{timeDomain}),
 		$lq = restore_temporal($lq, $obj->{timeDomain}),
 		$uq = restore_temporal($uq, $obj->{timeDomain}) 
-			if ($obj->{timeDomain} && ($obj->{genMap} || $obj->{showValues}));
+			if ($obj->{timeDomain} && ($obj->{genMap} || $showvals));
 
 		$xoff = int(length($lex) * $tfw/2),
 		$img->string(gdTinyFont,$p1x-$xoff,$p1y-$tfh, $tlex,
 			$obj->{textColor})
-			if ($obj->{showValues});
+			if ($showvals);
 		$obj->updateImagemap('CIRCLE', $tlex, 0, $tlex, undef, undef, 
 			$p1x, $p1y, 4)
 			if ($obj->{genMap});
@@ -1967,7 +2048,7 @@ sub plotBox {
 
 		$img->string(gdTinyFont,$p2x-$xoff,$p1y-$tfh, $tuex, 
 			$obj->{textColor})
-			if ($obj->{showValues});
+			if ($showvals);
 		$obj->updateImagemap('CIRCLE', $tuex, 0, $tuex, undef, undef, 
 			$p2x, $p1y, 4)
 			if ($obj->{genMap});
@@ -1976,9 +2057,9 @@ sub plotBox {
 #	NOTE: we should us pointshape provided by props!!!
 #
 		my $marker = $obj->make_marker('filldiamond', $color);
-		foreach $val (@$ary) {
-			last if ($val >= $lex);
-			($p1x, $p1y) = $obj->pt2pxl($val, $dumy);
+		foreach (@$ary) {
+			last if ($_ >= $lex);
+			($p1x, $p1y) = $obj->pt2pxl($_, $dumy);
 			$p1y -= $yoff;
 			$img->copy($marker, $p1x-4, $p1y-4, 0, 0, 9, 9);
 		}
@@ -2075,70 +2156,110 @@ sub plotAll {
 	my ($i, $n, $k);
 	my @tary = ();
 	
-	for ($i = 0; $i <= $#$typeary; $i++) {
-		push(@tary, $i) 
-			if ($$typeary[$i] == $type);
+	foreach (0..$#$typeary) {
+		push(@tary, $_) 
+			if ($$typeary[$_] == $type);
 	}
 
-	for ($n = 0; $n <= $#tary; $n++) {
-		return undef unless $obj->plotData($tary[$n]);
+	foreach $n (@tary) {
+		my $ary = $obj->{data}->[$n];
+		my $t = $obj->{props}->[$n];
+		$t=~s/\s+/ /g;
+#		$t = lc $t;
+		my @props = split (' ', $t);
+		my $color = 'black';
+		my $marker = undef;
+		my $line = 'line';
+		my @areacolors = ();
+		my $stacked = 0;
+		my $coloridx = 0;
+		my $legend;
+		foreach (@props) {
+#
+#	if its iconic, load the icon image
+#
+			$marker = $1,
+			next
+				if /^icon:(\S+)/i;
+
+			$_ = lc $_;
+			push(@areacolors, $_), next
+				if ($colors{$_});
+
+			$stacked = 1, next
+				if ($_ eq 'stack');
+
+			$marker = $_,
+			next
+				if ($valid_shapes{$_} && ($_ ne 'null'));
+
+			$marker = 'fillcircle',
+			next
+				if ((! $marker) && ($_ eq 'points'));
+					
+			$marker = undef, next 
+				if ($_ eq 'nopoints');
+
+			$line = $_
+				if /^(line|noline|fill)$/;
+		}
+
+		if (($line eq 'fill') && $stacked) {
+#
+#	pull apart the datapoint arrays and plot them individually from the top
+#	to the bottom
+			my @newary = ();
+			my $j = $#{$ary->[1]};
+#
+#	in case our color list is short
+			my $k = 0;
+			my $colorcnt = @areacolors;
+			while ($#areacolors < $j) {
+				push @areacolors, $areacolors[$k];
+				$k++;
+				$k = 0 if ($k == $colorcnt);
+			}
+			for (; $j >= 0; $j--) {
+				@newary = ();
+				$color = $areacolors[$j];
+				$i = 0;
+				push(@newary, $$ary[$i], $ary->[$i+1]->[$j]),
+				$i += 2
+					while ($i <= $#$ary);
+				$legend = $obj->{legend} ? $obj->{legend}->[$n]->[$j] : undef;
+				return undef unless $obj->plotData($n, \@newary, $color, 'fill', $marker,
+					$legend);
+				$obj->{legendPos}++ if $obj->{legend};
+			}
+			next;
+		}
+		$legend = $obj->{legend} ? $obj->{legend}->[$n] : undef;
+		return undef unless $obj->plotData($n, $ary, $areacolors[$coloridx], $line, $marker,
+			$obj->{legend}->[$n]);
+		$coloridx++;
+		$coloridx = 0 if ($coloridx = $#areacolors);
 	}
 	return 1;
 }
 
 # draws the specified dataset in $obj->{data}
 sub plotData {
-	my ($obj, $k) = @_;
-	my ($i, $n, $ary, $px, $py, $prevpx, $prevpy, $pyt, $pyb);
-	my ($color, $line, $img, $prop, $s, $voff);
+	my ($obj, $k, $ary, $color, $line, $marker, $legend) = @_;
+	my ($i, $n, $px, $py, $prevpx, $prevpy, $pyt, $pyb);
+	my ($img, $prop, $s, $voff);
 	my @props = ();
 # legend is left justified underneath
-	my $legend = $obj->{legend};
 	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, $obj->{yl}, 
 		$obj->{yh});
-	my ($marker, $markw, $markh, $yoff, $wdelta, $hdelta);
+	my ($markw, $markh, $yoff, $wdelta, $hdelta);
 	$img = $obj->{img};	
-	
-	
-	$color = 'black';
-	$marker = undef;
-	$line = 'line';
 
-	$ary = $obj->{data}->[$k];
-	my $t = $obj->{props}->[$k];
-	$t=~s/\s+/ /g;
-	$t = lc $t;
-	@props = split (' ', $t);
-	foreach $prop (@props) {
-		$color = $prop, next
-			if ($colors{$prop});
-
-		$marker = $prop,
-		next
-			if ($shapes{$prop} && ($prop ne 'icon'));
-#
-#	if its iconic, load the icon image
-#
-		$marker = $obj->{icons}->[$k],
-		next
-			if (($prop eq 'icon') && $obj->{icons} && 
-				$obj->{icons}->[$k]);
-
-		$marker = 'fillcircle',
-		next
-			if ((! $marker) && ($prop eq 'points'));
-					
-		$marker = undef, next 
-			if ($prop eq 'nopoints');
-
-		$line = $prop
-			if ($prop=~/^(line|noline|fill)$/);
-	}
 	$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
 		unless $obj->{$color};
 		
 	if ($marker) {
-		$marker = ($shapes{$marker}) ? $obj->make_marker($marker, $color) :
+		$marker = ($valid_shapes{$marker} && ($marker ne 'null')) ? 
+			$obj->make_marker($marker, $color) :
 			$obj->getIcon($marker);
 		return undef unless $marker;
 		($markw, $markh) = $marker->getBounds();
@@ -2149,8 +2270,7 @@ sub plotData {
 #
 #	render legend if requested
 #
-	$obj->drawLegend($k, $color, $marker, $$legend[$k])
-		if ($legend && $$legend[$k]);
+	$obj->drawLegend($k, $color, $marker, $legend) if $legend;
 #
 #	line/point/area charts
 #
@@ -2171,6 +2291,17 @@ sub plotData {
 	my $x;
 	my $incr = $obj->{symDomain} ? 1 : 2;
 	my $xd;
+#
+#	create a brush to draw linegraphs
+	my $lbrush;
+	if ($line eq 'line') {
+		my $lw = $obj->{lineWidth} ? $obj->{lineWidth} : 1;
+		$lbrush = new GD::Image($lw,$lw);
+		my $ci = $lbrush->colorAllocate(@{$colors{$color}});
+		$lbrush->filledRectangle(0,0,$lw, $lw,$ci);
+		$img->setBrush($lbrush);
+	}
+
 	for ($x = 0; $x <= $domsize; $x += $incr) {
 		$xd = $$xhash{$$domain[$x]} if $obj->{symDomain};
 		$i = $obj->{symDomain} ? $xd * 2: $x;
@@ -2179,6 +2310,11 @@ sub plotData {
 # get next point
 		($px, $py) = $obj->pt2pxl(($obj->{symDomain} ? $xd+1 : $$ary[$i]),
 			$$ary[$i+1] );
+
+# draw line from previous point, maybe
+		$img->line($prevpx, $prevpy, $px, $py, gdBrushed)
+			if (($line eq 'line') && $i);
+		($prevpx, $prevpy) = ($px, $py);
 
 # draw point, maybe
 		$img->copy($marker, $px-$wdelta, $py-$hdelta, 0, 0, $markw, 
@@ -2201,11 +2337,6 @@ sub plotData {
 		$voff = (length($s) * $tfw)>>1,
 		$img->string(gdTinyFont,$px-$voff,$py-$yoff, $s, $obj->{textColor})
 			if ($obj->{showValues});
-
-# draw line from previous point, maybe
-		$img->line($prevpx, $prevpy, $px, $py, $obj->{$color})
-			if (($line eq 'line') && $i);
-		($prevpx, $prevpy) = ($px, $py);
 	}
 	return 1;
 }
@@ -2216,6 +2347,7 @@ sub drawLegend {
 #	add the dataset to the legend using current color
 #	and shape (if any)
 #
+	$k += $obj->{legendPos};
 	$shape = $obj->make_marker('fillsquare', $color)
 		unless $shape;
 
@@ -2226,12 +2358,13 @@ sub drawLegend {
 		(($k%3) * (3*$tfh/2));
 
 	my $img = $obj->{img};
-	my $legend = $obj->{legend};
-	$img->string (gdTinyFont, $legend_wd + 25, $legend_ht,
-		$$legend[$k], $obj->{$color});
-
 	$img->line($legend_wd, $legend_ht+4, $legend_wd+20, 
-		$legend_ht+4, $obj->{$color});
+		$legend_ht+4, $obj->{$color})
+		if $color;
+
+	$color = 'black' unless $color;
+	$img->string (gdTinyFont, $legend_wd + 25, $legend_ht,
+		$text, $obj->{$color});
 
 	my ($w, $h);
 	($w, $h) = $shape->getBounds(),
@@ -2716,10 +2849,8 @@ sub fill_region
 		push @bottom, [$x, $ybot];
 	}
 
-	foreach my $bottom (reverse @bottom)
-	{
-		$poly->addPt($bottom->[0], $bottom->[1]);
-	}
+	$poly->addPt($_->[0], $_->[1])
+		foreach (reverse @bottom);
 
 	# Draw a filled and a line polygon
 	$img->filledPolygon($poly, $ci);
@@ -2735,7 +2866,7 @@ sub make_marker {
 	my $white = $brush->colorAllocate(255, 255, 255);
 	my $clr = $brush->colorAllocate(@{$colors{$mclr}});
 	$brush->transparent($white);
-	$mtype = $shapes{$mtype};
+	$mtype = $valid_shapes{$mtype};
 
 # square, filled	
 	$brush->filledRectangle(0,0,6,6,$clr),
@@ -2840,6 +2971,12 @@ sub drawIcons {
 
 		my $srcY = 0;
 		my $h = $iconh;
+#
+#	handle candlestick points
+		$img->copy($iconimg, $pxl, $pyb, 0, $srcY, $iconw, $h),
+		return 1
+			if ($pyt == 0);
+
 		while ($pyb > $pyt) {	
 			$h = $pyb - $pyt,
 			$srcY = $iconh - $h,
@@ -2934,15 +3071,6 @@ sub plot3DAxes {
 				($ishisto ? $obj->{horizStep} : $obj->{vertStep}));
 		
 		for ($i = $imin; $i < $imax; $i += $step) {
-
-#			($gx, $gy) = $obj->pt2pxl($i, $yl, $zl),
-#			($hx, $hy) = $obj->pt2pxl($i, $yl, $zh),
-#			$img->line($gx, $gy, $hx, $hy, $obj->{gridColor}),
-#			($gx, $gy) = $obj->pt2pxl($i, $yh, $zh),
-#			$img->line($gx, $gy, $hx, $hy, $obj->{gridColor}),
-#			next
-#				if ($ishisto);
-
 			($gx, $gy) = $obj->pt2pxl($xl, $i, $zl);
 			($hx, $hy) = $obj->pt2pxl($xl, $i, $zh);
 			$img->line($gx, $gy, $hx, $hy, $obj->{gridColor});
@@ -2982,9 +3110,9 @@ sub plot3DTicks {
 		my $zs = $obj->{zValues};
 		my $xv = $ishisto ? $xl : $xh;
 		my $yv = $ishisto ? $yh : $yl;
-		for ($i = 0; $i <= $#$zs; $i++) {
-			($gx, $gy) = $obj->pt2pxl($xv, $yv, $i+1+0.8);
-			$text = $$zs[$i];
+		foreach (0..$#$zs) {
+			($gx, $gy) = $obj->pt2pxl($xv, $yv, $_+1+0.8);
+			$text = $$zs[$_];
 			$text = substr($text, 0, 22) . '...' if (length($text) > 25);
 			$img->string(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
 		}
@@ -2992,9 +3120,9 @@ sub plot3DTicks {
 	my $xs = $obj->{xValues};
 	my $xoff = ($yl >= 0) ? 1 : $ishisto ? 0 : 0.5;
 	my $zv = (($yl >= 0) || $ishisto) ? $zl : $zh; 
-	for ($i = 0; $i <= $#$xs; $i++) {
-		($gx, $gy) = $obj->pt2pxl($i+$xoff, $yl, $zv);
-		$text = $$xs[$i];
+	foreach (0..$#$xs) {
+		($gx, $gy) = $obj->pt2pxl($_+$xoff, $yl, $zv);
+		$text = $$xs[$_];
 		$text = substr($text, 0, 22) . '...' if (length($text) > 25);
 
 		$gy += (length($text) * $sfw) + 5,
@@ -3049,59 +3177,88 @@ sub plot3DBars {
 	my $k = 0;
 	my $color = 'black';
 	my $ary;
+	my $showvals;
+	my $ys;
+	my $t;
+	my $numPts = $#{$obj->{data}->[0]};
+	my @props;
+	my $stacked = undef;
+	my @barcolors = ();
 #
 #	extract properties
 #
 	for ($k = 0; $k < $numRanges; $k++) {
-		my $t = $obj->{props}->[$k];
+		push @tops, [];
+		push @fronts, [];
+		push @sides, [];
+		$t = $obj->{props}->[$k];
 		$t=~s/\s+/ /g;
 		$t = lc $t;
-		my @props = split (' ', $t);
-		foreach my $prop (@props) {
+		@props = split (' ', $t);
+		$showvals = $obj->{showValues};
+		$stacked = 0;
+		foreach (@props) {
+			$showvals = [ ], next if ($_ eq 'showvalues');
+			$stacked = 1, next if ($_ eq 'stack');
 #
 #	generate light, medium, and dark version for front,
 #	top, and side faces
 #
-			$color = $prop,
-			push(@tops, $img->colorAllocate(@{$colors{$prop}})),
-			push(@fronts, $img->colorAllocate(int($colors{$prop}->[0] * 0.8), 
-				int($colors{$prop}->[1] * 0.8), int($colors{$prop}->[2] * 0.8))),
-			push(@sides, $img->colorAllocate(int($colors{$prop}->[0] * 0.6), 
-				int($colors{$prop}->[1] * 0.6), int($colors{$prop}->[2] * 0.6)))
-				if ($colors{$prop});
+			$color = $_,
+			push(@barcolors, $_),
+			$obj->{$color} = $img->colorAllocate(@{$colors{$_}}),
+			push(@{$tops[$k]}, $obj->{$color}),
+			push(@{$fronts[$k]}, $img->colorAllocate(int($colors{$_}->[0] * 0.8), 
+				int($colors{$_}->[1] * 0.8), int($colors{$_}->[2] * 0.8))),
+			push(@{$sides[$k]}, $img->colorAllocate(int($colors{$_}->[0] * 0.6), 
+				int($colors{$_}->[1] * 0.6), int($colors{$_}->[2] * 0.6))),
+				if ($colors{$_});
 		}
-		$obj->{$color} = $tops[$#tops];
-		$obj->drawLegend($k, $color, undef, $$legend[$k])
-			if (($legend) && ($$legend[$k]));
+		
+		if (($legend) && ($$legend[$k])) {
+			$obj->drawLegend($k, $color, undef, $$legend[$k]), next
+				unless $stacked;
+
+			$obj->drawLegend($_, $barcolors[$_], undef, $$legend[$k]->[$_])
+				foreach (0..$#{$$legend[$k]});
+		}
 	}
 #
 #	draw each bar
 #	WE NEED A BETTER CONTROL VALUE HERE!!! since different plots may not
 #	have the exact same domain!!!
 #
-	my $numPts = $#{$obj->{data}->[0]};
-	for (my $i = 0, my $j = 0; $i <= $numPts; $i+=4) {
-		if ($numRanges == 1) {
+	my ($i, $j) = (0,0);
+	unless (($numRanges > 1) || $stacked) {
 #
 #	to support multicolor single ranges
-			$ary = $obj->{data}->[0];
-			$obj->drawCube($$ary[$i], $$ary[$i+1], $$ary[$i+2], $$ary[$i+3],
-				0, $fronts[$j], $tops[$j], $sides[$j], 
+		$ary = $obj->{data}->[0];
+		for (; $i <= $numPts; $i+=3) {
+			$ys = $$ary[$i+1];
+			$obj->drawCube($$ary[$i], $$ys[0], $$ys[1], $$ary[$i+2],
+				0, $fronts[0]->[$j], $tops[0]->[$j], $sides[0]->[$j], 
 				$xoff, $xbarw, $zbarw, $$xvals[$$ary[$i]-1], 
-				$$zvals[$$ary[$i+3]-1]);
+				$$zvals[$$ary[$i+2]-1], $showvals);
+			$obj->renderCubeValues($showvals) if $showvals;
 			$j++;
-			$j = 0 if ($j > $#fronts);
-			next;
+			$j = 0 if ($j > $#{$fronts[0]});
 		}
+		return 1;
+	}
 #
-#	multirange, draw the bar for each dataset
-		for ($k = 0; $k < $numRanges; $k++) {
-			my $numPts = $#{$obj->{data}->[$k]};
-			my $ary = $obj->{data}->[$k];
-			$obj->drawCube($$ary[$i], $$ary[$i+1], $$ary[$i+2], $$ary[$i+3],
-				$k, $fronts[$k], $tops[$k], $sides[$k], 
+#	multirange (or stacked), draw the bar for each dataset
+	$numRanges--;
+	for (; $i <= $numPts; $i+=3) {
+		foreach $k (0..$numRanges) {
+			$numPts = $#{$obj->{data}->[$k]};
+			$ary = $obj->{data}->[$k];
+			$ys = $$ary[$i+1];
+			$obj->drawCube($$ary[$i], $$ys[$_-1], $$ys[$_], $$ary[$i+2],
+				$k, $fronts[$k]->[$_-1], $tops[$k]->[$_-1], $sides[$k]->[$_-1], 
 				$xoff, $xbarw, $zbarw, $$xvals[$$ary[$i]-1], 
-				$$zvals[$$ary[$i+3]-1]);
+				$$zvals[$$ary[$i+2]-1], $showvals, $stacked),
+				foreach (1..$#$ys);
+			$obj->renderCubeValues($showvals) if $showvals;
 		}
 	}
 	return 1;
@@ -3116,9 +3273,12 @@ sub computeSides {
 
 sub drawCube {
 	my ($obj, $x, $yl, $yh, $z, $k, $front, $top, $side, 
-		$xoff, $xbarw, $zbarw, $xval, $zval) = @_;
+		$xoff, $xbarw, $zbarw, $xval, $zval, $showvals, $stacked) = @_;
 	my ($xl, $xr) = computeSides($x, $xoff, $xbarw, $k);
 	my $ishisto = $obj->{plotTypes} & HISTO;
+	my @val_stack = ();
+	my ($mx, $px, $py);
+
 	$z++;
 #
 #	generate value coordinates of visible vertices
@@ -3151,6 +3311,8 @@ sub drawCube {
 	for ($i = 0; $i < 21; $i+=3) {
 		push(@xlatverts, $obj->pt2pxl($v[$i], $v[$i+1], $v[$i+2]));
 	}
+	my $xwidth = $xlatverts[12] - $xlatverts[0];
+
 	my @faces = ($top, $front, $side);
 #
 #	render faces as filled polygons to obscure any prior cubes
@@ -3158,9 +3320,8 @@ sub drawCube {
 	for ($i = 0; $i < 3; $i++) {
 		my $poly = new GD::Polygon;
 		my $ary = $polyverts[$i];
-		for ($j = 0; $j < 4; $j++) {
-			$poly->addPt($xlatverts[$$ary[$j]],$xlatverts[$$ary[$j]+1]);
-		}
+		$poly->addPt($xlatverts[$$ary[$_]],$xlatverts[$$ary[$_]+1])
+			foreach (0..3);
 		$img->filledPolygon($poly, $faces[$i]);
 	}
 	for ($i = 0; $i < 18; $i+=2) {
@@ -3169,7 +3330,7 @@ sub drawCube {
 			$xlatverts[$vert2lines[$i+1]],
 			$xlatverts[$vert2lines[$i+1]+1], $obj->{black});
 	}
-	return 1 unless ($obj->{genMap} || $obj->{showValues});
+	return 1 unless ($obj->{genMap} || $showvals);
 #
 #	generate image map for top(right) face only
 #
@@ -3178,27 +3339,58 @@ sub drawCube {
 		my $text = ($obj->{zAxisLabel}) ? "($xval, $y, $zval)" : "($xval, $y)";
 		my $ary = $polyverts[($ishisto ? 2 : 0)];
 		my @ptsary = ();
-		for ($i = 0; $i < 4; $i++) {
-			push(@ptsary, $xlatverts[$$ary[$i]], $xlatverts[$$ary[$i]+1]);
-		}
+		push(@ptsary, $xlatverts[$$ary[$_]], $xlatverts[$$ary[$_]+1])
+			foreach (0..3);
 		$obj->updateImagemap('POLY', $text, 0, $xval, $y, $zval, @ptsary);
 	}
-	return 1 unless $obj->{showValues};
+	return 1 unless $showvals;
+#
+#	push values info on a stack, then render *after* we've drawn all the cubes
+#	(for stacked bars)
+#
+	$mx = ($xr + $xl)/($ishisto ? 1.9 : 2);
+	($px, $py) = $obj->pt2pxl($mx, $yh, $z - $zbarw);
+#
+#	adjust value position based on +/- and stacking
+#
+	my $valsz = (length($y) * $tfw);
+	if ($stacked) {
+#		$px += (($y > 0) ? (-15 - $valsz) : 15) if $ishisto;
+#		$py += (($y < 0) ? 10 : (($xwidth > ($obj->{yMaxlen} * $tfw)) ? 10 : 10 + $valsz)) 
+		$px -= (15 + $valsz) if $ishisto;
+		$py += (($xwidth > $obj->{yMaxlen}) ? 10 : 10 + $valsz) 
+			unless $ishisto;
+	}
+	else {
+		$px += (($y < 0) ? -15 : 15) if $ishisto;
+		$py += (($y < 0) ? (($xwidth < ($obj->{yMaxlen} * $tfw)) ? 10 + $valsz : 10) : -10) 
+			unless $ishisto;
+	}
+	$y = $yh - $yl if (($yh > 0) && ($yl > 0));
+	$y = $yl - $yh if (($yh < 0) && ($yl < 0));
+	push(@$showvals, $px, $py, $y, ($xwidth > ($obj->{yMaxlen} * $tfw)));
+	return 1;
+}
+
+sub renderCubeValues {
+	my ($obj, $val_stack) = @_;
 #
 #	render the top text label
 #
-	my ($mx, $px, $py);
-
-	$mx = ($xr + $xl)/2,
-	($px, $py) = $obj->pt2pxl($mx, $yh, $z - $zbarw),
-	$img->stringUp(gdTinyFont, $px, $py-10, $y, $obj->{textColor}),
-	return 1
-		unless $ishisto;
-
-	$mx = ($xr + $xl)/1.9;
-	($px, $py) = $obj->pt2pxl($mx, $yh, $z - $zbarw);
-	$img->string(gdTinyFont, $px+15, $py, $y, $obj->{textColor});
-	1;
+	my ($px, $py, $y, $xwidth, $ishisto);
+	$ishisto = $obj->{plotTypes} & HISTO;
+	my $img = $obj->{img};
+	
+	while (@$val_stack) {
+		$px = shift @$val_stack;
+		$py = shift @$val_stack;
+		$y = shift @$val_stack;
+		$xwidth = shift @$val_stack;
+		$img->stringUp(gdTinyFont, $px, $py, $y, $obj->{textColor}), next
+			unless ($ishisto || $xwidth);
+		$img->string(gdTinyFont, $px, $py, $y, $obj->{textColor});
+	}
+	return 1;
 }
 
 sub abs { my $x = shift; return ($x < 0) ? -1*$x : $x; }
@@ -3215,9 +3407,11 @@ sub plotPie {
 	$t = lc $t;
 	my @props = split (' ', $t);
 	my $img = $obj->{img};
-	foreach my $prop (@props) {
-		push(@colormap, $img->colorAllocate(@{$colors{$prop}}))
-			if ($colors{$prop});
+	my $showvals = $obj->{showValues};
+	foreach (@props) {
+		$showvals = 1, next if ($_ eq 'showvalues');
+		push(@colormap, $img->colorAllocate(@{$colors{$_}}) )
+			if $colors{$_};
 	}
 #
 #	render each wedge, in clockwise order, starting from 12 o'clock
@@ -3299,7 +3493,6 @@ sub drawWedge {
 			push(@ptsary, $x, $y);
 			last if ((2 * 3.1415926 * $pct) - $tarc < (2 * 3.1415926/36));
 			$tarc += (2 * 3.1415926/36);
-				
 		}
 		if ($tarc < (2 * 3.1415926 * $pct)) {
 			($x, $y) = computeCoords($xc, $yc, $vr, $hr, 
@@ -3385,6 +3578,27 @@ sub updateImagemap {
 #
 	return $obj->updatePerlImagemap($plotNum, $x, $y, $z, $shape, @pts)
 		if (uc $obj->{mapType} eq 'PERL');
+
+	my $imgURL = $obj->{mapURL};
+	my $imgScript = $obj->{mapScript};
+#
+#	if modifier is supplied, call it before applying any of our
+#	transforms
+#
+	if ($obj->{mapModifier}) {
+		my $maphash = {
+			URL => $imgURL,
+			Script => $imgScript,
+			Name => $obj->{genMap},
+			PLOTNUM => $plotNum,
+			X => $x, Y => $y, Z => $z,
+			AltText => $alt
+		};
+		&{$obj->{mapModifier}}($maphash);
+		$imgURL = $maphash->{URL};
+		$imgScript = $maphash->{Script};
+		$alt = $maphash->{AltText};
+	}
 #
 #	render image map element:
 #	hotspot is an 8 pixel diameter circle centered on datapoint for
@@ -3404,7 +3618,6 @@ sub updateImagemap {
 #
 #	interpolate special variables
 #
-	my $imgURL = $obj->{mapURL};
 	$imgURL=~s/:PLOTNUM\b/$plotNum/g,
 	$imgURL=~s/:X\b/$x/g,
 	$imgURL=~s/:Y\b/$y/g,
@@ -3413,7 +3626,6 @@ sub updateImagemap {
 #
 #	interpolate special variables
 #
-	my $imgScript = $obj->{mapScript};
 	$imgScript=~s/:PLOTNUM\b/$plotNum/g,
 	$imgScript=~s/:X\b/$x/g,
 	$imgScript=~s/:Y\b/$y/g,
@@ -3530,13 +3742,13 @@ sub setGanttPoints {
 				($$pcts[$i] >= 0) && ($$pcts[$i] <= 100)));
 
 		my @deps = ();
-		foreach my $d (@depends) {
-			next unless $$d[$i];
+		foreach (@depends) {
+			next unless $_->[$i];
 
 			$obj->{errmsg} = "Invalid dependency; $$taskary[$i] cannot be self-dependent.",
 			return undef
-				if (uc $$d[$i] eq uc $$taskary[$i]);
-			push(@deps, $$d[$i]);
+				if (uc $_->[$i] eq uc $$taskary[$i]);
+			push(@deps, $_->[$i]);
 		}
 
 		$taskhash{uc $$taskary[$i]} = $startdate;
@@ -3547,25 +3759,24 @@ sub setGanttPoints {
 			[ $$taskary[$i], $startdate, $enddate, $$assignees[$i], $$pcts[$i], \@deps ] ;
 	}		
 	foreach my $d (@depends) {
-		for ($i = 0; $i <= $#$d; $i++) {
-			next unless $$d[$i];
-			$obj->{errmsg} = 'Unknown task ' . $$d[$i],
+		foreach (0..$#$d) {
+			next unless $$d[$_];
+			$obj->{errmsg} = 'Unknown task ' . $$d[$_],
 			return undef
-				unless $taskhash{uc $$d[$i]};
+				unless $taskhash{uc $$d[$_]};
 
-			$obj->{errmsg} = "Invalid dependency; $$d[$i] precedes $$taskary[$i].",
+			$obj->{errmsg} = "Invalid dependency; $$d[$_] precedes $$taskary[$_].",
 			return undef
-				if ($taskhash{uc $$d[$i]} < $taskhash{uc $$taskary[$i]});
+				if ($taskhash{uc $$d[$_]} < $taskhash{uc $$taskary[$_]});
 		}
 	}
 #
 #	sort tasks on startdate
 	my @started = sort numerically keys(%starthash);
 	foreach my $startdate (@started) {
-		foreach my $task (@{$starthash{$startdate}}) {
-			push(@data, @$task);
-			$xh++;
-		}
+		push(@data, @$_),
+		$xh++
+			foreach (@{$starthash{$startdate}});
 	}
 	push(@{$obj->{data}}, \@data);
 	push(@{$obj->{props}}, $props);
@@ -3588,7 +3799,9 @@ sub plotGantt {
 	my ($offset, $span, $pct, $compend, $prtT, $starts, $ends);
 	my $img = $obj->{img};
 
+	my $showvals = $obj->{showValues};
 	foreach (split(' ', $props)) {
+		$showvals = 1, next if ($_ eq 'showvalues');
 		$color = $_ if $colors{$_};
 	}
 	$obj->{$color} = $img->colorAllocate(@{$colors{$color}})
@@ -3612,8 +3825,8 @@ sub plotGantt {
 		$s = $taskhash{uc $$data[$i]};
 		$deps = $$data[$i+5];
 		next unless ($deps && ($#$deps >= 0));
-		foreach $depend (@$deps) {
-			$t = $taskhash{uc $depend};
+		foreach (@$deps) {
+			$t = $taskhash{uc $_};
 			$img->line($pts[$s+2], $pts[$s+3], $pts[$t], $pts[$s+3], $obj->{black})
 				if ($pts[$s+2] < $pts[$t]); # horiz line if src ends before tgt starts
 			$srcx = ($pts[$s+2] < $pts[$t]) ? $pts[$t] : 
@@ -3659,7 +3872,333 @@ sub plotGantt {
 	1;
 }
 
+sub setQuadPoints {
+	my ($obj, @ranges) = @_;
+	my ($min, $max) = (1.0E+38, 1.0E-38);
+	my $props = pop @ranges;
+	$obj->{errmsg} = 'Invalid dataset supplied for quadtree',
+	return undef
+		unless ((ref $ranges[0]) && (ref $ranges[0] eq 'ARRAY') 
+			&& (@{$ranges[0]} > 2));
+	my $cells = @{$ranges[0]};
+	my @dataset = ();
+	push (@dataset, [ ])
+		foreach (1..$cells);
+
+	foreach my $x (@ranges) {
+		$obj->{errmsg} = 'Invalid dataset supplied for quadtree',
+		return undef
+			unless ((ref $x) && (ref $x eq 'ARRAY') && ($#$x > 1));
+		$obj->{errmsg} = 'Unbalanced dataset supplied for quadtree',
+		return undef
+			unless ($cells == @$x);
+#
+#	transform tabular format into clustered format
+#
+		push @{$dataset[$_-1]}, $x->[$_-1]
+			foreach (1..$cells);
+	}
+	foreach (@{$ranges[$#ranges]}) {
+		next unless defined($_);
+#
+#	adjust min/max intensity values
+#
+		$min = $_ unless ($min < $_);
+		$max = $_ unless ($max > $_);
+	}
+	$obj->{yl} = $min;
+	$obj->{yh} = $max;
+#
+#	generate a tree structure to cluster the data
+#	for easier plotting later
+#
+	my %keyhash = ();
+	$cells--;
+	$obj->{data} = \@dataset;
+	$obj->clusterQuadPts([ 0..$cells ], 0, \%keyhash, '');
+	$obj->{data}->[0] = \%keyhash;
+	$obj->{props}->[0] = $props;
+	$obj->{plotTypes} |= QUADTREE;
+	return 1;
+}
+
+sub clusterQuadPts {
+	my ($obj, $rowlist, $keycol, $keyhash, $category) = @_;
+	my $result = 0;
+#
+#	if its last index column, just sum the value
+#
+	my $rows = $obj->{data};
+	my $ttlcols = @{$$rows[$$rowlist[0]]} - 1;
+	if ($keycol == $ttlcols - 2) {
+#
+#	save the key, value and intensity in the hash
+#
+		$$keyhash{$$rows[$_]->[$keycol]} = 
+			[ ($category . ':' . $$rows[$_]->[$keycol]), 
+				$$rows[$_]->[$keycol+1], 
+				$$rows[$_]->[$keycol+2] ],
+		$result += $$rows[$_]->[$keycol+1]
+			foreach (@$rowlist);
+		return $result;
+	}
+#
+#	collect distinct keycols values and create array
+#
+	my %idxhash = ();
+	foreach (@$rowlist) {
+#
+#	accumulate key values; create new child node hash on first occurance
+#
+		$idxhash{$$rows[$_]->[$keycol]} = [ ]
+			unless $idxhash{$$rows[$_]->[$keycol]};
+#
+#	accumulate indexes of rows in the same category
+#
+		push @{$idxhash{$$rows[$_]->[$keycol]}}, $_;
+	}
+#
+#	recurse to compute totals of each child node
+#
+	foreach (keys(%idxhash)) {
+		my %lclhash = ();	# create a new hash on every pass
+		$$keyhash{$_} = 
+			[ \%lclhash, $obj->clusterQuadPts($idxhash{$_}, $keycol+1, \%lclhash, 
+				($category eq '') ? $_ : ($category . ':' . $_)) ];
+	}
+#
+#	now compute our subtotal
+#
+	$result += $$keyhash{$_}->[1]
+		foreach (keys(%$keyhash));
+	return $result;
+}
+
+sub plotQuadtree {
+	my ($obj) = @_;
+#
+# generate color gradient
+#
+	$obj->computeGradient;
+#
+#	then render within defined margins
+#	note we always leave 40 pixel margins on each side
+#
+	$obj->renderQuadTree([ $obj->{data}->[0] ], 40, 40, $obj->{width} - 80, 
+		$obj->{height} - 80, 'v', '');
+	return 1;
+}
+#
+#	sub to generate a quadtree via recursion
+#
+sub renderQuadTree {
+	my ($obj, $group, $xorig, $yorig, $w, $h, $splitdir) = @_;
+	
+	my @cluster1 = ();
+	my @cluster2 = ();
+	my ($ttl, $half, $hash, $no_more_room, $w1, $w2, $h1, $h2);
+#
+#	if the node is a singleton, then partition
+#	its children
+#
+	while ((ref $$group[0] eq 'HASH') && (! $#$group)) {
+		my @newgroup = ();
+		$hash = $$group[0];
+		push(@newgroup, (ref $$hash{$_}->[0]) ? $$hash{$_}->[0] : $$hash{$_})
+			foreach (keys(%$hash));
+		$group = \@newgroup;
+	}
+#
+#	at the atom level, so draw the area
+	if (! ref $$group[0]) {
+		my $img = $obj->{img};
+		my $colormap = $obj->{colormap};
+		my $color;
+		foreach (@$colormap) {
+#
+#	locate color that matches our intensity
+#
+			$color = $_->[5], last
+				if ($$group[2] >= $_->[3] && $$group[2] <= $_->[4]);
+		}
+		$img->filledRectangle($xorig, $yorig, $xorig+$w, $yorig+$h, $color);
+		$img->rectangle($xorig, $yorig, $xorig+$w, $yorig+$h, $obj->{black});
+		my ($category, $item) = ($1,$2) if ($$group[0]=~/^(.*):(.+?)$/);
+		$obj->updateImagemap('RECT', 
+			"$$group[0]=$$group[1]($$group[2])",
+			$$group[2], $category, $item, $$group[1], 
+			$xorig, $yorig, $xorig+$w, $yorig+$h)
+			if $obj->{genMap};
+		return 1;
+	}
+#
+#	if our group is all atoms, recursively split them up
+#
+	if (ref $$group[0] eq 'ARRAY') {
+		return $obj->renderQuadTree($$group[0], $xorig, $yorig, $w, $h, $splitdir)
+			if ($#$group == 0);
+
+		my $ttl = 0;
+		$ttl += $_->[1]
+			foreach (@$group);
+ 		$half = $ttl/2;
+ 		foreach (@$group) {
+			$half -= $_->[1],
+			push(@cluster1, $_),
+			next
+				if ($half > 0);
+			push(@cluster2, $_);
+		}
+#
+#	divide the area based on current split direction
+		$no_more_room = 0;
+		if ($splitdir eq 'v') {
+			$w1 = int($w * ((($ttl/2) - $half)/$ttl));
+			$w2 = $w - $w1;
+			$no_more_room = ($w2 <= 0);
+		}
+		else {
+			$h1 = int($h * ((($ttl/2) - $half)/$ttl));
+			$h2 = $h - $h1;
+			$no_more_room = ($h2 <= 0);
+		}
+#
+#	render each half
+#
+		return undef
+			unless (($splitdir eq 'v') ?
+				$obj->renderQuadTree(((@cluster1 == 1) ? $cluster1[0] : \@cluster1), 
+					$xorig, $yorig, $w1, $h, 'h') :
+				$obj->renderQuadTree(((@cluster1 == 1) ? $cluster1[0] : \@cluster1),
+					$xorig, $yorig, $w, $h1, 'v'));
+
+		return ($no_more_room ? 1 : 
+			($splitdir eq 'v') ?
+			$obj->renderQuadTree(((@cluster2 == 1) ? $cluster2[0] : \@cluster2), 
+				$xorig+$w1, $yorig, $w2, $h, 'h') :
+			$obj->renderQuadTree(((@cluster2 == 1) ? $cluster2[0] : \@cluster2), 
+				$xorig, $yorig+$h1, $w, $h2, 'v'));
+	}
+#
+#	at non-leaf node, so partition
+#
+#	partition group into 2 nearly equal halves
+#
+	my @ttlhash = ();
+	my $i = 0;
+	$ttl = 0;
+	foreach $hash (@$group) {
+		$ttlhash[$i] = 0;
+		$ttlhash[$i] += $$hash{$_}->[1]
+			foreach (keys(%$hash));
+		$ttl += $ttlhash[$i];
+		$i++;
+	}
+	$i = 0;
+	$half = $ttl/2;
+	foreach $hash (@$group) {
+		$half -= $ttlhash[$i++],
+		push(@cluster1, $hash),
+		next
+			if (($half > 0) && ($i < $#ttlhash));
+		push(@cluster2, $hash);
+	}
+#
+#	divide the area based on current split direction
+#
+	$no_more_room = 0;
+	if ($splitdir eq 'v') {
+		$w1 = int($w * ((($ttl/2) - $half)/$ttl));
+		$w2 = $w - $w1;
+		$no_more_room = ($w2 <= 0);
+	}
+	else {
+		$h1 = int($h * ((($ttl/2) - $half)/$ttl));
+		$h2 = $h - $h1;
+		$no_more_room = ($h2 <= 0);
+	}
+#
+#	render each half
+#
+	return undef
+		unless (($splitdir eq 'v') ?
+			$obj->renderQuadTree(\@cluster1, $xorig, $yorig, $w1, $h, 'h') :
+			$obj->renderQuadTree(\@cluster1, $xorig, $yorig, $w, $h1, 'v'));
+
+	return ($no_more_room ? 1 : 
+		($splitdir eq 'v') ?
+		$obj->renderQuadTree(\@cluster2, $xorig+$w1, $yorig, $w2, $h, 'h') :
+		$obj->renderQuadTree(\@cluster2, $xorig, $yorig+$h1, $w, $h2, 'v'));
+}
+
+sub computeGradient {
+	my ($obj) = @_;
+#
+#	compute color gradient from min and max intensity
+#	values and input property string
+#
+	my @colormap = ();
+	my @t = split(' ', $obj->{props}->[0]);
+	foreach (@t) {
+		push @colormap, $colors{$_}
+			if defined($colors{$_});
+#
+#	may need showvalues in future
+#
+	}
+#
+#	compute intensity steps using 24 equal segments
+#	then assign intensity ranges to colormap in equal
+#	segments
+#	NOTE that the last color in list is used as upper bound
+#	of gradient shading
+#
+	my $incr = ($obj->{yh} - $obj->{yl})/24;
+	my $shadestep = ($obj->{yh} - $obj->{yl})/$#colormap;
+	my $min = $obj->{yl};
+	my $max;
+	$_->[3] = $min,
+	$_->[4] = $min + $shadestep, 
+	$min += $shadestep
+		foreach (@colormap);
+		
+	my @newmap = ();
+	my ($redincr, $greenincr, $blueincr) = (0,0,0);
+	my $img = $obj->{img};
+	my ($thiscolor, $nextcolor);
+	$nextcolor = $colormap[0];
+	my ($redcomp, $greencomp, $bluecomp);
+	my $i;
+	foreach (1..$#colormap) {
+
+		$thiscolor = $nextcolor;
+		$nextcolor= $colormap[$_];
+		$min = $thiscolor->[3];
+		$max = $thiscolor->[4];
+
+		$i = int(($max - $min)/$incr);
+		$redincr = ($nextcolor->[0] - $thiscolor->[0])/$i;
+		$greenincr = ($nextcolor->[1] - $thiscolor->[1])/$i;
+		$blueincr = ($nextcolor->[2] - $thiscolor->[2])/$i;
+		my ($redcomp, $greencomp, $bluecomp, $min, $max) = @$thiscolor;
+#
+#	compute the (min,max) and allocate color for each step of current color segment
+#
+		push(@newmap, [ $redcomp, $greencomp, $bluecomp, $min, $min + $incr,
+			$img->colorAllocate($redcomp, $greencomp, $bluecomp) ]),
+		$min += $incr,
+		$redcomp += $redincr, 
+		$greencomp += $greenincr, 
+		$bluecomp += $blueincr
+			while ($min < $max);
+	}
+	$obj->{colormap} = \@newmap;
+	return 1;
+}
+
 1;
+}
+
 __END__
 
 =head1 NAME

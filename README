@@ -1,5 +1,5 @@
 NAME
-    DBD::Chart - DBI driver abstraction for DBD::Chart::Plot and GD::Graph
+    DBD::Chart - DBI driver abstraction for Rendering Charts and Graphs
 
 SYNOPSIS
             $dbh = DBI->connect('dbi:Chart')
@@ -47,7 +47,7 @@ DESCRIPTION
 
     Perl 5.6.0 minimum
     DBI 1.14 minimum
-    DBD::Chart::Plot 0.61 (included with this package)
+    DBD::Chart::Plot 0.70 (included with this package)
     GD X.XX minimum
     GD::Text X.XX minimum
     libpng
@@ -74,8 +74,15 @@ DESCRIPTION
         perl Makefile.PL
         make
 
-    Sorry, no tests are available yet. After you install, you can run the
-    scripts in the 'examples' subdirectory and examine the resulting images.
+    You can test the installation by running
+
+            make test
+
+    this will render a bunch of charts and an HTML page to view them with.
+    Assuming the test completes successfully, you should use a web browser
+    to view the file t/plottest.html and verify the images look reasonable.
+
+    If tests succeed, proceed with installation via
 
         make install
 

@@ -7,6 +7,15 @@
 #
 #	History:
 #
+#		0.70	2002-Jun-01	D. Arnold
+#			added quadtree plots
+#			added cumulative (aka stacked) barcharts
+#			fix for individual graph SHOWVALUES
+#			added support for official DBI array binding
+#			added LINEWIDTH property
+#			added chart_map_modifier attribute
+#			added installation tests
+#
 #		0.63	2002-May-16	D. Arnold
 #			Fix for Gantt date axis alignment
 #
@@ -80,7 +89,8 @@ our %mincols = (
 'CANDLESTICK', 3, 
 'SURFACEMAP', 3,
 'BOXCHART', 1,
-'GANTT', 3
+'GANTT', 3,
+'QUADTREE', '3'
 );
 
 our %binary_props = (
@@ -90,7 +100,10 @@ our %binary_props = (
 'THREE_D', 1, 
 'SHOWPOINTS', 1, 
 'SHOWVALUES', 1, 
-'KEEPORIGIN', 1);
+'KEEPORIGIN', 1,
+'CUMULATIVE', 1,
+'STACK', 1
+);
 	
 our %string_props = (
 'X_AXIS', 1, 
@@ -120,7 +133,9 @@ our %trans_props = (
 'Y-MIN', 'Y_MIN',
 'COLORS', 'COLOR',
 'ICONS', 'ICON',
-'SHAPES', 'SHAPE'
+'SHAPES', 'SHAPE',
+'X-ORIENT', 'X_ORIENT',
+'CUMULATIVE', 'STACK'
 );
 
 our %valid_props	= ( 
@@ -166,7 +181,10 @@ our %valid_props	= (
 'MAPURL', 1,
 'MAPSCRIPT', 1,
 'MAPNAME', 1,
-'MAPTYPE', 1
+'MAPTYPE', 1,
+'CUMULATIVE', 1,
+'STACK', 1,
+'LINEWIDTH', 1
 );
 
 our %valid_colors = (
@@ -224,7 +242,7 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.63';
+$DBD::Chart::VERSION = '0.64';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
@@ -355,7 +373,37 @@ my %inv_pieprop = (
 'Y_MAX', 1, 
 'Y_MIN', 1,
 'ICON', 1,
-'ICONS', 1
+'ICONS', 1,
+'CUMULATIVE', 1,
+'STACK', 1,
+'LINEWIDTH', 1
+);
+
+my %inv_quadtree = (
+'SHAPE', 1, 
+'SHAPES', 1, 
+'SHOWGRID', 1, 
+'SHOWPOINTS', 1, 
+'X-AXIS', 1, 
+'Y-AXIS', 1, 
+'Z-AXIS', 1, 
+'X_AXIS', 1, 
+'Y_AXIS', 1, 
+'Z_AXIS', 1, 
+'SHOWVALUES', 1, 
+'X-LOG', 1, 
+'Y-LOG', 1, 
+'Y-MAX', 1, 
+'Y-MIN', 1,
+'X_LOG', 1, 
+'Y_LOG', 1, 
+'Y_MAX', 1, 
+'Y_MIN', 1,
+'ICON', 1,
+'ICONS', 1,
+'CUMULATIVE', 1,
+'STACK', 1,
+'LINEWIDTH', 1
 );
 
 my %inv_barprop = (
@@ -363,7 +411,8 @@ my %inv_barprop = (
 'SHAPES', 1, 
 'SHOWPOINTS', 1, 
 'X-LOG', 1,
-'X_LOG', 1
+'X_LOG', 1,
+'LINEWIDTH', 1
 );
 
 my %inv_candle = (
@@ -372,6 +421,7 @@ my %inv_candle = (
 'X-LOG', 1,
 '3-D', 1
 );
+
 #
 #	defaults for simple queries
 my %dfltprops = ( 
@@ -405,7 +455,9 @@ my %dfltprops = (
 'MAPURL', undef,
 'MAPSCRIPT', undef,
 'MAPNAME', undef,
-'MAPTYPE', undef
+'MAPTYPE', undef,
+'STACK', undef,
+'LINEWIDTH', undef
 );
 #
 #	default globals for composite queries
@@ -442,12 +494,15 @@ my %dfltcomposites = (
 'SHOWVALUES', 0, 
 'COLORS', \@dfltcolors, 
 'ICONS', undef,
+'STACK', undef,
+'LINEWIDTH', undef
 );
 #
 #	map of compatible chart types in composite
 #	images
 my %compatibility = (
 'PIECHART', undef,
+'QUADTREE', undef,
 'BOXCHART', 
 	{
 	'BARCHART' => 1,
@@ -737,9 +792,20 @@ sub parse_props {
 			return (undef, $t);
 		}
 
+		if ($prop eq 'LINEWIDTH') {
+
+			$props{ $prop } = $t,
+			next
+				if (($t=~/^\d+$/) && ($t > 0) && ($t <= 100));
+
+			$DBD::Chart::err = -1;
+			$DBD::Chart::errstr = 'Invalid value for LINEWIDTH property.';
+			return (undef, $t);
+		}
+
 		$DBD::Chart::err = -1,
 		$DBD::Chart::errstr = 
-			"Y_MAX and Y_MIN deprecated as of release 0.50.",
+			'Y_MAX and Y_MIN deprecated as of release 0.50.',
 		next
 			if (($prop eq 'Y_MAX') || ($prop eq 'Y_MIN'));
 
@@ -773,6 +839,7 @@ sub parse_props {
 			$t=~s/\s+//g;
 			@colors = split(',', $t);
 			for (my $i = 0; $i <= $#colors; $i++) {
+				next if (uc $colors[$i] eq 'NULL');
 				$colors[$i] = "?$$numphs",
 				$$numphs++,
 				next
@@ -812,6 +879,7 @@ sub parse_props {
 	if (defined($props{'COLOR'})) {
 		my $colors = $props{'COLOR'};
 		foreach $prop (@$colors) {
+			next unless defined($prop);
 			next if check_color($prop);
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = "Unknown color $prop.",
@@ -821,7 +889,8 @@ sub parse_props {
 	if (defined($props{'SHAPE'})) {
 		my $shapes = $props{'SHAPE'};
 		foreach $prop (@$shapes) {
-			next if $valid_shapes{$prop};
+			next unless defined($prop);
+			next if ($valid_shapes{$prop} || ($prop eq 'null'));
 			$DBD::Chart::err = -1;
 			$DBD::Chart::errstr = "Unknown point shape $prop.";
 			return (undef, $t);
@@ -1061,7 +1130,7 @@ sub validate_value {
 }
 
 sub prepare {
-	my($dbh, $statement)= @_;
+	my($dbh, $statement, $attrs)= @_;
 	my $i;
 	my $tstmt = $statement;
 	$tstmt=~s/^\s*(.+);?\s*$/$1/;
@@ -1374,7 +1443,7 @@ sub prepare {
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = 'Unrecognized SELECT statement.',
 			return undef
-				unless ($remnant=~/^(CANDLESTICK|SURFACEMAP|POINTGRAPH|HISTOGRAM|LINEGRAPH|AREAGRAPH|PIECHART|BARCHART|BOXCHART|GANTT)(\s*,\s*IMAGEMAP)?\s+FROM\s+(\?|\w+)\s*(.*)$/i);
+				unless ($remnant=~/^(CANDLESTICK|SURFACEMAP|POINTGRAPH|HISTOGRAM|LINEGRAPH|AREAGRAPH|PIECHART|BARCHART|BOXCHART|QUADTREE|GANTT)(\s*,\s*IMAGEMAP)?\s+FROM\s+(\?|\w+)\s*(.*)$/i);
 
 			$ctype = uc $1;
 			$imagemap = uc $2 unless $imagemap;
@@ -1384,7 +1453,7 @@ sub prepare {
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = 'IMAGEMAP not valid in subquery.',
 			return undef
-				if (($is_composite) && ($2 ne ''));
+				if ($is_composite && defined($2) && ($2 ne ''));
 
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = 'Incompatible chart types in composite image.',
@@ -1406,13 +1475,6 @@ sub prepare {
 					$mincols{$ctype} . ' columns.',
 				return undef
 					if (scalar(@$ctypes) < $mincols{$ctype});
-
-				$DBD::Chart::err = -1,
-				$DBD::Chart::errstr = 
-					'CANDLESTICK chart requires 2N + 1 columns.',
-				return undef
-					if (($ctype eq 'CANDLESTICK') && 
-						((scalar(@$ctypes) - 1) & 1));
 
 				$dversions{$filenm} = $$chart{'version'};
 			}
@@ -1471,6 +1533,9 @@ sub prepare {
 		$sth->{'chart_version'} = \%dversions;
 		$sth->{'chart_imagemap'} = $imagemap;
 		$sth->{'chart_qnames'} = \@dnames;
+		$sth->{'chart_map_modifier'} = $attrs->{chart_map_modifier}
+			if ($attrs && $attrs->{chart_map_modifier} &&
+				(ref $attrs->{chart_map_modifier} eq 'CODE'));
 		if ($imagemap) {
 			$sth->STORE('NUM_OF_FIELDS', 2);
 			$sth->{'NAME'} = [ '', '' ];
@@ -1586,6 +1651,10 @@ SQL_INTERVAL_HR2SEC, '+HH:MM:SS'
 my %month = ( 'JAN', 0, 'FEB', 1, 'MAR', 2, 'APR', 3, 'MAY', 4, 'JUN', 5, 
 'JUL', 6, 'AUG', 7, 'SEP', 8, 'OCT', 9, 'NOV', 10, 'DEC', 11);
 
+my @quadcolors = qw(
+black blue purple green red orange yellow white
+);
+
 sub check_color {
 	my ($color) = @_;
 	
@@ -1635,8 +1704,8 @@ sub validate_value {
 				($day < 32) && ($day > 0));
 	}
 	if (($ttype == SQL_INTERVAL_HR2SEC) &&
-		($p=~/^[\-\+]?(\d+:)?(\d+:)?(\d+)(\.\d+)?/)) {
-		my ($hr, $min, $sec, $subsec) = ($1, $2, $3, $4);
+		($p=~/^[\-\+]?((\d+):)?((\d+):)?(\d+)(\.\d+)?/)) {
+		my ($hr, $min, $sec, $subsec) = ($2, $4, $5, $6);
 		return 1
 			if (((! $min) || ($min < 60)) && ($sec < 60));
 	}
@@ -1693,7 +1762,7 @@ sub validate_properties {
 		next if ((($prop eq 'BACKGROUND') || ($prop eq 'GRIDCOLOR') ||
 			($prop eq 'TEXTCOLOR')) && (check_color($t)));
 
-		next if (($prop eq 'X-ORIENT') && 
+		next if (($prop eq 'X_ORIENT') && 
 			($t=~/^(HORIZONTAL|VERTICAL|DEFAULT)$/i));
 
  		next if (($prop eq 'COLOR') && (check_color($t)));
@@ -1707,6 +1776,21 @@ sub validate_properties {
 		return undef;
 	}
 	return 1;
+}
+#
+#	official DBI array binding i/f
+#
+sub execute_array {
+	my($sth, $attribs, @bind_values) = @_;
+	
+	$sth->bind_param_status($$attribs{ArrayTupleStatus}) if $$attribs{ArrayTupleStatus};
+	
+	if (@bind_values) {
+		$sth->bind_param_array($_, $bind_values[$_])
+			foreach (1..@bind_values);
+	}
+		
+	return $sth->execute();
 }
 
 sub execute {
@@ -2144,7 +2228,7 @@ sub execute {
 #
 #	if COLORMAP, just fetch and return
 #
-	if ($$dcharts[0] eq 'COLORMAP') {
+	if ($$dcharts[0] && ($$dcharts[0] eq 'COLORMAP')) {
 		my $table = $DBD::Chart::charts{COLORMAP};
 		my $col1 = $table->{data}->[0];
 		if (defined($$props{NAME})) {
@@ -2299,7 +2383,7 @@ sub execute {
 #
 #	validate and copy in any placeholder values
 #
-		return undef if (! validate_properties($props, $parms));
+		return undef unless validate_properties($props, $parms);
 
 		if ($i == 0) {
 #
@@ -2327,34 +2411,35 @@ sub execute {
 				mapType => $sth->{chart_imagemap},
 				mapURL => $$props{MAPURL},
 				mapScript => $$props{MAPSCRIPT},
-				mapType => ($$props{MAPTYPE}) ? $$props{MAPTYPE} : 'HTML'
+				mapType => ($$props{MAPTYPE}) ? $$props{MAPTYPE} : 'HTML',
+				mapModifier => $sth->{chart_map_modifier}
 			)
 				if $sth->{chart_imagemap};
 
 			$img->setOptions( logo => $$props{LOGO}) if $$props{LOGO};
 
 			$img->setOptions( 'xAxisLabel' => $$props{'X_AXIS'})
-				if ($$props{'X_AXIS'});
+				if $$props{'X_AXIS'};
 			$img->setOptions( 'yAxisLabel' => $$props{'Y_AXIS'})
-				if ($$props{'Y_AXIS'});
+				if $$props{'Y_AXIS'};
 			$img->setOptions( 'zAxisLabel' => $$props{'Z_AXIS'})
-				if ($$props{'Z_AXIS'});
+				if $$props{'Z_AXIS'};
 			
 			$img->setOptions( 'xAxisVert' => ($$props{'X_ORIENT'} eq 'VERTICAL'))
-				if ($$props{'X_ORIENT'});
+				if $$props{'X_ORIENT'};
 			
 			$img->setOptions( 'horizGrid' => 1, 
 				'vertGrid' => ($$dtypes[$i] ne 'BARCHART'))
-				if ($$props{'SHOWGRID'});
+				if $$props{'SHOWGRID'};
 
 			$img->setOptions( 'xLog' => 1)
-				if ($$props{'X_LOG'});
+				if $$props{'X_LOG'};
 			
 			$img->setOptions( 'yLog' => 1)
-				if ($$props{'Y_LOG'});
+				if $$props{'Y_LOG'};
 			
 			$img->setOptions( 'keepOrigin' => 1)
-				if ($$props{'KEEPORIGIN'});
+				if $$props{'KEEPORIGIN'};
 		}
 
 		next if ($$dtypes[$i] eq 'IMAGE');	# specific chart processing from here on
@@ -2363,17 +2448,22 @@ sub execute {
 #
 		my @colors = ();
 		my $clist = ($$props{'COLOR'}) ? $$props{'COLOR'} : \@dfltcolors;
-		$t = ($$dtypes[$i] eq 'PIECHART') ? scalar @{$$data[0]} : scalar @$data;
-		$t-- unless (($$dtypes[$i] eq 'BOXCHART') || # ($$dtypes[$i] eq 'HISTOGRAM') || 
-			($$dtypes[$i] eq 'PIECHART'));
-		$t /= 2 if ($$dtypes[$i] eq 'CANDLESTICK');
-		$t = 1 if ($$props{'Z_AXIS'});
-		$t = scalar @{$$data[0]}
-			if ((($$dtypes[$i] eq 'BARCHART') || ($$dtypes[$i] eq 'HISTOGRAM')) && 
-			(scalar @$clist > 1) && (scalar @$data == 2));
-		for ($k = 0, $j = 0; $k < $t; $k++) {
-			push(@colors, $$clist[$j++]);
-			$j = 0 if ($j >= scalar(@$clist));
+		if ($$dtypes[$i] eq 'QUADTREE') {
+			@colors = $$props{'COLOR'} ? @{$$props{'COLOR'}} : @quadcolors;
+		}
+		else {
+			$t = ($$dtypes[$i] eq 'PIECHART') ? scalar @{$$data[0]} : scalar @$data;
+			$t-- unless (($$dtypes[$i] eq 'BOXCHART') || # ($$dtypes[$i] eq 'HISTOGRAM') || 
+				($$dtypes[$i] eq 'PIECHART'));
+			$t /= 2 if ($$dtypes[$i] eq 'CANDLESTICK');
+			$t = 1 if ($$props{'Z_AXIS'});
+			$t = scalar @{$$data[0]}
+				if ((($$dtypes[$i] eq 'BARCHART') || ($$dtypes[$i] eq 'HISTOGRAM')) && 
+				(scalar @$clist > 1) && (scalar @$data == 2));
+			for ($k = 0, $j = 0; $k < $t; $k++) {
+				push(@colors, $$clist[$j++]);
+				$j = 0 if ($j >= scalar(@$clist));
+			}
 		}
 
 		my $propstr = '';
@@ -2415,9 +2505,9 @@ sub execute {
 			if ($is_symbolic || 
 				($symboltype{$xdomain} && ($$dtypes[$i] ne 'GANTT')));
 		$img->setOptions( 'timeDomain' => $timetype{$xdomain})
-			if $timetype{$xdomain};
+			if (defined($xdomain) && $timetype{$xdomain});
 		$img->setOptions( 'timeRange' => $timetype{$ydomain})
-			if $timetype{$ydomain};
+			if (defined($ydomain) && $timetype{$ydomain});
 #
 #	we need to support temporal Z-axis!!!
 #
@@ -2432,6 +2522,20 @@ sub execute {
 			$DBD::Chart::errstr = $img->{errmsg},
 			return undef 
 				unless $img->setPoints($$data[0], $$data[1], $propstr);
+			next;
+		}
+#
+#	Quadtree:
+#	1st N-2 data arrays are categories, in a category hierarchy, 
+#	data array N-1 is the values assigned to the individual items,
+#	data array N is the intensity values of individual items
+#
+		if ($$dtypes[$i] eq 'QUADTREE') {
+			$propstr = 'quadtree ' . join(' ', @colors);
+			$DBD::Chart::err = -1,
+			$DBD::Chart::errstr = $img->{errmsg},
+			return undef
+				unless $img->setPoints(@$data, $propstr);
 			next;
 		}
 #
@@ -2453,17 +2557,20 @@ sub execute {
 #
 		my @colnames = ();
 		if (! $srcsth) {
-			foreach (keys(%$columns)) {
-				$colnames[$$columns{$_}] = $_;
-			}
+			$colnames[$$columns{$_}] = $_
+				foreach (keys(%$columns));
 		}
 		else { 
 			@colnames = @$columns;
 		}
 		shift @colnames unless ($$dtypes[$i] eq 'BOXCHART');
 
-		$img->setOptions( 'showValues' => 1)
+#		$img->setOptions( 'showValues' => 1)
+#			if ($$props{'SHOWVALUES'});
+		$propstr .= 'showvalues '
 			if ($$props{'SHOWVALUES'});
+		$propstr .= 'stack '
+			if ($$props{'STACK'});
 #
 #	default x-axis label orientation is vertical for candlesticks
 #	and symbollic domains
@@ -2488,13 +2595,16 @@ sub execute {
 				(scalar(@$data) > 3)) {
 #	its multirange
 				my $incr = ($$dtypes[$i] ne 'CANDLESTICK') ? 1 : 2;
+#	if stacked, we need an arrayref of legends
+				my $legary = ($$props{'STACK'}) ? [ ] : \@legends;
+				push(@legends, $legary) if ($$props{'STACK'});
 				for (my $c = 0; $c <= $#colnames; $c += $incr) {
 #
 #	prepend query names if provided for composites
-					push(@legends, ($$dnames[$i] . '.' . $colnames[$c])),
+					push(@$legary, ($$dnames[$i] . '.' . $colnames[$c])),
 					next
 						if ($$dnames[$i]);
-					push(@legends, $colnames[$c]);
+					push(@$legary, $colnames[$c]);
 				}
 			}
 			elsif ($#$dtypes > 1) {
@@ -2513,8 +2623,8 @@ sub execute {
 				push(@icons, $$iconlist[$j++]);
 				$j = 0 if ($j > $#$iconlist);
 			}
+			$img->setOptions( icons => \@icons );
 		}
-		$img->setOptions( icons => \@icons ) if ($$props{ICON});
 
 		if (($$dtypes[$i] eq 'BARCHART') ||
 			($$dtypes[$i] eq 'HISTOGRAM')) {
@@ -2523,7 +2633,7 @@ sub execute {
 #	datasets. If more than 1 dataset is supplied, then
 #	bars are grouped
 #
-			$propstr = ($$dtypes[$i] eq 'HISTOGRAM') ? 'histo ' : 'bar ';
+			$propstr .= ($$dtypes[$i] eq 'HISTOGRAM') ? 'histo ' : 'bar ';
 			if ($$props{'Z_AXIS'}) {
 				$DBD::Chart::err = -1,
 				$DBD::Chart::errstr = $img->{errmsg},
@@ -2543,13 +2653,24 @@ sub execute {
 						$propstr . join(' ', @colors)),
 				next;
 			}
+#
+#	if stacked, send all the data at the same time
+#
+			if ($$props{'STACK'}) {
+				$propstr .= $$props{ICON} ? 'icon:' . join(' icon:', @icons) : join(' ', @colors);
+				$DBD::Chart::err = -1,
+				$DBD::Chart::errstr = $img->{errmsg},
+				return undef
+					unless $img->setPoints(@$data, $propstr);
+				next;
+			}
 
 			for ($i=1; $i <= $#$data; $i++) {
 				$DBD::Chart::err = -1,
 				$DBD::Chart::errstr = $img->{errmsg},
 				return undef
 					unless $img->setPoints($$data[0], $$data[$i],
-						$propstr . ($$props{ICON} ? 'icon' : $colors[$i-1]));
+						$propstr . ($$props{ICON} ? 'icon:' . $icons[$i-1] : $colors[$i-1]));
 			}
 			next;
 		}
@@ -2560,19 +2681,11 @@ sub execute {
 		my $shapelist = ($$props{'SHAPE'}) ? $$props{'SHAPE'} : 
 			[ 'fillcircle' ];
 		$$props{SHOWPOINTS} = 1 if $$props{SHAPE};
-		@icons = () if ($$props{ICON});
 		for ($k = 1, $j = 0, my $n = 0; $k <= $#$data; $k++) {
-			push(@shapes, $$shapelist[$j++]);
-			push(@icons, ($$shapelist[$j-1] eq 'icon') ? $$iconlist[$n++] : undef)
-				if ($$props{ICON});
+			push(@shapes, ($$shapelist[$j] eq 'icon') ? 'icon:' . $$iconlist[$n++] : $$shapelist[$j]);
 			$n = 0 if ($n > $#$iconlist);
+			$j++;
 			$j = 0 if ($j > $#$shapelist);
-		}
-		if ($$props{ICON}) {
-			$DBD::Chart::err = -1,
-			$DBD::Chart::errstr = $img->{errmsg},
-			return undef
-				unless $img->setOptions( icons => \@icons )
 		}
 
 		if ($$dtypes[$i] eq 'CANDLESTICK') {
@@ -2581,8 +2694,19 @@ sub execute {
 #	datasets, consisting of 2-tuples (y-min, y-max).
 #	If more than 1 dataset is supplied, then sticks are grouped
 #
+			$img->setOptions( lineWidth => ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 2));
+			if ($$props{'STACK'}) {
+				$propstr .= 'candle ' . join(' ', @colors);
+				$propstr .= ' ' . $shapes[0]
+					if ($$props{'SHOWPOINTS'});
+				$DBD::Chart::err = -1,
+				$DBD::Chart::errstr = $img->{errmsg},
+				return undef
+					unless $img->setPoints(@$data, $propstr);
+				next;
+			}
 			for (my $n = 0, $k = 1; $k <= $#$data; $k += 2, $n++) {
-				$propstr = 'candle ' . $colors[$n];
+				$propstr .= 'candle ' . $colors[$n];
 				$propstr .= ' ' . $shapes[$n]
 					if ($$props{'SHOWPOINTS'});
 				$DBD::Chart::err = -1,
@@ -2598,7 +2722,7 @@ sub execute {
 #	each data array is a distinct domain to be plotted
 #
 			for (my $n = 0, $k = 0; $k <= $#$data; $k++, $n++) {
-				$propstr = 'box ' . $colors[$n];
+				$propstr .= 'box ' . $colors[$n];
 				$propstr .= ' ' . $shapes[$n]
 					if ($$props{'SHOWPOINTS'});
 				$DBD::Chart::err = -1,
@@ -2611,18 +2735,30 @@ sub execute {
 #
 #	line, point, or area graph
 #
-		for ($k = 1; $k <= $#$data; $k++) {
-			$propstr = ($$dtypes[$i] eq 'POINTGRAPH') ?
-				'noline ' . $colors[$k-1] . ' ' . $shapes[$k-1] :
-				($$dtypes[$i] eq 'LINEGRAPH') ? 
-					$colors[$k-1] :
-					'fill ' . $colors[$k-1] ;
-			$propstr .= ' ' . $shapes[$k-1] 
+		$img->setOptions( lineWidth => ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 1));
+		if (($$dtypes[$i] eq 'AREAGRAPH') && ($$props{'STACK'})) {
+			$propstr .= 'fill ' . join(' ', @colors) ;
+			$propstr .= ' ' . join(' ', @shapes) 
 				if ($$props{'SHOWPOINTS'} || $$props{'SHAPE'});
 			$DBD::Chart::err = -1,
 			$DBD::Chart::errstr = $img->{errmsg},
 			return undef
-				unless $img->setPoints($$data[0], $$data[$k], $propstr);
+				unless $img->setPoints(@$data, $propstr);
+			next;
+		}
+		for ($k = 1; $k <= $#$data; $k++) {
+			my $tprops = $propstr;
+			$tprops .= ($$dtypes[$i] eq 'POINTGRAPH') ?
+				'noline ' . $colors[$k-1] . ' ' . $shapes[$k-1] :
+				($$dtypes[$i] eq 'LINEGRAPH') ? 
+					$colors[$k-1] :
+					'fill ' . $colors[$k-1] ;
+			$tprops .= ' ' . $shapes[$k-1] 
+				if ($$props{'SHOWPOINTS'} || $$props{'SHAPE'});
+			$DBD::Chart::err = -1,
+			$DBD::Chart::errstr = $img->{errmsg},
+			return undef
+				unless $img->setPoints($$data[0], $$data[$k], $tprops);
 		}
 	}
 #
@@ -2812,7 +2948,7 @@ sub DESTROY { undef }
 
 =head1 NAME
 
-DBD::Chart - DBI driver abstraction for DBD::Chart::Plot and GD::Graph
+DBD::Chart - DBI driver abstraction for Rendering Charts and Graphs
 
 =head1 SYNOPSIS
 
@@ -2867,7 +3003,7 @@ See L<GD(3)>, L<GD::Graph(3)> for details about the graphing engines.
 
 =item DBI 1.14 minimum
 
-=item DBD::Chart::Plot 0.61 (included with this package)
+=item DBD::Chart::Plot 0.70 (included with this package)
 
 =item GD X.XX minimum
 
@@ -2905,9 +3041,16 @@ and then enter the following:
     perl Makefile.PL
     make
 
-Sorry, no tests are available yet. After you install, you can
-run the scripts in the 'examples' subdirectory and examine the
-resulting images.
+You can test the installation by running
+
+	make test
+
+this will render a bunch of charts and an HTML page to view
+them with. Assuming the test completes successfully, you should
+use a web browser to view the file t/plottest.html and verify
+the images look reasonable.
+
+If tests succeed, proceed with installation via 
 
     make install
 
