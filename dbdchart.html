@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>DBD::Chart 0.50 - Perl DBI Driver abstraction for rendering charts and graphs</title>
+<title>DBD::Chart 0.51 - Perl DBI Driver abstraction for rendering charts and graphs</title>
 <META NAME="keywords" CONTENT="Chart, graph, chart, Perl, perl, DBD, DBI, PNG, GD">
 <META NAME="description" CONTENT="DBD::Chart Reference and User Guide.">
 <META NAME="author" CONTENT="By Dean Arnold"></head>
@@ -434,13 +434,19 @@ BTW: This driver is 100% pure Perl.<p>
 <a name="version"></a>
 <h2>CURRENT VERSION</h2><p>
 
-Release 0.50<p>
+Release 0.51<p>
 
-<a href="http://www.presicient.com/dbdchart/dbdchart050.zip">ZIP version</a><br>
-<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.50.tar.gz">.tar.gz version</a>
+<a href="http://www.presicient.com/dbdchart/dbdchart051.zip">ZIP version</a><br>
+<a href="http://www.presicient.com/dbdchart/DBD-Chart-0.51.tar.gz">.tar.gz version</a>
 
 <a name="history"></a>
 <h2>CHANGE HISTORY</h2><p>
+
+Release 0.51:
+<ul>
+<li>3-D piechart support
+<li>multicolor, single range barcharts
+</ul>
 
 Release 0.50:
 <ul>
@@ -732,7 +738,7 @@ The following qualifiers are allowed:<p>
 	<td valign=top align=center><b>COLOR</b><br>(synonym: <b>COLORS</b>)</td>
 	<td valign=top>sets the color of chart elements; may be multivalued, in which case each wedge(piechart),
 bar(barchart, histogram), box&whisker, line(linegraph), area(areagraph), pointset(scattergraph), or candlestick-set uses the next
-color in the list.Valid color values are <code>white, lgray, gray, dgray, black, lblue, blue, dblue, gold, lyellow,
+color in the list. Valid color values are <code>white, lgray, gray, dgray, black, lblue, blue, dblue, gold, lyellow,
 yellow, dyellow, lgreen, green. dgreen, lred, red, dred, lpurple,
 purple, dpurple, lorange, orange, pink, dpink, marine, cyan, lbrown, dbrown.</code></td>
 	<td valign=top>black</td>
@@ -814,7 +820,7 @@ fillcircle, opencircle, icon.</code> Default none.</td>
 	<td>&nbsp;</td></tr>
 <tr>
 	<td valign=top align=center><b>3-D</b></td>
-	<td valign=top>sets the 3-D effect on bar charts.</td>
+	<td valign=top>sets the 3-D effect on pie and bar charts.</td>
 	<td valign=top>0</td>
 	<td>&nbsp;</td></tr>
 <tr>
@@ -1344,7 +1350,7 @@ I reserve the right to provide support for this software
 to individual sites under a separate (possibly fee-based)
 agreement.<p>
 
-<center><i>Last updated November 30, 2001</i>
+<center><i>Last updated December 3, 2001</i>
 
 </body></html>
 

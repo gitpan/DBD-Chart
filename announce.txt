@@ -1,43 +1,14 @@
-DBD::Chart 0.50 is now available from either 
+DBD::Chart 0.51 is now available from either 
 http://www.presicient.com/dbdchart/ or from CPAN (shortly).
 
-Changes from 0.43:
-	- added 3 axis bar charts
-	- GD::Graph, GD::Graph3d no longer required (DBD::Chart::Plot includes
-		its own barchart, piechart rendering engine)
-	- added box & whisker charts
-	- iconic barcharts and datapoints (ie, bars as stacks of icons, instead of
-		solid rectangles)
-	- generation of HTML or Perl imagemap files to create hotspots for data points
-	- added GRIDCOLOR property to specify color of background grid
-	- added TEXTCOLOR property to specify color of image text
-	- several bug fixes
-	- minimum Perl 5.6.0 required
-	- moved log processing to the Plot module
+Changes from 0.50:
+	- added 3-D piechart support
+	- cupport for multicolor barcharts (ala GD::Graph::bars)
 
 FYI: DBD::Chart is a Perl DBI driver abstraction for rendering charts
 and graphs using a variant of SQL. Review the DBD::Chart homepage at
 http://www.presicient.com/dbdchart/ for detailed
 information.
-
-NOTES:
-
-Current DBD::Chart users should re-run their scripts through
-this version to be certain they're satisfied with any possible
-changes, and to assure backward compatibility. While I have tried
-to maintain backward compatibility, DBD::Chart::Plot's new 
-barchart and piechart engine will produce visibly different 
-output than the previous GD::Graph-based versions, and 
-(alas) I haven't had time to implement the 3-D effect for 
-piecharts yet.
-
-For those directly using DBD::Chart::Plot (ie, using Perl attribute
-hashes rather than SQL), you should read the included README.plot
-for the updates. Again, I have tried to maintain backward compatibility,
-but there may be something that got lost in the upgrade.
-
-Feedback on problems, suggestions, even complaints, is welcome.
-Just drop a note to darnold@presicient.com.
 
 Regards,
 Dean Arnold

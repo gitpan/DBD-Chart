@@ -7,6 +7,11 @@
 #
 #	History:
 #
+#		0.51	2001-Dec-01 D. Arnold
+#			Support multicolor single range barcharts
+#			Support for 3D piecharts
+#			Support for temporal datatypes
+#
 #		0.50	2001-Oct-29 D. Arnold
 #			Add ICON(ICONS) property
 #			Add COLORS synonym
@@ -169,7 +174,7 @@ package DBD::Chart;
 use DBI;
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.50';
+$DBD::Chart::VERSION = '0.51';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
@@ -1865,6 +1870,10 @@ sub execute {
 		$t-- unless (($$dtypes[$i] eq 'BOXCHART') || ($$dtypes[$i] eq 'PIECHART'));
 		$t /= 2 if ($$dtypes[$i] eq 'CANDLESTICK');
 		$t = 1 if ($$props{'Z-AXIS'});
+		$t = scalar @{$$data[0]}
+			if (($$dtypes[$i] eq 'BARCHART') && 
+			(scalar @$clist > 1) && 
+			(scalar @$data == 2));
 		for ($k = 0, $j = 0; $k < $t; $k++) {
 			push(@colors, $$clist[$j++]);
 			$j = 0 if ($j >= scalar(@$clist));
@@ -1999,9 +2008,18 @@ sub execute {
 					$propstr . $colors[0]);
 			}
 			else {
-				for ($i=1; $i <= $#$data; $i++) {
-					$img->setPoints($$data[0], $$data[$i],
-						$propstr . ($$props{ICON} ? 'icon' : $colors[$i-1]));
+#
+#	if single domain and multiple colors, then push all colors into
+#	the property string
+				if (($#$data == 1) && (! $$props{ICON})) {
+					$img->setPoints($$data[0], $$data[1],
+						$propstr . join(' ', @colors));
+				}
+				else {
+					for ($i=1; $i <= $#$data; $i++) {
+						$img->setPoints($$data[0], $$data[$i],
+							$propstr . ($$props{ICON} ? 'icon' : $colors[$i-1]));
+					}
 				}
 			}
 			$img->plot;

@@ -9,6 +9,10 @@
 #
 #	Change History:
 #
+#	0.51	2001-Dec-01		D. Arnold
+#		Support multicolor barcharts
+#		Support 3D piecharts
+#
 #	0.50	2001-Oct-14		 D. Arnold
 #		Add barchart, piechart engine
 #		Add iconic barcharts, pointshapes
@@ -37,7 +41,7 @@
 require 5.6.0;
 package DBD::Chart::Plot;
 
-$DBD::Chart::Plot::VERSION = '0.50';
+$DBD::Chart::Plot::VERSION = '0.51';
 
 use GD;
 use strict;
@@ -549,10 +553,6 @@ sub set3DBarPoints {
 sub set2DBarPoints {
 	my ($obj, $xary, $yary, $props) = @_;
 
-	$obj->{errmsg} = 'Unbalanced dataset.',
-	return undef
-		if ($#$xary != $#$yary);
-			
 	my $baseary = ($obj->{data}) ? $obj->{data}->[0] : undef;
 	$obj->{errmsg} = 'Domain does not match prior domain.', 
 	return undef
@@ -1125,14 +1125,16 @@ sub computeSpacing {
 sub plot2DBars {
 	my $obj = shift;
 	my ($i, $k, $ary, $px, $py, $pyt, $pyb);
-	my ($color, $prop, $s);
+	my ($color, $prop, $s, $colorcnt);
+	my @barcolors = ();
+	my @brushes = ();
 	my @props = ();
 	my $legend = $obj->{legend};
 	my ($xl, $xh, $yl, $yh) = ($obj->{xl}, $obj->{xh}, $obj->{yl}, 
 		$obj->{yh});
 	my ($brush, $ci, $t);
 	my ($useicon, $marker, $boff);
-	my $img = $obj->{img};	
+	my $img = $obj->{img};
 	
  	for ($k = 0; $k < scalar(@{$obj->{data}}); $k++) {
 		$color = 'black';
@@ -1143,7 +1145,8 @@ sub plot2DBars {
 		$t = lc $t;
 		@props = split (' ', $t);
 		foreach $prop (@props) {
-			$color = $prop, next
+			$color = $prop,
+			push (@barcolors, $prop), next
 				if ($colors{$prop});
 #
 #	if its iconic, load the icon image
@@ -1152,24 +1155,31 @@ sub plot2DBars {
 				if (($prop eq 'icon') && $obj->{icons} && 
 					$obj->{icons}->[$k]);
 		}
-		$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
-			unless $obj->{$color};
+#
+#	allocate each color we're using
+		$colorcnt = 0;
+		foreach $color (@barcolors) {
+			$colorcnt++;
+			$obj->{$color} = $obj->{img}->colorAllocate(@{$colors{$color}})
+				unless $obj->{$color};
+#
+#	generate brushes to draw bars
+#
+			$brush = new GD::Image($obj->{brushWidth}, 1),
+			$ci = $brush->colorAllocate(@{$colors{$color}}),
+			$brush->filledRectangle(0,0,$obj->{brushWidth},0,$ci),
+			push(@brushes, $brush)
+				unless $marker;
+		}
 
 		$marker = $obj->getIcon($marker, 1)
 			if ($marker);
 #
 #	render legend if requested
+#	(a bit confusing here for multicolor single range charts?)
 #
 		$obj->drawLegend($k, $color, $marker, $$legend[$k])
 			if (($legend) && ($$legend[$k]));
-#
-#	generate brush to draw bars
-#
-		$brush = new GD::Image($obj->{brushWidth}, 1),
-		$ci = $brush->colorAllocate(@{$colors{$color}}),
-		$brush->filledRectangle(0,0,$obj->{brushWidth},0,$ci),
-		$img->setBrush($brush)
-			unless $marker;
 
 		my $bars  = scalar @{$obj->{data}};
 #
@@ -1182,7 +1192,7 @@ sub plot2DBars {
 		my $xoffset = ($k * $obj->{brushWidth}) - $ttlw 
 			+ $boff;
 
-		for (my $i = 0; $i <= $#$ary; $i += 3) {
+		for (my $i = 0, my $j = 0; $i <= $#$ary; $i += 3) {
 
 # get top and bottom points
 			($px, $pyb) = $obj->pt2pxl ( ($i/3)+1, $$ary[$i+1] );
@@ -1190,6 +1200,8 @@ sub plot2DBars {
 			$px += $xoffset;
 				
 # draw line between top and bottom
+			$j = 0 if ($j == $colorcnt);
+			$img->setBrush($brushes[$j++]),
 			$img->line($px, $pyb, $px, $pyt, gdBrushed)
 				unless $marker;
 #
@@ -2148,7 +2160,7 @@ sub plot3DAxes {
 
 	$zl -= (0.8);
 	$zh += $zbarw;
-	my $ycenter = ($yl < 0) ? 0 : $yl;
+	my $yc = ($yl < 0) ? 0 : $yl;
 	my @v = (
 		$xl, $yl, $zl,	# bottom front left
 		$xl, $yl, $zh,	# bottom rear left
@@ -2159,10 +2171,10 @@ sub plot3DAxes {
 		$xh, $yh, $zh,	# top rear right
 #
 #	in case floor is above bottom of graph
-		$xl, $ycenter, $zl,	# bottom front left
-		$xh, $ycenter, $zl,	# bottom front right
-		$xh, $ycenter, $zh,	# bottom rear right
-		$xl, $ycenter, $zh	# bottom rear left
+		$xl, $yc, $zl,	# bottom front left
+		$xh, $yc, $zl,	# bottom front right
+		$xh, $yc, $zh,	# bottom rear right
+		$xl, $yc, $zh	# bottom rear left
 	);
 
 	my @xlatverts = ();
@@ -2218,7 +2230,7 @@ sub plot3DTicks {
 	my $data = $obj->{data}->[0];
 	$zl -= (0.8);
 	$zh += $zbarw;
-	my $ycenter = ($yl < 0) ? 0 : $yl;
+	my $yc = ($yl < 0) ? 0 : $yl;
 	my $i;
 	my $xlatverts = $obj->{xlatVerts};
 
@@ -2227,7 +2239,7 @@ sub plot3DTicks {
 	if ($obj->{zAxisLabel}) {
 		my $zs = $obj->{zValues};
 		for ($i = 0; $i <= $#$zs; $i++) {
-			($gx, $gy) = $obj->pt2pxl($xh, $ycenter, $i+1+0.8);
+			($gx, $gy) = $obj->pt2pxl($xh, $yc, $i+1+0.8);
 			$text = $$zs[$i];
 			$text = substr($text, 0, 22) . '...' if (length($text) > 25);
 			$img->string(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
@@ -2298,7 +2310,7 @@ sub plot3DBars {
 				if ($colors{$prop});
 
 		}
-		$obj->{$color} = $fronts[$#fronts];
+		$obj->{$color} = $tops[$#tops];
 		$obj->drawLegend($k, $color, undef, $$legend[$k])
 			if (($legend) && ($$legend[$k]));
 	}
@@ -2306,7 +2318,18 @@ sub plot3DBars {
 #	draw each bar
 	my $numPts = $#{$obj->{data}->[0]};
 	my $ary;
-	for (my $i = 0; $i <= $numPts; $i+=4) {
+	for (my $i = 0, my $j = 0; $i <= $numPts; $i+=4) {
+		if ($numRanges == 1) {
+#
+#	to support multicolor single ranges
+			$ary = $obj->{data}->[0];
+			$obj->drawCube($$ary[$i], $$ary[$i+1], $$ary[$i+2], $$ary[$i+3],
+				0, $fronts[$j], $tops[$j], $sides[$j], 
+				$xoff, $xbarw, $zbarw, $$xvals[$$ary[$i]-1], $$zvals[$$ary[$i+3]-1]);
+			$j++;
+			$j = 0 if ($j > $#fronts);
+			next;
+		}
 		for (my $k = 0; $k < $numRanges; $k++) {
 			$ary = $obj->{data}->[$k];
 			$obj->drawCube($$ary[$i], $$ary[$i+1], $$ary[$i+2], $$ary[$i+3],
@@ -2437,12 +2460,24 @@ sub plotPie {
 #
 #	compute center coords and radius of pie
 #
-	my $xcenter = int($obj->{width}/2);
-	my $ycenter = int(($obj->{height}/2) - 30);
-	my $radius = $xcenter - $maxlen - 10;
-	$radius = $ycenter - 10 if ($ycenter - 10 < $radius);
-	$img->arc($xcenter, $ycenter, $radius*2, $radius*2, 0, 360, $obj->{black});
-	$img->line($xcenter, $ycenter, $xcenter, $ycenter - $radius, $obj->{black});
+	my $xc = int($obj->{width}/2);
+	my $yc = int(($obj->{height}/2) - 30);
+	my $hr = $xc - $maxlen - 10;
+	my $vr = $obj->{threed} ? int($hr * tan(30 * (3.1415926/180))) : $hr;
+	my $piefactor = $obj->{threed} ? cotan(30 * (3.1415926/180)) : 1;
+
+	$vr = $yc - 10, $hr = $vr
+		unless ($obj->{threed} || ($yc - 10 > $vr));
+	$vr = $yc - 10, $hr = int($vr/tan(30))
+		if ($obj->{threed} && ($vr > $yc - 10));
+
+	$img->arc($xc, $yc, $hr*2, $vr*2, 0, 360, $obj->{black});
+	$img->arc($xc, $yc+20, $hr*2, $vr*2, 0, 180, $obj->{black}),
+	$img->line($xc-$hr, $yc, $xc-$hr, $yc+20, $obj->{black}),
+	$img->line($xc+$hr, $yc, $xc+$hr, $yc+20, $obj->{black})
+		if $obj->{threed};
+
+#	$img->line($xc, $yc, $xc, $yc - $radius, $obj->{black});
 #
 #	now draw each wedge
 #
@@ -2451,14 +2486,14 @@ sub plotPie {
 	for ($i = 0, $j = 0; $i <= $#$ary; $i+=2, $j++) { 
 		$w = $$ary[$i+1];
 		my $color = $colormap[$j%(scalar @colormap)];
-		$arc = $obj->drawWedge($arc, $color, $xcenter, 
-			$ycenter, $radius, $w/$total, $$ary[$i], $w);
+		$arc = $obj->drawWedge($arc, $color, $xc, 
+			$yc, $vr, $hr, $w/$total, $$ary[$i], $w, $piefactor);
 	}
 	return 1;
 }
 
 sub drawWedge {
-	my ($obj, $arc, $color, $xcenter, $ycenter, $radius, $pct, $text, $val) = @_;
+	my ($obj, $arc, $color, $xc, $yc, $vr, $hr, $pct, $text, $val, $piefactor) = @_;
 	my $img = $obj->{img};
 #
 #	locate coords at 80% of radius that bisects the wedge;
@@ -2472,74 +2507,92 @@ sub drawWedge {
 	if ($obj->{genMap}) {
 		my $tarc = 0;
 
-		my @ptsary = ($xcenter, $ycenter);
+		my @ptsary = ($xc, $yc);
 		while ($tarc <= (2 * 3.1415926 * $pct)) {
-			($x, $y) = computeCoords($xcenter, $ycenter, $radius, 
-				$arc + $tarc);
+			($x, $y) = computeCoords($xc, $yc, $vr, $hr, 
+				$arc + $tarc, $piefactor);
 			push(@ptsary, $x, $y);
 			last if ((2 * 3.1415926 * $pct) - $tarc < (2 * 3.1415926/36));
 			$tarc += (2 * 3.1415926/36);
 				
 		}
 		if ($tarc < (2 * 3.1415926 * $pct)) {
-			($x, $y) = computeCoords($xcenter, $ycenter, $radius, 
-				$arc + (2 * 3.1415926 * $pct));
+			($x, $y) = computeCoords($xc, $yc, $vr, $hr, 
+				$arc + (2 * 3.1415926 * $pct), $piefactor);
 			push(@ptsary, $x, $y);
 		}
 		$obj->updateImagemap('POLY', 
 			"$val(" . (int($pct * 1000)/10) . '%)', 0, $text, $val, 
 			int(10000*$pct)/100, @ptsary);
 	}
+	my $start = $arc;
 	my $bisect = $arc + ($pct * 3.1415926);
 	$arc += (2 * 3.1415926 * $pct); 
+	my $visible = ($obj->{threed} &&
+		(($start < 3.1415926/2) || ($start >= (1.5 * 3.1415926)) ||
+		($arc < 3.1415926/2) || ($arc >= (1.5 * 3.1415926))));
+	$start = (($arc < 3.1415926/2) || ($arc >= (1.5 * 3.1415926))) ?
+			$arc : $start;
 
 #	print "Plotting $text with $pct % angle $arc\n";
-	($x, $y) = computeCoords($xcenter, $ycenter, $radius, $arc);
-	($fx, $fy) = computeCoords($xcenter, $ycenter, $radius * 0.6, $bisect);
-	my ($gx, $gy) = computeCoords($xcenter, $ycenter, $radius, $bisect);
-	$img->line($xcenter, $ycenter, $x, $y, $obj->{black});
+	($x, $y) = computeCoords($xc, $yc, $vr, $hr, $arc, $piefactor);
+	($fx, $fy) = computeCoords($xc, $yc, $vr * 0.6, $hr* 0.6, $bisect, $piefactor);
+	$img->line($xc, $yc, $x, $y, $obj->{black});
 	$img->fill($fx, $fy, $color);
+#
+#	draw front face line if visible
+	if ($visible) {
+		$img->line($x, $y, $x, $y+20, $obj->{black})
+			if ($start == $arc);
+		($fx, $fy) = computeCoords($xc, $yc+10, $vr, $hr, $start, $piefactor);
+		$fx += ($start == $arc) ? 2 : -2;
+		$img->fill($fx, $fy, $color);
+	}
 #
 #	render text
 #
 	if ($text) {
-		$gy -= $sfh if (($gx >= $xcenter) && ($gy < $ycenter));
-		$gx = ($gx > $xcenter) ? $gx+$sfw : ($gx == $xcenter) ? 
-			$gx-(length($text) * $sfw/2) :
-			$gx-((length($text)+1) * $sfw);
+		my ($gx, $gy) = computeCoords($xc, $yc, $vr, $hr, $bisect, $piefactor);
+		$gy -= $sfh if (($bisect > 3.1415926/2) && ($bisect <= 3.1415926));
+
+		$gy += 20 if ($obj->{threed} && 
+			(($bisect < 3.1415926/2) || ($bisect >= (1.5 * 3.1415926))));
+		$gx -= ((length($text)+1) * $sfw) 
+			if (($gx < $xc) && ($bisect > 3.1415926/4));
+		$gx += $sfw if ($gx > $xc);
+		$gx -= (length($text) * $sfw/2) 
+			if (($gx == $xc) || ($bisect <= 3.1415926/4));
+
 		$img->string(gdSmallFont, $gx, $gy, $text, $obj->{textColor});
 	}
 	return $arc;
 }
 
 sub computeCoords {
-	my ($xcenter, $ycenter, $radius, $arc) = @_;
-	my ($x, $y);
-	
-	if ($arc <= 3.1415926/2) {
-		$x = $xcenter + ($radius * sin($arc));
-		$y = $ycenter - ($radius * cos($arc));
-	}
-	elsif ($arc <= 3.1415926) {
-		$x = $xcenter + ($radius * cos($arc - 3.1415926/2));
-		$y = $ycenter + ($radius * sin($arc- 3.1415926/2));
-	}
-	elsif ($arc <= 3.1415926 * 1.5) {
-		$x = $xcenter - ($radius * sin($arc - 3.1415926));
-		$y = $ycenter + ($radius * cos($arc - 3.1415926));
-	}
-	else {
-		$x = $xcenter - ($radius * sin(3.1415926*2 - $arc));
-		$y = $ycenter - ($radius * cos(3.1415926*2 - $arc));
-	}
-	$x = ($x - int($x) >= 0.5) ? int($x)+1 : int($x);
-	$y = ($y - int($y) >= 0.5) ? int($y)+1 : int($y);
-	return ($x, $y);
+	my ($xc, $yc, $vr, $hr, $arc, $piefactor) = @_;
+
+	return (
+		int($xc + $piefactor * $vr * cos($arc + (3.1415926/2))), 
+		int($yc + $piefactor * ($vr/$hr) * $vr * sin($arc+ (3.1415926/2)))
+	);
 }
-1;
+
+sub tan {
+	my ($angle) = @_;
+	
+	return (sin($angle)/cos($angle));
+}
+
+sub cotan {
+	my ($angle) = @_;
+	
+	return (cos($angle)/sin($angle));
+}
 
 sub updateImagemap {
 	my ($obj, $shape, $alt, $plotNum, $x, $y, $z, @pts) = @_;
+	$y = '' unless defined($y);
+	$z = '' unless defined($z);
 #
 #	do different for Perl map
 #
@@ -2556,8 +2609,6 @@ sub updateImagemap {
 #	the equivalent input values
 #
 	$shape = uc $shape;
-	$y = '' unless defined($y);
-	$z = '' unless defined($z);
 	$x =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
 	$y =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
 	$z =~ s/([^;\/?:@&=+\$,A-Za-z0-9\-_.!~*'()])/$escapes{$1}/g;
@@ -2669,7 +2720,7 @@ sub addLogo {
 	$img->copy($logoimg, $dstX, $dstY, $srcX, $srcY, $w-1, $h-1);
 	return 1;
 }
-
+ 1;
 __END__
 
 =head1 NAME

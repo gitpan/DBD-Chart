@@ -74,15 +74,15 @@ WHERE WIDTH=600 AND HEIGHT=600 AND
 	Y-AXIS = 'Y Axis' AND
 	keepOrigin = 1 AND
 	SHOWGRID = 1 AND
-	COLORS=red AND
+	COLORS=(red, green, blue, yellow, cyan) AND
 	X-ORIENT = 'HORIZONTAL' AND
 	MAPNAME = 'barsample' AND
 	MAPURL = 'http://www.presicient.com/samplemap.pl?x=:X&y=:Y' AND
 	MAPTYPE = 'HTML' AND
 	MAPSCRIPT = 'ONCLICK=\"alert(''Got X=:X, Y=:Y'')\"'"
-	);
+	) || warn $dbh->errstr, "\n";
 
-$sth->execute;
+$sth->execute || warn $sth->errstr, "\n";
 $row = $sth->fetchrow_arrayref;
 
 open(BAR, '>samplebar.png');
@@ -208,6 +208,7 @@ $sth = $dbh->prepare("SELECT PIECHART, IMAGEMAP FROM samplepie
 WHERE WIDTH=500 AND HEIGHT=500 AND
 	title = 'Sample Pie Chart' AND
 	signature = 'Copyright(C) 2001, Presicient Corp.' AND
+	3-D=1 AND
 	MAPNAME = 'piesample' AND
 	COLORS=(red, green, blue, yellow, gray, marine) AND
 	mapURL = 'http://www.presicient.com/samplemap.pl?x=:X&y=:Y&z=:Z'"
