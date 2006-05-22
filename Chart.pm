@@ -1,11 +1,16 @@
 #23456789012345678901234567890123456789012345678901234567890123456789012345
 #
-#   Copyright (c) 2001,2002, Dean Arnold
+#   Copyright (c) 2001-2006, Dean Arnold
 #
-#   You may distribute under the terms of the Artistic License, as 
+#   You may distribute under the terms of the Artistic License, as
 #	specified in the Perl README file.
 #
 #	History:
+#
+#		0.82	2006-May-20	D. Arnold
+#			update to support unexecuted sth's via
+#				DBIx::Chart::SthContainer objects
+#			fix uninit value warning in X_ORIENT check
 #
 #		0.81	2005-Jan-26	D. Arnold
 #			converted to DBI::set_err for improved error reporting
@@ -82,7 +87,7 @@
 #			GD::Image) FORMAT and GIF logos, added use Carp.
 #
 #		0.42	2001-Sep-29 D. Arnold
-#			fix to support X-ORIENT='HORIZONTAL' on candlestick and 
+#			fix to support X-ORIENT='HORIZONTAL' on candlestick and
 #			symbolic domains
 #
 #		0.41	2001-Jun-01 D. Arnold
@@ -102,14 +107,14 @@
 require 5.6.0;
 use strict;
 
-our %mincols = ( 
-'PIECHART', 2, 
-'BARCHART', 2, 
+our %mincols = (
+'PIECHART', 2,
+'BARCHART', 2,
 'HISTOGRAM', 2,
-'POINTGRAPH', 2, 
-'LINEGRAPH', 2, 
-'AREAGRAPH', 2, 
-'CANDLESTICK', 3, 
+'POINTGRAPH', 2,
+'LINEGRAPH', 2,
+'AREAGRAPH', 2,
+'CANDLESTICK', 3,
 'SURFACEMAP', 3,
 'BOXCHART', 1,
 'GANTT', 3,
@@ -117,30 +122,30 @@ our %mincols = (
 );
 
 our %binary_props = (
-'SHOWGRID', 1, 
-'X_LOG', 1, 
-'Y_LOG', 1, 
-'THREE_D', 1, 
-'SHOWPOINTS', 1, 
+'SHOWGRID', 1,
+'X_LOG', 1,
+'Y_LOG', 1,
+'THREE_D', 1,
+'SHOWPOINTS', 1,
 'KEEPORIGIN', 1,
 'CUMULATIVE', 1,
 'STACK', 1,
 'ANCHORED', 1,
 'BORDER', 1
 );
-	
+
 our %num_props = (
 'SHOWVALUES', 1
 );
 
 our %string_props = (
-'X_AXIS', 1, 
-'Y_AXIS', 1, 
-'Z_AXIS', 1, 
-'TITLE', 1, 
-'SIGNATURE', 1, 
-'LOGO', 1, 
-'X_ORIENT', 1, 
+'X_AXIS', 1,
+'Y_AXIS', 1,
+'Z_AXIS', 1,
+'TITLE', 1,
+'SIGNATURE', 1,
+'LOGO', 1,
+'X_ORIENT', 1,
 'FORMAT', 1,
 'TEMPLATE', 1,
 'MAPURL', 1,
@@ -165,39 +170,39 @@ our %trans_props = (
 'CUMULATIVE', 'STACK'
 );
 
-our %valid_props	= ( 
-'SHOWVALUES', 1, 
-'SHOWPOINTS', 1, 
+our %valid_props	= (
+'SHOWVALUES', 1,
+'SHOWPOINTS', 1,
 'BACKGROUND', 1,
-'KEEPORIGIN', 1, 
-'SIGNATURE', 1, 
-'SHOWGRID', 1, 
-'X-AXIS', 1, 
+'KEEPORIGIN', 1,
+'SIGNATURE', 1,
+'SHOWGRID', 1,
+'X-AXIS', 1,
 'Y-AXIS', 1,
-'Z-AXIS', 1, 
-'X_AXIS', 1, 
+'Z-AXIS', 1,
+'X_AXIS', 1,
 'Y_AXIS', 1,
-'Z_AXIS', 1, 
-'TITLE', 1, 
-'COLOR', 1, 
-'COLORS', 1, 
-'WIDTH', 1, 
-'HEIGHT', 1, 
+'Z_AXIS', 1,
+'TITLE', 1,
+'COLOR', 1,
+'COLORS', 1,
+'WIDTH', 1,
+'HEIGHT', 1,
 'SHAPE', 1,
 'SHAPES', 1,
-'X-ORIENT', 1, 
-'X_ORIENT', 1, 
-'FORMAT', 1, 
-'LOGO', 1, 
-'X-LOG', 1, 
-'Y-LOG', 1, 
+'X-ORIENT', 1,
+'X_ORIENT', 1,
+'FORMAT', 1,
+'LOGO', 1,
+'X-LOG', 1,
+'Y-LOG', 1,
 '3-D', 1,
-'Y-MAX', 1, 
+'Y-MAX', 1,
 'Y-MIN', 1,
-'X_LOG', 1, 
-'Y_LOG', 1, 
+'X_LOG', 1,
+'Y_LOG', 1,
 'THREE_D', 1,
-'Y_MAX', 1, 
+'Y_MAX', 1,
 'Y_MIN', 1,
 'ICON', 1,
 'ICONS', 1,
@@ -217,39 +222,39 @@ our %valid_props	= (
 );
 
 our %valid_colors = (
-	white	=> [255,255,255], 
-	lgray	=> [191,191,191], 
+	white	=> [255,255,255],
+	lgray	=> [191,191,191],
 	gray	=> [127,127,127],
 	dgray	=> [63,63,63],
 	black	=> [0,0,0],
-	lblue	=> [0,0,255], 
+	lblue	=> [0,0,255],
 	blue	=> [0,0,191],
-	dblue	=> [0,0,127], 
+	dblue	=> [0,0,127],
 	gold	=> [255,215,0],
-	lyellow	=> [255,255,0], 
-	yellow	=> [191,191,0], 
+	lyellow	=> [255,255,0],
+	yellow	=> [191,191,0],
 	dyellow	=> [127,127,0],
-	lgreen	=> [0,255,0], 
-	green	=> [0,191,0], 
+	lgreen	=> [0,255,0],
+	green	=> [0,191,0],
 	dgreen	=> [0,127,0],
-	lred	=> [255,0,0], 
+	lred	=> [255,0,0],
 	red		=> [191,0,0],
 	dred	=> [127,0,0],
-	lpurple	=> [255,0,255], 
+	lpurple	=> [255,0,255],
 	purple	=> [191,0,191],
 	dpurple	=> [127,0,127],
-	lorange	=> [255,183,0], 
+	lorange	=> [255,183,0],
 	orange	=> [255,127,0],
-	pink	=> [255,183,193], 
+	pink	=> [255,183,193],
 	dpink	=> [255,105,180],
-	marine	=> [127,127,255], 
+	marine	=> [127,127,255],
 	cyan	=> [0,255,255],
-	lbrown	=> [210,180,140], 
+	lbrown	=> [210,180,140],
 	dbrown	=> [165,42,42],
 	transparent => [1,1,1]
 );
 
-our @dfltcolors = qw( red green blue yellow purple orange 
+our @dfltcolors = qw( red green blue yellow purple orange
 dblue cyan dgreen lbrown );
 
 our %valid_shapes = (
@@ -271,15 +276,15 @@ use DBI;
 use DBI qw(:sql_types);
 
 # Do NOT @EXPORT anything.
-$DBD::Chart::VERSION = '0.81';
+$DBD::Chart::VERSION = '0.82';
 
 $DBD::Chart::drh = undef;
 $DBD::Chart::err = 0;
 $DBD::Chart::errstr = '';
 $DBD::Chart::state = '00000';
-%DBD::Chart::charts = ();	# defined chart list; 
+%DBD::Chart::charts = ();	# defined chart list;
 							# hash of (name, property hash)
-$DBD::Chart::seqno = 1;	# id for each CREATEd chart so we don't access 
+$DBD::Chart::seqno = 1;	# id for each CREATEd chart so we don't access
 						# stale names
 
 sub driver {
@@ -289,7 +294,7 @@ sub driver {
 	return $DBD::Chart::drh if $DBD::Chart::drh;
 	my($class, $attr) = @_;
 	$class .= '::dr';
-	
+
 	$DBD::Chart::drh = DBI::_new_drh($class,
 		{
 			'Name' => 'Chart',
@@ -304,7 +309,7 @@ sub driver {
 #	generate the base colormap
 #
 	my %table = ();
-	$table{columns} = { 
+	$table{columns} = {
 		'NAME' => 0,
 		'REDVALUE' => 1,
 		'GREENVALUE' => 2,
@@ -353,9 +358,9 @@ use constant SQL_INTERVAL_HR2SEC => 110;
 #	for compatibility between DBI pre 1.200
 #	and new DBI
 
-my %typeval = ( 
-'CHAR', SQL_CHAR, 
-'VARCHAR', SQL_VARCHAR, 
+my %typeval = (
+'CHAR', SQL_CHAR,
+'VARCHAR', SQL_VARCHAR,
 'INT', SQL_INTEGER,
 'SMALLINT', SQL_SMALLINT,
 'TINYINT', SQL_TINYINT,
@@ -367,9 +372,9 @@ my %typeval = (
 'TIME', SQL_TIME
 );
 
-my %typeszs = ( 
+my %typeszs = (
 'CHAR', 1,
-'VARCHAR', 32000, 
+'VARCHAR', 32000,
 'INT', 4,
 'SMALLINT', 2,
 'TINYINT', 1,
@@ -382,24 +387,24 @@ my %typeszs = (
 );
 
 my %inv_pieprop = (
-'SHAPE', 1, 
-'SHAPES', 1, 
-'SHOWGRID', 1, 
-'SHOWPOINTS', 1, 
-'X-AXIS', 1, 
-'Y-AXIS', 1, 
-'Z-AXIS', 1, 
-'X_AXIS', 1, 
-'Y_AXIS', 1, 
-'Z_AXIS', 1, 
-'SHOWVALUES', 1, 
-'X-LOG', 1, 
-'Y-LOG', 1, 
-'Y-MAX', 1, 
+'SHAPE', 1,
+'SHAPES', 1,
+'SHOWGRID', 1,
+'SHOWPOINTS', 1,
+'X-AXIS', 1,
+'Y-AXIS', 1,
+'Z-AXIS', 1,
+'X_AXIS', 1,
+'Y_AXIS', 1,
+'Z_AXIS', 1,
+'SHOWVALUES', 1,
+'X-LOG', 1,
+'Y-LOG', 1,
+'Y-MAX', 1,
 'Y-MIN', 1,
-'X_LOG', 1, 
-'Y_LOG', 1, 
-'Y_MAX', 1, 
+'X_LOG', 1,
+'Y_LOG', 1,
+'Y_MAX', 1,
 'Y_MIN', 1,
 'ICON', 1,
 'ICONS', 1,
@@ -410,24 +415,24 @@ my %inv_pieprop = (
 );
 
 my %inv_quadtree = (
-'SHAPE', 1, 
-'SHAPES', 1, 
-'SHOWGRID', 1, 
-'SHOWPOINTS', 1, 
-'X-AXIS', 1, 
-'Y-AXIS', 1, 
-'Z-AXIS', 1, 
-'X_AXIS', 1, 
-'Y_AXIS', 1, 
-'Z_AXIS', 1, 
-'SHOWVALUES', 1, 
-'X-LOG', 1, 
-'Y-LOG', 1, 
-'Y-MAX', 1, 
+'SHAPE', 1,
+'SHAPES', 1,
+'SHOWGRID', 1,
+'SHOWPOINTS', 1,
+'X-AXIS', 1,
+'Y-AXIS', 1,
+'Z-AXIS', 1,
+'X_AXIS', 1,
+'Y_AXIS', 1,
+'Z_AXIS', 1,
+'SHOWVALUES', 1,
+'X-LOG', 1,
+'Y-LOG', 1,
+'Y-MAX', 1,
 'Y-MIN', 1,
-'X_LOG', 1, 
-'Y_LOG', 1, 
-'Y_MAX', 1, 
+'X_LOG', 1,
+'Y_LOG', 1,
+'Y_MAX', 1,
 'Y_MIN', 1,
 'ICON', 1,
 'ICONS', 1,
@@ -438,9 +443,9 @@ my %inv_quadtree = (
 );
 
 my %inv_barprop = (
-'SHAPE', 1, 
-'SHAPES', 1, 
-'SHOWPOINTS', 1, 
+'SHAPE', 1,
+'SHAPES', 1,
+'SHOWPOINTS', 1,
 'X-LOG', 1,
 'X_LOG', 1,
 'LINEWIDTH', 1
@@ -456,28 +461,28 @@ my %inv_candle = (
 
 #
 #	defaults for simple queries
-my %dfltprops = ( 
-'SHAPE', undef, 
-'WIDTH', 300, 
+my %dfltprops = (
+'SHAPE', undef,
+'WIDTH', 300,
 'HEIGHT', 300,
-'SHOWGRID', 0, 
-'SHOWPOINTS', 0, 
-'SHOWVALUES', 0, 
-'X_AXIS', 'X axis', 
-'Y_AXIS', 'Y axis', 
-'Z_AXIS', undef, 
-'TITLE', '', 
-'COLORS', \@dfltcolors, 
-'X_LOG', 0, 
-'Y_LOG', 0, 
-'THREE_D', 0, 
+'SHOWGRID', 0,
+'SHOWPOINTS', 0,
+'SHOWVALUES', 0,
+'X_AXIS', 'X axis',
+'Y_AXIS', 'Y axis',
+'Z_AXIS', undef,
+'TITLE', '',
+'COLORS', \@dfltcolors,
+'X_LOG', 0,
+'Y_LOG', 0,
+'THREE_D', 0,
 'BACKGROUND', 'white',
-'SIGNATURE', undef, 
-'LOGO', undef, 
-'X_ORIENT', 'DEFAULT', 
+'SIGNATURE', undef,
+'LOGO', undef,
+'X_ORIENT', 'DEFAULT',
 'FORMAT', 'PNG',
-'KEEPORIGIN', 0, 
-'Y_MAX', undef, 
+'KEEPORIGIN', 0,
+'Y_MAX', undef,
 'Y_MIN', undef,
 'ICONS', undef,
 'FONT', undef,
@@ -495,22 +500,22 @@ my %dfltprops = (
 );
 #
 #	default globals for composite queries
-my %dfltglobals = ( 
-'WIDTH', 300, 
+my %dfltglobals = (
+'WIDTH', 300,
 'HEIGHT', 300,
-'SHOWGRID', 0, 
-'X_AXIS', 'X axis', 
-'Y_AXIS', 'Y axis', 
-'TITLE', '', 
-'X_LOG', 0, 
-'Y_LOG', 0, 
-'THREE_D', 0, 
+'SHOWGRID', 0,
+'X_AXIS', 'X axis',
+'Y_AXIS', 'Y axis',
+'TITLE', '',
+'X_LOG', 0,
+'Y_LOG', 0,
+'THREE_D', 0,
 'BACKGROUND', 'white',
-'SIGNATURE', undef, 
-'LOGO', undef, 
-'X_ORIENT', 'DEFAULT', 
+'SIGNATURE', undef,
+'LOGO', undef,
+'X_ORIENT', 'DEFAULT',
 'FORMAT', 'PNG',
-'KEEPORIGIN', 0, 
+'KEEPORIGIN', 0,
 'FONT', undef,
 'GRIDCOLOR', 'black',
 'TEXTCOLOR', 'black',
@@ -524,10 +529,10 @@ my %dfltglobals = (
 #
 #	default subquery props for composite queries
 my %dfltcomposites = (
-'SHAPE', undef, 
-'SHOWPOINTS', 0, 
-'SHOWVALUES', 0, 
-'COLORS', \@dfltcolors, 
+'SHAPE', undef,
+'SHOWPOINTS', 0,
+'SHOWVALUES', 0,
+'COLORS', \@dfltcolors,
 'ICONS', undef,
 'STACK', undef,
 'ANCHORED', 1,
@@ -539,7 +544,7 @@ my %dfltcomposites = (
 my %compatibility = (
 'PIECHART', undef,
 'QUADTREE', undef,
-'BOXCHART', 
+'BOXCHART',
 	{
 	'BARCHART' => 1,
 	'POINTGRAPH' => 1,
@@ -550,8 +555,8 @@ my %compatibility = (
 	},
 'HISTOGRAM', { 'HISTOGRAM' => 1 },
 'SURFACEMAP', { 'SURFACEMAP' => 1 },
-'BARCHART', 
-	{ 
+'BARCHART',
+	{
 	'BARCHART' => 1,
 	'POINTGRAPH' => 1,
 	'LINEGRAPH' => 1,
@@ -561,7 +566,7 @@ my %compatibility = (
 	},
 
 'POINTGRAPH',
-	{ 
+	{
 	'BARCHART' => 1,
 	'POINTGRAPH' => 1,
 	'LINEGRAPH' => 1,
@@ -570,7 +575,7 @@ my %compatibility = (
 	'BOXCHART' => 1
 	},
 'LINEGRAPH',
-	{ 
+	{
 	'BARCHART' => 1,
 	'POINTGRAPH' => 1,
 	'LINEGRAPH' => 1,
@@ -579,7 +584,7 @@ my %compatibility = (
 	'CANDLESTICK' => 1
 	},
 'AREAGRAPH',
-	{ 
+	{
 	'BARCHART' => 1,
 	'POINTGRAPH' => 1,
 	'LINEGRAPH' => 1,
@@ -587,8 +592,8 @@ my %compatibility = (
 	'BOXCHART' => 1,
 	'CANDLESTICK' => 1
 	},
-'CANDLESTICK', 
-	{ 
+'CANDLESTICK',
+	{
 	'BARCHART' => 1,
 	'POINTGRAPH' => 1,
 	'LINEGRAPH' => 1,
@@ -599,18 +604,18 @@ my %compatibility = (
 );
 #
 #	map the global properties for composites
-my %global_props	= ( 
+my %global_props	= (
 'BACKGROUND', 1,
-'KEEPORIGIN', 1, 
-'SIGNATURE', 1, 
-'SHOWGRID', 1, 
+'KEEPORIGIN', 1,
+'SIGNATURE', 1,
+'SHOWGRID', 1,
 'X_AXIS', 1,
 'Y_AXIS', 1,
 'Z_AXIS', 1,
 'TITLE', 1,
-'WIDTH', 1, 
-'HEIGHT', 1, 
-'X_ORIENT', 1, 
+'WIDTH', 1,
+'HEIGHT', 1,
+'X_ORIENT', 1,
 'FORMAT', 1,
 'LOGO', 1,
 'X_LOG', 1,
@@ -630,7 +635,7 @@ my %global_props	= (
 
 sub check_color {
 	my ($color) = @_;
-	
+
 	my $table = $DBD::Chart::charts{COLORMAP};
 	my $col1 = $table->{data}->[0];
 	my $c;
@@ -650,7 +655,7 @@ sub parse_col_defs {
 	$req =~s/,(\S)/, $1/g;
 	$req =~s/(\S)\(/$1 \(/g;
 	$req =~s/(\S)\)/$1 \)/g;
-	
+
 	$req=~s/\s+NOT\s+NULL//ig;
 	$req =~s/\bLONG\s+VARCHAR\b/ VARCHAR(32000)/g;
 	$req =~s/\bCHAR\s+VARYING\b/ VARCHAR/g;
@@ -696,7 +701,7 @@ sub parse_col_defs {
 		push(@$typeary, $typeval{$decl}),
 		next
 			if (($decl) = /^\s*\S+\s+(TIMESTAMP|SMALLINT|INTERVAL|TINYINT|VARCHAR|FLOAT|CHAR|DATE|TIME|INT|DEC)\s*$/i);
-			
+
 		push(@$typelen, $decsz),
 		push(@$typescale, 0),
 		push(@$typeary, $typeval{$decl}),
@@ -716,8 +721,8 @@ sub parse_col_defs {
 		push(@$typescale, $decscal),
 		push(@$typeary, SQL_DECIMAL),
 		next
-			if ((($decsz, $decscal) = 
-				/^\s*\S+\s+DEC\s*\((\d+);(\d+)\)\s*$/i) && 
+			if ((($decsz, $decscal) =
+				/^\s*\S+\s+DEC\s*\((\d+);(\d+)\)\s*$/i) &&
 				($decsz < 19) && ($decsz > 0) && ($decscal < $decsz));
 
 # if we get here, we've got something bogus
@@ -750,7 +755,7 @@ sub restore_strings {
 
 sub parse_props {
 	my ($dbh, $ctype, $t, $numphs, $is_subquery, $strlits) = @_;
-	
+
 	my %props = $is_subquery ? %dfltcomposites : ($ctype eq 'IMAGE' ? %dfltglobals : %dfltprops);
 	my ($prop, $op);
 	$t=~s/\s*AND\s*/\r/ig;
@@ -783,7 +788,7 @@ sub parse_props {
 		$$numphs++,
 		next
 			if ($t eq '?');
-		
+
 		if ($binary_props{$prop}) {
 #
 #	make sure its zero or 1
@@ -826,20 +831,20 @@ sub parse_props {
 			return ($dbh->DBI::set_err(-1, 'Invalid value for LINEWIDTH property.','S1000'), $t);
 		}
 
-#		$DBD::Chart::errstr = 
+#		$DBD::Chart::errstr =
 #			'Y_MAX and Y_MIN deprecated as of release 0.50.',
 		next
 			if (($prop eq 'Y_MAX') || ($prop eq 'Y_MIN'));
 
-		if (($prop eq 'BACKGROUND') || ($prop eq 'GRIDCOLOR') || 
-			($prop eq 'TEXTCOLOR')) { 
+		if (($prop eq 'BACKGROUND') || ($prop eq 'GRIDCOLOR') ||
+			($prop eq 'TEXTCOLOR')) {
 
 			$t = restore_strings($dbh, $prop, $t, $strlits)
 				if ($t=~/<\d+>/);
 			$t = lc $t;
 			$props{$prop} = $t,
 			next
-				if (check_color($t) || 
+				if (check_color($t) ||
 					(($prop eq 'BACKGROUND') && ($t eq 'transparent')));
 
 			return ($dbh->DBI::set_err(-1, "Invalid value for $prop property.",'S1000'), $t);
@@ -914,14 +919,14 @@ sub parse_props {
 	}
 
 	return ($dbh->DBI::set_err(-1, "Invalid value for 'X_ORIENT' property.",'S1000'), $t)
-		if (($props{X_ORIENT}) && 
+		if ($props{X_ORIENT} &&
 			($props{X_ORIENT}!~/^(HORIZONTAL|VERTICAL|DEFAULT)$/i));
 
 	return ($dbh->DBI::set_err(-1, "Invalid value for 'MAPTYPE' property.",'S1000'), $t)
-		if (($props{MAPTYPE}) && ($props{MAPTYPE}!~/^(HTML|PERL)$/i));
+		if ($props{MAPTYPE} && ($props{MAPTYPE}!~/^(HTML|PERL)$/i));
 
 	return ($dbh->DBI::set_err(-1, "Only alphanumerics and _ allowed for 'MAPNAME' property.",'S1000'), $t)
-		if (($props{MAPNAME}) && ($props{MAPNAME}=~/\W/));
+		if ($props{MAPNAME} && ($props{MAPNAME}=~/\W/));
 
 	return (\%props, $t);
 }
@@ -946,7 +951,7 @@ sub parse_predicate {
 		if ($collist=~/^\s*\?\s*$/i);
 #
 #	start pessimistically
-	my $terrstr = "Invalid value for column $tname.";	
+	my $terrstr = "Invalid value for column $tname.";
 	return $dbh->DBI::set_err(-1, $terrstr,'S1000')
 		if ((($$ctypes[$$predcol] == SQL_FLOAT) ||
 			($$ctypes[$$predcol] == SQL_DECIMAL)) &&
@@ -978,9 +983,9 @@ sub parse_predicate {
 	$DBD::Chart::errstr = '',
 	$$predval = $collist,
 	return 1
-		if (($$ctypes[$$predcol] != SQL_CHAR) && 
+		if (($$ctypes[$$predcol] != SQL_CHAR) &&
 			($$ctypes[$$predcol] != SQL_VARCHAR));
-		
+
 	return $dbh->DBI::set_err(-1, $terrstr,'S1000')
 		unless ($collist=~/^('[^']*')(.*)$/);
 
@@ -1057,7 +1062,7 @@ sub validate_value {
 			unless ($$remnant=~/^'([\-\+]?(\d+:)?(\d+:)?(\d+)(\.\d+)?)'\s*,\s*(.*)$/);
 		my ($time, $hr, $min, $sec, $subsec) = ($2, $3, $4, $5);
 		$$remnant = $6;
-		
+
 		return $dbh->DBI::set_err(-1, $errstr,'S1000')
 			unless defined(validate_interval($hr, $min, $sec, $subsec));
 		return $time;
@@ -1128,7 +1133,7 @@ sub prepare {
 	$cmd = uc $cmd;
 	my ($filenm, $collist, $tcols);
 	if (($cmd eq 'CREATE') || ($cmd eq 'DROP')) {
-		return $dbh->DBI::set_err(-1, 
+		return $dbh->DBI::set_err(-1,
 			'Only CREATE { TABLE | CHART }, DROP { TABLE | CHART }, ' .
 			'SELECT, INSERT, UPDATE, or DELETE statements supported.',
 			'S1000')
@@ -1210,7 +1215,7 @@ sub prepare {
 			if ($remnant!~/^\((.+)\)$/);
 
 		$remnant = $1;
-		my $colcnt = parse_col_defs($dbh, $remnant, \%cols, \@typeary, 
+		my $colcnt = parse_col_defs($dbh, $remnant, \%cols, \@typeary,
 			\@typelens, \@typescale);
 		return undef if (! $colcnt);
 	}
@@ -1235,7 +1240,7 @@ sub prepare {
 			next
 				if ($remnant=~/^NULL\s*,\s*(.*)$/i);
 
-			$setcols{$cnum} = validate_value($dbh, $$ctypes[$cnum], \$remnant, 
+			$setcols{$cnum} = validate_value($dbh, $$ctypes[$cnum], \$remnant,
 				$$cprecs[$cnum], "Invalid value for column at position $cnum.");
 			return undef
 				unless defined($setcols{$cnum});
@@ -1292,7 +1297,7 @@ sub prepare {
 #	get predicate; only 1 allowed
 #
 		return undef unless
-			parse_predicate($dbh, $remnant, \$predcol, \$predop, \$predval, 
+			parse_predicate($dbh, $remnant, \$predcol, \$predop, \$predval,
 				\$numphs, $ccols, $ctypes);
 	}
 	else {	# must be SELECT
@@ -1356,7 +1361,7 @@ sub prepare {
 		}
 
 		return $dbh->DBI::set_err(-1, 'Invalid composite chart specification.', 'S1000')
-			unless (($#queries == 0) || 
+			unless (($#queries == 0) ||
 				(($queries[0]=~/^IMAGE(\s*,\s*IMAGEMAP)?$/i) && ($queries[1]!~/^WHERE/i)));
 
 		return $dbh->DBI::set_err(-1, 'No subqueries provided for composite chart.', 'S1000')
@@ -1398,18 +1403,18 @@ sub prepare {
 				if ($is_composite && $4);
 
 			return $dbh->DBI::set_err(-1, 'Incompatible chart types in composite image.','S1000')
-				if (($is_composite) && ($#dtypes > 0) && 
+				if (($is_composite) && ($#dtypes > 0) &&
 					(! $compatibility{$dtypes[1]}->{$ctype}));
 #
 #	collect any column-list values
 #
 			my $cols = [ '*' ];
-			$colnames=$1 
+			$colnames=$1
 				if ($colnames && ($colnames=~/^\s*(.+)\s*$/));
 			@$cols = split(',', $colnames)
 				if ($colnames && ($colnames ne '*'));
 			$$cols[$_]=~s/^\s*(.+)\s*$/$1/ foreach (0..$#$cols);
-				
+
 			if ($filenm ne '?') {
 				$chart = $DBD::Chart::charts{$filenm};
 				return $dbh->DBI::set_err(-1, $filenm . ' does not exist.', 'S1000')
@@ -1465,7 +1470,7 @@ sub prepare {
 		if ($cmd eq 'CREATE');
 
 	$sth->{chart_predicate} = [ $predcol, $predop, $predval ]
-		if ((($cmd eq 'UPDATE') || ($cmd eq 'DELETE')) && 
+		if ((($cmd eq 'UPDATE') || ($cmd eq 'DELETE')) &&
 			(defined($predcol)));
 
 	$sth->{chart_version} = $$chart{version},
@@ -1533,7 +1538,7 @@ sub STORE {
 	    return 1 if $value; # is already set
 	    croak("Can't disable AutoCommit");
 	}
-	
+
 	return $dbh->DBD::_::db::STORE($attrib, $value);
 }
 
@@ -1611,7 +1616,7 @@ SQL_TIMESTAMP, 'YYYY-MM-DD HH:MM:SS',
 SQL_INTERVAL_HR2SEC, '+HH:MM:SS'
 );
 
-my %month = ( 'JAN', 0, 'FEB', 1, 'MAR', 2, 'APR', 3, 'MAY', 4, 'JUN', 5, 
+my %month = ( 'JAN', 0, 'FEB', 1, 'MAR', 2, 'APR', 3, 'MAY', 4, 'JUN', 5,
 'JUL', 6, 'AUG', 7, 'SEP', 8, 'OCT', 9, 'NOV', 10, 'DEC', 11);
 
 my @quadcolors = qw(
@@ -1620,7 +1625,7 @@ black blue purple green red orange yellow white
 
 sub check_color {
 	my ($color) = @_;
-	
+
 	my $table = $DBD::Chart::charts{COLORMAP};
 	my $col1 = $table->{data}->[0];
 	my $c;
@@ -1648,13 +1653,13 @@ sub validate_value {
 
 	return 1
 		if (($p=~/^[\-\+]?\d+$/) &&
-			(($ttype == SQL_INTEGER) || 
+			(($ttype == SQL_INTEGER) ||
 			 (($ttype == SQL_SMALLINT) && ($p > -32768) && ($p < 32768)) ||
 			 (($ttype == SQL_TINYINT) && ($p > -128) && ($p < 128)))
 			);
-		
+
 	return 1
-		if ((($ttype == SQL_FLOAT) || ($ttype == SQL_DECIMAL)) && 
+		if ((($ttype == SQL_FLOAT) || ($ttype == SQL_DECIMAL)) &&
 			($p=~/^[\-\+]?\d+(\.\d+(E[\-\+]?\d+)?)?$/i));
 
 	if (($ttype == SQL_DATE) &&
@@ -1691,9 +1696,9 @@ sub validate_value {
 	if ($parmsts) {
 		$$parmsts[$k] =
 	"Supplied value not compatible with target field at parameter $i.",
-		return undef 
+		return undef
 			if (ref $parmsts eq 'ARRAY');
-		$$parmsts{$k} = 
+		$$parmsts{$k} =
 	"Supplied value not compatible with target field at parameter $i."
 	}
 	return $sth->DBI::set_err(-1, "Supplied value not compatible with target field at parameter $i.", 'S1000');
@@ -1720,11 +1725,11 @@ sub validate_properties {
 		next if ((($prop eq 'BACKGROUND') || ($prop eq 'GRIDCOLOR') ||
 			($prop eq 'TEXTCOLOR')) && (check_color($t)));
 
-		next if (($prop eq 'X_ORIENT') && 
+		next if (($prop eq 'X_ORIENT') &&
 			($t=~/^(HORIZONTAL|VERTICAL|DEFAULT)$/i));
 
  		next if (($prop eq 'COLOR') && (check_color($t)));
- 		
+
  		next if (($prop eq 'SHAPE') && ($valid_shapes{$t}));
 #
 #	invalid property parameter value
@@ -1738,14 +1743,14 @@ sub validate_properties {
 #
 sub execute_array {
 	my($sth, $attribs, @bind_values) = @_;
-	
+
 	$sth->bind_param_status($$attribs{ArrayTupleStatus}) if $$attribs{ArrayTupleStatus};
-	
+
 	if (@bind_values) {
 		$sth->bind_param_array($_, $bind_values[$_])
 			foreach (1..@bind_values);
 	}
-		
+
 	return $sth->execute();
 }
 
@@ -1765,16 +1770,16 @@ sub execute {
 	my $typeary = $sth->{chart_types};
 	$precs = $sth->{chart_precisions};
 	$scales = $sth->{chart_scales};
-	
+
 	my $cols = $sth->{chart_columns}
 		if ($cmd eq 'CREATE');
-		
+
 	my $setcols = $sth->{chart_columns}
 		if (($cmd eq 'UPDATE') || ($cmd eq 'INSERT'));
-		
+
 	my $predicate = $sth->{chart_predicate}
 		if (($cmd eq 'UPDATE') || ($cmd eq 'DELETE'));
-		
+
 	if ($cmd eq 'CREATE') {
 #
 #	save the description info
@@ -1853,24 +1858,24 @@ sub execute {
 		if (($verify) && ($parms)) {
 			$p = $$parms[0];
 			$is_parmref = 1 if ((ref $$parms[0]));
-			$is_parmary = 1 
+			$is_parmary = 1
 				if (($is_parmref) && (ref $$parms[0] eq 'ARRAY'));
 			$maxary = scalar(@$p) if ($is_parmary);
 			for ($i = 1; $i < $sth->{NUM_OF_PARAMS}; $i++) {
 				my $p = $$parms[$i];
-				return $sth->DBI::set_err(-1, 
+				return $sth->DBI::set_err(-1,
 					'All parameters must be of same type (scalar, scalarref, or arrayref).', 'S1000')
 					if ( (($is_parmref) && (! (ref $p) ) ) ||
 						((! $is_parmref) && (ref $p)));
 
-				return $sth->DBI::set_err(-1, 
+				return $sth->DBI::set_err(-1,
 					'All parameters must be of same type (scalar, scalarref, or arrayref).', 'S1000')
 					if ((($is_parmary) && ((! (ref $p)) || (ref $p ne 'ARRAY'))) ||
 						((! $is_parmary) && (ref $p) && (ref $p eq 'ARRAY')));
 #
 #	validate param arrays are consistent
 #
-				return $sth->DBI::set_err(-1, 
+				return $sth->DBI::set_err(-1,
 					'All parameter arrays must be the same size.','S1000')
 					if (($is_parmary) && (scalar(@$p) != $maxary));
 			}
@@ -1901,11 +1906,11 @@ sub execute {
 					if (! defined($p))
 					{
 						if ($parmsts) {
-							$$parmsts[$k] = 
+							$$parmsts[$k] =
 							'NULL values not allowed in predicates.',
 							return undef
 								if (ref $parmsts eq 'ARRAY');
-							$$parmsts{$k} = 
+							$$parmsts{$k} =
 							'NULL values not allowed in predicates.';
 						}
 						return $sth->DBI::set_err(-1, 'NULL values not allowed in predicates.', 'S1000');
@@ -1929,9 +1934,9 @@ sub execute {
 				unless defined($v);
 
 			next unless $i;	# only proceed for RGB values
-				
+
 			return $sth->DBI::set_err(-1, 'Invalid value for COLORMAP component field.','S1000')
-				if (($v < 0) || ($v > 255)); 
+				if (($v < 0) || ($v > 255));
 		}
 #
 #	then check params
@@ -1951,7 +1956,7 @@ sub execute {
 #
 				next unless $i; # only proceed for RGB components
 
-				return $sth->DBI::set_err(-1, 
+				return $sth->DBI::set_err(-1,
 					"Invalid value for COLORMAP component field.", 'S1000')
 					if (($p!~/^\d+$/) || ($p > 255));
 			}
@@ -1988,15 +1993,15 @@ sub execute {
 #
 #	need to push this error on the param status list (if one exists)
 #
-					$DBD::Chart::errstr = 
+					$DBD::Chart::errstr =
 				"Supplied value truncated at parameter $j.";
 
 					$p = substr($p, 0, $$precs[$i]);
 
-					$$parmsts[$k] = 
+					$$parmsts[$k] =
 				"Supplied value truncated at parameter $j."
 						if ($parmsts && (ref $parmsts eq 'ARRAY'));
-					$$parmsts{$k} = 
+					$$parmsts{$k} =
 				"Supplied value truncated at parameter $j."
 						if ($parmsts && (ref $parmsts ne 'ARRAY'));
 				}
@@ -2005,7 +2010,7 @@ sub execute {
 		} # end foreach value
 		return $k;
 	}
-	
+
 	if ($cmd eq 'UPDATE') {
 #
 #	check predicate to determine row numbers to update
@@ -2039,15 +2044,15 @@ sub execute {
 #
 #	need to push this error on the param status list (if one exists)
 #
-					$DBD::Chart::errstr = 
+					$DBD::Chart::errstr =
 				"Supplied value truncated at parameter $j.";
 
 					$p = substr($p, 0, $$precs[$i]);
 
-					$$parmsts[$k] = 
+					$$parmsts[$k] =
 				"Supplied value truncated at parameter $j."
 						if ($parmsts && (ref $parmsts eq 'ARRAY'));
-					$$parmsts{$k} = 
+					$$parmsts{$k} =
 				"Supplied value truncated at parameter $j."
 						if ($parmsts && (ref $parmsts ne 'ARRAY'));
 				}
@@ -2062,8 +2067,8 @@ sub execute {
 		return $sth->DBI::set_err(-1, 'Parameter arrays not allowed for literally qualified UPDATE.', 'S1000')
 			if (($predval ne '?') && ($is_parmary));
 
-		my %rowmap = eval_predicate($$predicate[0], $$predicate[1], 
-			$predval, $types, $data, $parms, $is_parmary, $is_parmref, 
+		my %rowmap = eval_predicate($$predicate[0], $$predicate[1],
+			$predval, $types, $data, $parms, $is_parmary, $is_parmref,
 			$maxary);
 
 		return 0 unless scalar(%rowmap);
@@ -2093,7 +2098,7 @@ sub execute {
 #
 #	need to push this error on the param status list (if one exists)
 #
-					$DBD::Chart::errstr = 
+					$DBD::Chart::errstr =
 					"Supplied value truncated at parameter $j.";
 
 					$p = substr($p, 0, $$precs[$i]);
@@ -2118,8 +2123,8 @@ sub execute {
 #
 #	build ary of rownums based on predicate
 #
-		my %rowmap = eval_predicate($$predicate[0], $$predicate[1], 
-			$$predicate[2], $types, $data, $parms, $is_parmary, 
+		my %rowmap = eval_predicate($$predicate[0], $$predicate[1],
+			$$predicate[2], $types, $data, $parms, $is_parmary,
 			$is_parmref, $maxary);
 
 		return 0 unless scalar(%rowmap);
@@ -2181,65 +2186,6 @@ sub execute {
 		$sth->{chart_colormap} = 0;
 		return scalar @$col1;
 	}
-
-	for ($i = 0; $i <= $#$dcharts; $i++) {
-		$name = $$dcharts[$i];
-		next unless (($i > 0) || $name); # for composite images
-		$srcsth = undef;
-		if ($name!~/^\?(\d+)$/) {
-			$chart = $DBD::Chart::charts{$name};
-
-			return $sth->DBI::set_err(-1, "Chart $name does not exist.", 'S1000')
-				unless $chart;
-
-			return $sth->DBI::set_err(-1, "Prepared version of $name differs from current version.", 'S1000')
-				if ($$chart{version} != $$dversions{$name});
-
-		}
-		else {	# its a parameterized chartsource
-			my $phn = $1;
-
-			return $sth->DBI::set_err(-1, 'Parameterized chartsource not provided.','S1000')
-				unless $$parms[$phn];
-
-			$srcsth = $$parms[$phn];
-			return $sth->DBI::set_err(-1, 
-				'Parameterized chartsource value must be a prepared and executed DBI statement handle.','S1000')
-				if ((ref $srcsth ne 'DBI::st') && (ref $srcsth ne 'DBIx::Chart::st'));
-
-			my $ctype = $$dtypes[$i];
-			return $sth->DBI::set_err(-1, "$ctype chart requires at least $mincols{$ctype} columns.",'S1000')
-				if ($srcsth->{NUM_OF_FIELDS} < $mincols{$ctype});
-
-			return $sth->DBI::set_err(-1, 'CANDLESTICK chart requires 2N + 1 columns.','S1000')
-				if (($ctype eq 'CANDLESTICK') && (! $$dprops[$i]->{STACK}) &&
-					(($srcsth->{NUM_OF_FIELDS} - 1) & 1));
-#
-#	collect and validate the column specification
-#
-			my $cols = $$dcols[$i];
-			my $colidxs = [ ];
-			$dcolidxs[$i] = $colidxs;
-			@$colidxs = (0..($srcsth->{NUM_OF_FIELDS} - 1)),
-			next 
-				if ($$cols[0] eq '*');
-			
-			my ($d, $idx);
-			$columns = get_ext_type_info($sth, $srcsth, 'NAME', ($i ? $i-1 : 0) );
-			foreach $d (0..$#$columns) {
-				$$columns[$d] = uc $$columns[$d] ;
-			}
-			foreach my $c (@$cols) {
-				foreach $d (0..$#$columns) {
-					$idx = $d,
-					last if ($c eq $$columns[$d]);
-				}
-				return $sth->DBI::set_err(-1, "Column $c not found in datasource.", 'S1000')
-					unless ($c eq $$columns[$idx]);
-				push @$colidxs, $idx;
-			}
-		}
-	}
 #
 #	now we can safely process and render
 #
@@ -2261,7 +2207,92 @@ sub execute {
 	for ($i = 0; $i < scalar(@$dtypes); $i++) {
 
 		if ($$dtypes[$i] ne 'IMAGE') {
-			if ($$dcharts[$i]=~/^\?(\d+)$/) {
+
+			$name = $$dcharts[$i];
+			next unless (($i > 0) || $name); # for composite images
+			$srcsth = undef;
+			if ($name!~/^\?(\d+)$/) {
+#
+#	its a local temp table
+#
+				$chart = $DBD::Chart::charts{$name};
+
+				return $sth->DBI::set_err(-1, "Chart $name does not exist.", 'S1000')
+					unless $chart;
+
+				return $sth->DBI::set_err(-1, "Prepared version of $name differs from current version.", 'S1000')
+					if ($$chart{version} != $$dversions{$name});
+
+				$chart = $DBD::Chart::charts{$$dcharts[$i]};
+#
+#	get the record description
+#
+				$columns = $$chart{columns};
+				$types = $$chart{types};
+				$precs = $$chart{precisions};
+				$scales = $$chart{scales};
+				$data = $$chart{data};
+			}
+			else {	# its a parameterized chartsource
+				my $phn = $1;
+
+				return $sth->DBI::set_err(-1, 'Parameterized chartsource not provided.','S1000')
+					unless $$parms[$phn];
+#
+#	DAA 2006-05-20 change to support execution of sth if its a DBIx::Chart::SthContainer
+#
+				$srcsth = $$parms[$phn];
+				return $sth->DBI::set_err(-1,
+					'Parameterized chartsource value must be a prepared and executed DBI statement handle.','S1000')
+#				if ((ref $srcsth ne 'DBI::st') && (ref $srcsth ne 'DBIx::Chart::st'));
+					if ((ref $srcsth ne 'DBI::st') && (ref $srcsth ne 'DBIx::Chart::SthContainer'));
+#
+#	if its an unexecuted container, we must execute *before* testing metadata
+#	(some DBD's don't have metadata until they're executed)
+#
+				my $ctype = $$dtypes[$i];
+				my $numflds;
+				if (ref $srcsth eq 'DBIx::Chart::SthContainer') {
+					return undef
+						unless $srcsth->execute();
+
+					$numflds = $srcsth->num_of_fields;
+				}
+				else {	# its a regular sth
+					$numflds = $srcsth->{NUM_OF_FIELDS};
+				}
+
+				return $sth->DBI::set_err(-1, "$ctype chart requires at least $mincols{$ctype} columns.",'S1000')
+					if ($numflds < $mincols{$ctype});
+
+				return $sth->DBI::set_err(-1, 'CANDLESTICK chart requires 2N + 1 columns.','S1000')
+					if (($ctype eq 'CANDLESTICK') && (! $$dprops[$i]->{STACK}) &&
+						(($numflds - 1) & 1));
+#
+#	collect and validate the column specification
+#
+				my $cols = $$dcols[$i];
+				my $colidxs = [ ];
+				$dcolidxs[$i] = $colidxs;
+				if ($$cols[0] eq '*') {
+					@$colidxs = (0..($numflds - 1));
+				}
+				else {
+					my ($d, $idx);
+					$columns = get_ext_type_info($sth, $srcsth, 'NAME', ($i ? $i-1 : 0) );
+					foreach $d (0..$#$columns) {
+						$$columns[$d] = uc $$columns[$d] ;
+					}
+					foreach my $c (@$cols) {
+						foreach $d (0..$#$columns) {
+							$idx = $d,
+							last if ($c eq $$columns[$d]);
+						}
+						return $sth->DBI::set_err(-1, "Column $c not found in datasource.", 'S1000')
+							unless ($c eq $$columns[$idx]);
+						push @$colidxs, $idx;
+					}
+				}
 #
 #	synthesize a chart structure from the stmt handle
 #	NOTE: we should eventually support array binding here!!!
@@ -2278,7 +2309,7 @@ sub execute {
 				$data = [];
 				my $rowcnt = 0;
 				my $row;
-				my $colidxs = $dcolidxs[$i];
+				$colidxs = $dcolidxs[$i];
 
 				push(@$data, [ ])
 					foreach (@$colidxs);
@@ -2288,17 +2319,6 @@ sub execute {
 					push(@{$$data[$_]}, $$r[$$colidxs[$_]])
 						foreach (0..$#$colidxs);
 				}
-			}
-			else {
-				$chart = $DBD::Chart::charts{$$dcharts[$i]};
-#
-#	get the record description
-#
-				$columns = $$chart{columns};
-				$types = $$chart{types};
-				$precs = $$chart{precisions};
-				$scales = $$chart{scales};
-				$data = $$chart{data};
 			}
 		}
 
@@ -2312,7 +2332,7 @@ sub execute {
 #
 #	create plot object
 #
-			$img = DBD::Chart::Plot->new($$props{WIDTH}, $$props{HEIGHT}, 
+			$img = DBD::Chart::Plot->new($$props{WIDTH}, $$props{HEIGHT},
 				get_colormap());
 			return undef unless $img;
 #
@@ -2325,12 +2345,12 @@ sub execute {
 
 			$img->setOptions( title => $$props{TITLE})
 				if $$props{TITLE};
-				
+
 			$img->setOptions( signature => $$props{SIGNATURE})
 				if $$props{SIGNATURE};
-				
-			$img->setOptions( 
-				genMap => ($$props{MAPNAME}) ? $$props{MAPNAME} : 'plot', 
+
+			$img->setOptions(
+				genMap => ($$props{MAPNAME}) ? $$props{MAPNAME} : 'plot',
 				mapType => $sth->{chart_imagemap},
 				mapURL => $$props{MAPURL},
 				mapScript => $$props{MAPSCRIPT},
@@ -2348,20 +2368,20 @@ sub execute {
 				if $$props{Y_AXIS};
 			$img->setOptions( 'zAxisLabel' => $$props{Z_AXIS})
 				if $$props{Z_AXIS};
-			
+
 			$img->setOptions( 'xAxisVert' => ($$props{X_ORIENT} eq 'VERTICAL'))
 				if $$props{X_ORIENT};
-			
-			$img->setOptions( 'horizGrid' => 1, 
+
+			$img->setOptions( 'horizGrid' => 1,
 				'vertGrid' => ($$dtypes[$i] ne 'BARCHART'))
 				if $$props{SHOWGRID};
 
 			$img->setOptions( 'xLog' => 1)
 				if $$props{X_LOG};
-			
+
 			$img->setOptions( 'yLog' => 1)
 				if $$props{Y_LOG};
-			
+
 			$img->setOptions( 'keepOrigin' => 1)
 				if $$props{KEEPORIGIN};
 
@@ -2380,12 +2400,12 @@ sub execute {
 		}
 		else {
 			$t = ($$dtypes[$i] eq 'PIECHART') ? scalar @{$$data[0]} : scalar @$data;
-			$t-- unless (($$dtypes[$i] eq 'BOXCHART') || # ($$dtypes[$i] eq 'HISTOGRAM') || 
+			$t-- unless (($$dtypes[$i] eq 'BOXCHART') || # ($$dtypes[$i] eq 'HISTOGRAM') ||
 				($$dtypes[$i] eq 'PIECHART'));
 			$t /= 2 if ($$dtypes[$i] eq 'CANDLESTICK');
 			$t = 1 if ($$props{Z_AXIS});
 			$t = scalar @{$$data[0]}
-				if ((($$dtypes[$i] eq 'BARCHART') || ($$dtypes[$i] eq 'HISTOGRAM')) && 
+				if ((($$dtypes[$i] eq 'BARCHART') || ($$dtypes[$i] eq 'HISTOGRAM')) &&
 				(scalar @$clist > 1) && (scalar @$data == 2));
 			for ($k = 0, $j = 0; $k < $t; $k++) {
 				push(@colors, $$clist[$j++]);
@@ -2399,7 +2419,7 @@ sub execute {
 #	and make sure every chart adheres to compatible types
 #
 		return $sth->DBI::set_err(-1, 'Incompatible domain types for composite image.', 'S1000')
-			unless ((! $xdomain) || 
+			unless ((! $xdomain) ||
 				($numtype{$xdomain} && $numtype{$$types[0]}) ||
 				($timetype{$xdomain} && $timetype{$$types[0]} &&
 					($timetype{$xdomain} eq $timetype{$$types[0]})) ||
@@ -2411,11 +2431,11 @@ sub execute {
 				($numtype{$ydomain} && $numtype{$$types[1]}) ||
 				($timetype{$ydomain} && $timetype{$$types[1]} &&
 					($timetype{$ydomain} eq $timetype{$$types[1]})));
-		$ydomain = $$types[1] 
+		$ydomain = $$types[1]
 			unless ($ydomain || ($$dtypes[$i] eq 'BOXCHART'));
 
 		return $sth->DBI::set_err(-1, 'Incompatible Z axis types for composite image.','S1000')
-			unless ((! $zdomain) || 
+			unless ((! $zdomain) ||
 				($numtype{$zdomain} && $numtype{$$types[2]}) ||
 				($timetype{$zdomain} && $timetype{$$types[2]} &&
 					($timetype{$zdomain} eq $timetype{$$types[2]})) ||
@@ -2423,7 +2443,7 @@ sub execute {
 
 		$zdomain = $$types[2] if ((! $zdomain) && $$props{Z_AXIS});
 		$img->setOptions( 'symDomain' => 1)
-			if (($$dtypes[$i] ne 'GANTT') && ($$dtypes[$i] ne 'QUADTREE') && 
+			if (($$dtypes[$i] ne 'GANTT') && ($$dtypes[$i] ne 'QUADTREE') &&
 				($is_symbolic || $symboltype{$xdomain}));
 		$img->setOptions( 'timeDomain' => $timetype{$xdomain})
 			if (defined($xdomain) && $timetype{$xdomain});
@@ -2433,7 +2453,7 @@ sub execute {
 #	we need to support temporal Z-axis!!!
 #
 #	Piechart:
-#	first data array is domain names, the 2nd is the 
+#	first data array is domain names, the 2nd is the
 #	datasets. If more than 1 dataset is supplied, the
 #	rest are ignored
 #
@@ -2445,7 +2465,7 @@ sub execute {
 		}
 #
 #	Quadtree:
-#	1st N-2 data arrays are categories, in a category hierarchy, 
+#	1st N-2 data arrays are categories, in a category hierarchy,
 #	data array N-1 is the values assigned to the individual items,
 #	data array N is the intensity values of individual items
 #
@@ -2475,7 +2495,7 @@ sub execute {
 			$colnames[$$columns{$_}] = $_
 				foreach (keys(%$columns));
 		}
-		else { 
+		else {
 			@colnames = @$columns;
 		}
 		shift @colnames unless ($$dtypes[$i] eq 'BOXCHART');
@@ -2488,7 +2508,8 @@ sub execute {
 #	default x-axis label orientation is vertical for candlesticks
 #	and symbollic domains
 #
-		$img->setOptions( 'xAxisVert' => ($$props{X_ORIENT} ne 'HORIZONTAL'))
+		$img->setOptions(
+			'xAxisVert' => ($$props{X_ORIENT} ? ($$props{X_ORIENT} ne 'HORIZONTAL') : 1))
 			if ((! $numtype{$$types[0]}) || ($$dtypes[$i] eq 'CANDLESTICK'));
 #
 #	force a legend if more than 1 range or plot
@@ -2503,7 +2524,7 @@ sub execute {
 #		}
 #
 		if (! $$props{Z_AXIS}) {
-			if ((($$dtypes[$i] ne 'CANDLESTICK') && (scalar(@$data) > 2)) || 
+			if ((($$dtypes[$i] ne 'CANDLESTICK') && (scalar(@$data) > 2)) ||
 				(($$dtypes[$i] eq 'BOXCHART') && (scalar(@$data) > 1)) ||
 				(scalar(@$data) > 3)) {
 #	its multirange
@@ -2554,7 +2575,7 @@ sub execute {
 			$propstr .= ($$dtypes[$i] eq 'HISTOGRAM') ? 'histo ' : 'bar ';
 			if ($$props{Z_AXIS}) {
 				return $sth->DBI::set_err(-1, $img->{errmsg}, 'S1000')
-					unless $img->setPoints($$data[0], $$data[1], $$data[2], 
+					unless $img->setPoints($$data[0], $$data[1], $$data[2],
 						$propstr . $colors[0]),
 				next;
 			}
@@ -2589,7 +2610,7 @@ sub execute {
 #	establish shape list, and merge with icon list if needed
 #
 		my @shapes = ();
-		my $shapelist = ($$props{SHAPE}) ? $$props{SHAPE} : 
+		my $shapelist = ($$props{SHAPE}) ? $$props{SHAPE} :
 			[ 'fillcircle' ];
 		$$props{SHOWPOINTS} = 1 if $$props{SHAPE};
 		for ($k = 1, $j = 0, my $n = 0; $k <= $#$data; $k++) {
@@ -2643,7 +2664,7 @@ sub execute {
 		$img->setOptions( lineWidth => ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 1));
 		if (($$dtypes[$i] eq 'AREAGRAPH') && ($$props{STACK})) {
 			$propstr .= ' fill ' . join(' ', @colors) ;
-			$propstr .= ' ' . join(' ', @shapes) 
+			$propstr .= ' ' . join(' ', @shapes)
 				if ($$props{SHOWPOINTS} || $$props{SHAPE});
 			$propstr .= ' float' unless $$props{ANCHORED};
 			return $sth->DBI::set_err(-1, $img->{errmsg}, 'S1000')
@@ -2654,10 +2675,10 @@ sub execute {
 			my $tprops = $propstr . ' ';
 			$tprops .= ($$dtypes[$i] eq 'POINTGRAPH') ?
 				'noline ' . $colors[$k-1] . ' ' . $shapes[$k-1] :
-				($$dtypes[$i] eq 'LINEGRAPH') ? 
+				($$dtypes[$i] eq 'LINEGRAPH') ?
 					$colors[$k-1] :
 					'fill ' . $colors[$k-1] ;
-			$tprops .= ' ' . $shapes[$k-1] 
+			$tprops .= ' ' . $shapes[$k-1]
 				if ($$props{SHOWPOINTS} || $$props{SHAPE});
 			$tprops .= ' width:' . ($$props{LINEWIDTH} ? $$props{LINEWIDTH} : 1);
 			$tprops .= ' float' unless $$props{ANCHORED};
@@ -2676,7 +2697,7 @@ sub execute {
 	return $sth->DBI::set_err(-1, $img->{errmsg}, 'S1000')
 		unless $sth->{chart_image};
 
-	$sth->{chart_imagemap} = 
+	$sth->{chart_imagemap} =
 		($sth->{chart_imagemap}) ? $img->getMap() : undef;
 	return $sth->DBI::set_err(-1, $img->{errmsg}, 'S1000')
 		unless $sth->{chart_image};
@@ -2708,9 +2729,9 @@ sub convert_time {
 		if (($type == SQL_TIMESTAMP) &&
 			($value=~/^(\d+)[\-\.\/](\w+)[\-\.\/](\d+)\s+(\d+):(\d+):(\d+)(\.\d+)?$/));
 
-	return (($1 ? (($1 eq '-') ? -1 : 1) : 1) * 
+	return (($1 ? (($1 eq '-') ? -1 : 1) : 1) *
 		(($3 ? ($3 * 3600) : 0) + ($5 ? ($5 * 60) : 0) + $6 + ($7 ? $7 : 0)))
-		if ((($type == SQL_INTERVAL_HR2SEC) || ($type == SQL_TIME)) && 
+		if ((($type == SQL_INTERVAL_HR2SEC) || ($type == SQL_TIME)) &&
 			($value=~/^([\-\+])?((\d+):)?((\d+):)?(\d+)(\.\d+)?$/));
 
 	return undef; # for completeness, shouldn't get here
@@ -2737,13 +2758,13 @@ sub test_predicate {
 }
 
 sub eval_predicate {
-	my ($predcol, $predop, $predval, $types, $data, $parms, $is_ary, 
+	my ($predcol, $predop, $predval, $types, $data, $parms, $is_ary,
 		$is_ref, $maxary) = @_;
 	my %rowmap = ();
 	my $pc = $$data[$predcol];
 	my $pctype = $$types[$predcol];
 	my ($k, $p);
-	
+
 	$predval=~s/^'(.+)'$/$1/,	# trim any quotes
 	test_predicate(\%rowmap, $pctype, $pc, $predop, $predval, -1),
 	return %rowmap
@@ -2806,7 +2827,7 @@ sub bind_param {
 	$params = [ ],
 	$sth->{chart_params} = $params
 		unless defined($params);
-	
+
 	$$params[$pNum-1] = $val;
 	1;
 }
@@ -2841,8 +2862,14 @@ sub get_ext_type_info {
 #
 #	if srcsth provides it, use it
 #
-	return $srcsth->{$item}
-		if eval { $t = $srcsth->{$item}; };
+	if (ref $srcsth eq 'DBIx::Chart::SthContainer') {
+		$t = $srcsth->get_metadata($item);
+		return $t if $t;
+	}
+	else {
+		return $srcsth->{$item}
+			if eval { $t = $srcsth->{$item}; };
+	}
 #
 #	if chart type map, and requested item
 #	exists in the type map, return it
@@ -2852,7 +2879,7 @@ sub get_ext_type_info {
 			(ref $sth->{chart_type_map} eq 'ARRAY') &&
 			$sth->{chart_type_map}->[$entry] &&
 			ref $sth->{chart_type_map}->[$entry] &&
-				(($entry == 0) && 
+				(($entry == 0) &&
 				((ref $sth->{chart_type_map}->[$entry] eq 'HASH') &&
 				$sth->{chart_type_map}->[$entry]->{$item}) ||
 			((ref $sth->{chart_type_map}->[$entry] eq 'ARRAY') &&
@@ -2992,7 +3019,7 @@ them with. Assuming the test completes successfully, you should
 use a web browser to view the file t/plottest.html and verify
 the images look reasonable.
 
-If tests succeed, proceed with installation via 
+If tests succeed, proceed with installation via
 
     make install
 
